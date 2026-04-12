@@ -3,6 +3,13 @@ import prisma from '@/lib/prisma';
 import { generatePDF } from '@/lib/pdf-generator';
 import { toBase64 } from '@/lib/utils';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
+import {
+    applyMappingsToTemplateElements,
+    buildCertificateMappingContext,
+    buildResolvedMappings,
+    extractTemplatePlaceholders,
+} from '@/lib/certificate-template-mapping';
+import { serializeSignatureAsset } from '@/lib/document-signature-library';
 
 export async function POST(request, props) {
     const params = await props.params;
@@ -29,6 +36,11 @@ export async function POST(request, props) {
                 class: true,
                 section: true,
                 school: true,
+                user: {
+                    select: {
+                        profilePicture: true,
+                    },
+                },
             },
         });
 
@@ -58,6 +70,35 @@ export async function POST(request, props) {
         const certificateNumber = `CERT-${schoolId.slice(0, 4).toUpperCase()}-${Date.now()}`;
 
         // 4. Convert logo to base64 if needed
+        const signatures = await prisma.signature.findMany({
+            where: {
+                schoolId,
+                isActive: true,
+            },
+            include: {
+                teacher: {
+                    select: {
+                        userId: true,
+                        name: true,
+                        employeeId: true,
+                    },
+                },
+                class: {
+                    select: {
+                        id: true,
+                        className: true,
+                    },
+                },
+                section: {
+                    select: {
+                        id: true,
+                        name: true,
+                        classId: true,
+                    },
+                },
+            },
+        });
+
         let layoutConfig = { ...template.layoutConfig };
         console.log(layoutConfig);
         // if (layoutConfig?.logoUrl && !layoutConfig.logoUrl.startsWith('data:')) {
@@ -79,6 +120,40 @@ export async function POST(request, props) {
             if (layoutConfig.signatureUrl) layoutConfig.signatureUrl = await toBase64(layoutConfig.signatureUrl);
             if (layoutConfig.stampUrl) layoutConfig.stampUrl = await toBase64(layoutConfig.stampUrl);
         }
+
+        const placeholderKeys = extractTemplatePlaceholders(layoutConfig?.elements || []);
+        const resolvedMappings = buildResolvedMappings(
+            placeholderKeys,
+            buildCertificateMappingContext({
+                student,
+                formValues: {
+                    ...customFields,
+                    issueDate,
+                },
+                fullUser: {
+                    school: student.school,
+                    schoolName: student.school?.name,
+                },
+                docSettings: {
+                    signatureUrl: student.school?.signatureUrl || '',
+                    stampUrl: student.school?.stampUrl || '',
+                    signatures: signatures.map(serializeSignatureAsset),
+                },
+                certificateMeta: {
+                    certificateNumber,
+                    verificationUrl: customFields?.verificationUrl || '',
+                },
+            }),
+            customFields,
+        );
+
+        layoutConfig = {
+            ...layoutConfig,
+            elements: applyMappingsToTemplateElements(
+                JSON.parse(JSON.stringify(layoutConfig.elements || [])),
+                resolvedMappings
+            ),
+        };
         // 5. Generate PDF
         // console.log('📄 Generating PDF...');
         const pdfUrl = await generatePDF({
@@ -86,7 +161,10 @@ export async function POST(request, props) {
             student,
             certificateNumber,
             issueDate,
-            customFields,
+            customFields: {
+                ...customFields,
+                ...resolvedMappings,
+            },
         });
 
         // console.log('✅ PDF generated:', pdfUrl);

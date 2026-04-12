@@ -1,28 +1,66 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { serializeSignatureAsset } from '@/lib/document-signature-library';
 
 export async function GET(request, props) {
     const params = await props.params;
     try {
         const { schoolId } = params;
 
-        const school = await prisma.school.findUnique({
-            where: { id: schoolId },
-            include: {
-                QrVerificationSettings: true,
-                PdfExportSettings: true,
-                // Stamps and Signatures are fetched separately usually or can be included if 1:1, but they are 1:Many.
-                // We will return school generic settings here.
-            }
-        });
+        const [school, signatures] = await Promise.all([
+            prisma.school.findUnique({
+                where: { id: schoolId },
+                include: {
+                    QrVerificationSettings: true,
+                    PdfExportSettings: true,
+                }
+            }),
+            prisma.signature.findMany({
+                where: {
+                    schoolId,
+                    isActive: true,
+                },
+                include: {
+                    teacher: {
+                        select: {
+                            userId: true,
+                            name: true,
+                            employeeId: true,
+                        },
+                    },
+                    class: {
+                        select: {
+                            id: true,
+                            className: true,
+                        },
+                    },
+                    section: {
+                        select: {
+                            id: true,
+                            name: true,
+                            classId: true,
+                        },
+                    },
+                },
+                orderBy: [
+                    { isDefault: 'desc' },
+                    { updatedAt: 'desc' },
+                ],
+            }),
+        ]);
 
         if (!school) return NextResponse.json({ error: "School not found" }, { status: 404 });
 
+        const principalSignature = signatures.find(signature => signature.placeholderKey === 'principalSignature' && signature.isDefault)
+            || signatures.find(signature => signature.placeholderKey === 'principalSignature')
+            || null;
+
         return NextResponse.json({
-            signatureUrl: school.signatureUrl,
+            signatureUrl: school.signatureUrl || principalSignature?.imageUrl || null,
             stampUrl: school.stampUrl,
             qrSettings: school.QrVerificationSettings,
-            pdfSettings: school.PdfExportSettings
+            pdfSettings: school.PdfExportSettings,
+            signatures: signatures.map(serializeSignatureAsset),
         });
 
     } catch (error) {

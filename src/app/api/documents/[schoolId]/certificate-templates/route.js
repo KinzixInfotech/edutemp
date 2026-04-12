@@ -7,9 +7,11 @@ export async function GET(request, props) {
     const params = await props.params;
     try {
         const { schoolId } = params;
+        const { searchParams } = new URL(request.url);
+        const type = searchParams.get('type');
 
         const { page, limit, skip } = getPagination(request);
-        const cacheKey = generateKey('certificate-templates', { schoolId, page, limit });
+        const cacheKey = generateKey('certificate-templates', { schoolId, page, limit, type });
 
         const result = await remember(cacheKey, async () => {
             const paged = await paginate(prisma.documentTemplate, {
@@ -17,6 +19,7 @@ export async function GET(request, props) {
                     schoolId,
                     templateType: 'certificate',
                     isActive: true,
+                    ...(type ? { subType: type } : {}),
                 },
                 orderBy: { createdAt: 'desc' },
                 include: {
@@ -90,6 +93,18 @@ export async function POST(request, props) {
             });
         }
 
+        // Rename any soft-deleted templates with the same name to avoid unique constraint collision
+        await prisma.documentTemplate.updateMany({
+            where: {
+                schoolId,
+                templateType: 'certificate',
+                subType: type,
+                name,
+                isActive: false,
+            },
+            data: { name: `${name}_deleted_${Date.now()}` },
+        });
+
         const template = await prisma.documentTemplate.create({
             data: {
                 name,
@@ -128,6 +143,14 @@ export async function POST(request, props) {
         }, { status: 201 });
     } catch (error) {
         console.error('Error creating certificate template:', error);
+
+        if (error?.code === 'P2002') {
+            return errorResponse(
+                'A certificate template with this name already exists for this certificate type. Please choose a different name.',
+                409
+            );
+        }
+
         return errorResponse('Failed to create template');
     }
 }

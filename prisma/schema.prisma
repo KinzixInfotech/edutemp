@@ -2368,6 +2368,7 @@ model TeachingStaff {
   teacherShifts         TeacherShift[]
   examEvaluators        ExamEvaluator[]         @relation("EvaluatorAssignments")
   teacherFeedbacks      TeacherFeedback[]
+  documentSignatures    Signature[]             @relation("TeachingStaffSignatures")
 
   @@index([departmentId])
 }
@@ -2437,6 +2438,7 @@ model Class {
 
   // StudentSession enrollments
   studentSessions StudentSession[]
+  documentSignatures Signature[] @relation("ClassSignatures")
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -2490,6 +2492,7 @@ model Section {
 
   // StudentSession enrollments
   studentSessions StudentSession[]
+  documentSignatures Signature[] @relation("SectionSignatures")
 
   @@unique([classId, name])
   @@index([classId])
@@ -3856,14 +3859,26 @@ model Signature {
   name               String
   designation        String?
   imageUrl           String
+  placeholderKey     String              @default("principalSignature")
+  teacherUserId      String?             @db.Uuid
+  classId            Int?
+  sectionId          Int?
+  tags               String[]            @default([])
   isDefault          Boolean             @default(false)
   isActive           Boolean             @default(true)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher            TeachingStaff?      @relation("TeachingStaffSignatures", fields: [teacherUserId], references: [userId])
+  class              Class?              @relation("ClassSignatures", fields: [classId], references: [id])
+  section            Section?            @relation("SectionSignatures", fields: [sectionId], references: [id])
   templateSignatures TemplateSignature[]
 
   @@index([schoolId])
+  @@index([schoolId, placeholderKey, isActive])
+  @@index([teacherUserId])
+  @@index([classId])
+  @@index([sectionId])
 }
 
 model Stamp {

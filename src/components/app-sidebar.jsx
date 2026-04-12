@@ -283,34 +283,9 @@ export const SidebarData = [
                 roles: ["ADMIN", "TEACHER"],
                 submenu: [
                     {
-                        label: "Character Certificate",
-                        url: "/dashboard/documents/generate/character",
+                        label: "Generate Certificates",
+                        url: "/dashboard/documents/generate",
                         roles: ["ADMIN", "TEACHER"],
-                    },
-                    {
-                        label: "Bonafide Certificate",
-                        url: "/dashboard/documents/generate/bonafide",
-                        roles: ["ADMIN", "TEACHER"],
-                    },
-                    {
-                        label: "Transfer Certificate",
-                        url: "/dashboard/documents/generate/transfer",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "School Leaving Certificate",
-                        url: "/dashboard/documents/generate/school-leaving",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "Competition Certificate",
-                        url: "/dashboard/documents/generate/competition",
-                        roles: ["ADMIN", "TEACHER"],
-                    },
-                    {
-                        label: "Custom Certificate",
-                        url: "/dashboard/documents/generate/custom",
-                        roles: ["ADMIN"],
                     },
                     {
                         label: "Bulk Generation",
@@ -866,4 +841,3 @@ export function AppSidebar({ ...props }) {
         </Sidebar>
     )
 }
-

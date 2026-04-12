@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -41,6 +41,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import {
+    applyMappingsToTemplateElements,
+    buildCertificateMappingContext,
+    buildResolvedMappings,
+    extractTemplatePlaceholders,
+} from '@/lib/certificate-template-mapping';
 
 const formSchema = z.object({
     classId: z.string().min(1, 'Class is required'),
@@ -64,6 +70,7 @@ export default function BulkGenerateCertificatesPage() {
     const [generationConfig, setGenerationConfig] = useState(null);
     const [studentCount, setStudentCount] = useState(0);
     const [loadingCount, setLoadingCount] = useState(false);
+    const [templateSearch, setTemplateSearch] = useState('');
 
     // Error Reporting State
     const [failedStudents, setFailedStudents] = useState([]);
@@ -72,6 +79,7 @@ export default function BulkGenerateCertificatesPage() {
     const {
         handleSubmit,
         watch,
+        register,
         setValue,
         formState: { errors },
     } = useForm({
@@ -130,6 +138,16 @@ export default function BulkGenerateCertificatesPage() {
         enabled: !!schoolId,
     });
 
+    const filteredTemplates = useMemo(() => {
+        if (!templateSearch.trim()) return templates || [];
+        const search = templateSearch.toLowerCase();
+        return (templates || []).filter((template) =>
+            [template.name, template.description, template.type]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(search))
+        );
+    }, [templateSearch, templates]);
+
     // Fetch Student Count
     useEffect(() => {
         const fetchCount = async () => {
@@ -162,60 +180,62 @@ export default function BulkGenerateCertificatesPage() {
 
     // Update preview
     useEffect(() => {
-        if (!templates || !watchedValues.templateId) return;
+        if (!templates || !watchedValues.templateId) {
+            setPreviewConfig(null);
+            return;
+        }
 
         const template = templates.find(t => t.id === watchedValues.templateId);
-        if (!template || !template.layoutConfig) return;
+        if (!template || !template.layoutConfig) {
+            setPreviewConfig(null);
+            return;
+        }
 
         const cls = classes?.find(c => c.id.toString() === watchedValues.classId) || {};
         const section = sections?.find(s => s.id.toString() === watchedValues.sectionId) || {};
 
-        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
-
-        const replacements = {
-            '{{studentName}}': 'John Doe (Sample)',
-            '{{rollNumber}}': '12345',
-            '{{admissionNo}}': 'ADM001',
-            '{{class}}': cls.className || 'Class X',
-            '{{section}}': section.name || 'A',
-            '{{dob}}': '2010-01-01',
-            '{{fatherName}}': 'Robert Doe',
-            '{{motherName}}': 'Jane Doe',
-            '{{schoolName}}': fullUser?.school?.name || 'School Name',
-            '{{issueDate}}': watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : '2024-01-01',
-            '{{dateOfLeaving}}': '2024-03-31',
-            '{{conduct}}': 'Good',
-            '{{reason}}': 'Completed Studies',
-            '{{academicYear}}': '2023-2024',
+        const sampleStudent = {
+            name: 'John Doe (Sample)',
+            rollNumber: '12345',
+            admissionNo: 'ADM001',
+            className: cls.className || 'Class X',
+            section: section.name || 'A',
+            dob: '2010-01-01',
+            fatherName: 'Robert Doe',
+            motherName: 'Jane Doe',
+            photo: 'https://placehold.co/100x100?text=Photo',
         };
-
-        const imageReplacements = {
-            '{{studentPhoto}}': 'https://placehold.co/100x100?text=Photo',
-            // Add others
-        };
-
-        const processedElements = elements.map(el => {
-            if (el.type === 'text' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key, 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'image') {
-                // Simple image logic
-                return el;
-            }
-            return el;
+        const placeholderKeys = extractTemplatePlaceholders(template.layoutConfig.elements || []);
+        const mappingContext = buildCertificateMappingContext({
+            student: sampleStudent,
+            formValues: {
+                ...watchedValues,
+                conductLabel: 'Good',
+                conduct: 'Good',
+                reason: watchedValues.reason || 'Completed Studies',
+                academicYear: watchedValues.academicYear || '2023-2024',
+            },
+            fullUser,
+            selectedYear,
+            certificateMeta: {
+                certificateNumber: 'CERT-SAMPLE-001',
+                tcNumber: 'TC-SAMPLE-001',
+                verificationUrl: 'https://example.com/verify/sample',
+            },
         });
+        const resolvedMappings = buildResolvedMappings(placeholderKeys, mappingContext);
 
         setPreviewConfig({
-            elements: processedElements,
+            elements: applyMappingsToTemplateElements(
+                JSON.parse(JSON.stringify(template.layoutConfig.elements || [])),
+                resolvedMappings
+            ),
             canvasSize: template.layoutConfig.canvasSize,
-            backgroundImage: template.layoutConfig.backgroundImage
+            backgroundImage: template.layoutConfig.backgroundImage,
+            backgroundAsset: template.layoutConfig.backgroundAsset || null,
         });
 
-    }, [templates, classes, sections, watchedValues.templateId, fullUser]);
+    }, [templates, classes, sections, watchedValues, fullUser, selectedYear]);
 
 
     const generateCertificates = async (data) => {
@@ -250,52 +270,35 @@ export default function BulkGenerateCertificatesPage() {
             const dateStr = new Date().toISOString().split('T')[0];
             const folder = zip.folder(`Certificates-${template.name}-${dateStr}`);
 
-            // Helper to process replacements
-            const processElements = (elements, student) => {
-                const replacements = {
-                    '{{studentName}}': student.name,
-                    '{{rollNumber}}': student.rollNumber || '',
-                    '{{admissionNo}}': student.admissionNo || '',
-                    '{{class}}': student.className || '',
-                    '{{section}}': student.section || '',
-                    '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
-                    '{{fatherName}}': student.fatherName || '',
-                    '{{motherName}}': student.motherName || '',
-                    '{{schoolName}}': fullUser?.school?.name || '',
-                    '{{issueDate}}': data.issueDate ? new Date(data.issueDate).toLocaleDateString() : '',
-                    // Default values for common certificate fields if not present in student
-                    '{{conduct}}': 'Good', // Standard default
-                    '{{reason}}': 'Passed Exam',
-                    '{{academicYear}}': `${new Date().getFullYear() - 1}-${new Date().getFullYear()}`,
-                };
-
-                const imageReplacements = {
-                    '{{studentPhoto}}': student.photo || 'https://placehold.co/100x100?text=Photo',
-                };
-
-                return elements.map(el => {
-                    if (el.type === 'text' && el.content) {
-                        let content = el.content;
-                        Object.entries(replacements).forEach(([key, value]) => {
-                            content = content.replace(new RegExp(key, 'g'), value);
-                        });
-                        return { ...el, content };
-                    }
-                    if (el.type === 'image' && el.url && el.url.includes('{{studentPhoto}}')) {
-                        return { ...el, url: student.photo || 'https://placehold.co/100x100?text=Photo' };
-                    }
-                    return el;
-                });
-            };
-
             for (let i = 0; i < students.length; i++) {
                 try {
                     const student = students[i];
+                    const placeholderKeys = extractTemplatePlaceholders(template.layoutConfig.elements || []);
+                    const mappingContext = buildCertificateMappingContext({
+                        student,
+                        formValues: {
+                            ...data,
+                            conductLabel: data.conduct || 'Good',
+                            academicYear: data.academicYear || `${new Date().getFullYear() - 1}-${new Date().getFullYear()}`,
+                        },
+                        fullUser,
+                        selectedYear,
+                        certificateMeta: {
+                            certificateNumber: `CERT-${Date.now()}-${i + 1}`,
+                            tcNumber: `TC-${Date.now()}-${i + 1}`,
+                            verificationUrl: '',
+                        },
+                    });
+                    const resolvedMappings = buildResolvedMappings(placeholderKeys, mappingContext);
 
                     const studentConfig = {
-                        elements: processElements(JSON.parse(JSON.stringify(template.layoutConfig.elements)), student),
+                        elements: applyMappingsToTemplateElements(
+                            JSON.parse(JSON.stringify(template.layoutConfig.elements)),
+                            resolvedMappings
+                        ),
                         canvasSize: template.layoutConfig.canvasSize,
-                        backgroundImage: template.layoutConfig.backgroundImage
+                        backgroundImage: template.layoutConfig.backgroundImage,
+                        backgroundAsset: template.layoutConfig.backgroundAsset || null,
                     };
 
                     setGenerationConfig(studentConfig);
@@ -442,10 +445,15 @@ export default function BulkGenerateCertificatesPage() {
                     {/* Form Inputs */}
                     <div className="space-y-1.5">
                         <Label>Select Template *</Label>
+                        <Input
+                            value={templateSearch}
+                            onChange={(e) => setTemplateSearch(e.target.value)}
+                            placeholder="Search templates..."
+                        />
                         <Select value={watchedValues.templateId} onValueChange={(v) => setValue('templateId', v)}>
                             <SelectTrigger><SelectValue placeholder="Select template" /></SelectTrigger>
                             <SelectContent>
-                                {templates?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                {filteredTemplates?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -473,7 +481,7 @@ export default function BulkGenerateCertificatesPage() {
 
                     <div className="space-y-1.5">
                         <Label>Issue Date</Label>
-                        <Input type="date" {...useForm().register("issueDate")} value={watchedValues.issueDate} onChange={e => setValue('issueDate', e.target.value)} />
+                        <Input type="date" {...register("issueDate")} />
                     </div>
 
                     <div className="h-px bg-border my-2" />

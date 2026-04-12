@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -150,6 +150,8 @@ export default function EditTemplatePage() {
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const [currentField, setCurrentField] = useState(null);
     const [isReady, setIsReady] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
+    const initialSnapshotRef = useRef(null);
 
     // Fetch template data
     const { data: template, isLoading } = useQuery({
@@ -199,9 +201,68 @@ export default function EditTemplatePage() {
                     backgroundImage: template.layoutConfig.backgroundImage || ''
                 });
             }
+            initialSnapshotRef.current = JSON.stringify({
+                form: {
+                    name: template.name || '',
+                    description: template.description || '',
+                    type: template.type || template.cardType || template.subType || '',
+                    isDefault: !!template.isDefault,
+                },
+                editor: {
+                    elements: template.layoutConfig?.elements || [],
+                    canvasSize: template.layoutConfig?.canvasSize || { width: 800, height: 600 },
+                    backgroundImage: template.layoutConfig?.backgroundImage || '',
+                },
+            });
+            setIsDirty(false);
             setIsReady(true);
         }
     }, [template, reset]);
+
+    useEffect(() => {
+        if (!isReady || !initialSnapshotRef.current) return;
+        const currentSnapshot = JSON.stringify({
+            form: {
+                name: watchedValues.name || '',
+                description: watchedValues.description || '',
+                type: watchedValues.type || '',
+                isDefault: !!watchedValues.isDefault,
+            },
+            editor: {
+                elements: editorConfig.elements || [],
+                canvasSize: editorConfig.canvasSize || { width: 800, height: 600 },
+                backgroundImage: editorConfig.backgroundImage || '',
+            },
+        });
+        setIsDirty(currentSnapshot !== initialSnapshotRef.current);
+    }, [editorConfig, isReady, watchedValues.description, watchedValues.isDefault, watchedValues.name, watchedValues.type]);
+
+    useEffect(() => {
+        if (!isDirty) return undefined;
+
+        const handleBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+
+        const handlePopState = () => {
+            const shouldLeave = window.confirm('You have unsaved changes. Leave this page without saving?');
+            if (shouldLeave) {
+                router.push(config.backUrl);
+                return;
+            }
+            window.history.pushState(null, '', window.location.href);
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.history.pushState(null, '', window.location.href);
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [config.backUrl, isDirty, router]);
 
     const updateMutation = useMutation({
         mutationFn: async (data) => {
@@ -232,6 +293,20 @@ export default function EditTemplatePage() {
         },
         onSuccess: () => {
             toast.success('Template updated successfully');
+            initialSnapshotRef.current = JSON.stringify({
+                form: {
+                    name: watchedValues.name || '',
+                    description: watchedValues.description || '',
+                    type: watchedValues.type || '',
+                    isDefault: !!watchedValues.isDefault,
+                },
+                editor: {
+                    elements: editorConfig.elements || [],
+                    canvasSize: editorConfig.canvasSize || { width: 800, height: 600 },
+                    backgroundImage: editorConfig.backgroundImage || '',
+                },
+            });
+            setIsDirty(false);
             queryClient.invalidateQueries({ queryKey: ['template', templateType, templateId, schoolId] });
             queryClient.invalidateQueries({ queryKey: [`${templateType}-templates`, schoolId] });
         },
@@ -270,6 +345,12 @@ export default function EditTemplatePage() {
 
     const onSubmit = (data) => {
         updateMutation.mutate(data);
+    };
+
+    const handleBackNavigation = () => {
+        if (!isDirty || window.confirm('You have unsaved changes. Leave this page without saving?')) {
+            router.push(config.backUrl);
+        }
     };
 
     if (!templateType || !config) {
@@ -354,7 +435,7 @@ export default function EditTemplatePage() {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => router.push(config.backUrl)}
+                        onClick={handleBackNavigation}
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back

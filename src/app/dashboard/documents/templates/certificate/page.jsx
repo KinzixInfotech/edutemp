@@ -38,6 +38,75 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 
+function TemplateCanvasPreview({ template }) {
+  const layout = template?.layoutConfig || {};
+  const canvasSize = layout.canvasSize || { width: 1123, height: 794 };
+  const elements = Array.isArray(layout.elements) ? layout.elements : [];
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-xl border bg-gradient-to-br from-zinc-100 to-zinc-200">
+      <div className="aspect-[4/3] p-3">
+        <div
+          className="relative h-full w-full overflow-hidden rounded-lg bg-white shadow-sm"
+          style={{
+            aspectRatio: `${canvasSize.width} / ${canvasSize.height}`,
+            backgroundImage: layout.backgroundImage ? `url(${layout.backgroundImage})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          {elements.slice(0, 10).map((el) => {
+            const widthPct = Math.max((el.width / canvasSize.width) * 100, 1.2);
+            const heightPct = Math.max((el.height / canvasSize.height) * 100, 1.2);
+            const leftPct = (el.x / canvasSize.width) * 100;
+            const topPct = (el.y / canvasSize.height) * 100;
+
+            if (el.type === 'text') {
+              return (
+                <div
+                  key={el.id}
+                  className="absolute overflow-hidden whitespace-nowrap"
+                  style={{
+                    left: `${leftPct}%`,
+                    top: `${topPct}%`,
+                    width: `${widthPct}%`,
+                    height: `${heightPct}%`,
+                    color: el.color || '#1f2937',
+                    fontSize: `${Math.max(6, ((el.fontSize || 16) / canvasSize.width) * 260)}px`,
+                    fontWeight: el.fontWeight || 'normal',
+                    opacity: el.opacity ?? 1,
+                  }}
+                >
+                  {el.content || 'Text'}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={el.id}
+                className="absolute rounded-sm border border-blue-200/60 bg-blue-100/70"
+                style={{
+                  left: `${leftPct}%`,
+                  top: `${topPct}%`,
+                  width: `${widthPct}%`,
+                  height: `${heightPct}%`,
+                  opacity: el.opacity ?? 1,
+                }}
+              />
+            );
+          })}
+          {elements.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+              Empty template
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CertificateTemplatePage() {
   const router = useRouter();
   const { fullUser } = useAuth();
@@ -174,6 +243,9 @@ export default function CertificateTemplatePage() {
         <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredTemplates?.map((template) => (
             <Card key={template.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6 pb-0">
+                <TemplateCanvasPreview template={template} />
+              </CardContent>
               <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1 flex-1 min-w-0">

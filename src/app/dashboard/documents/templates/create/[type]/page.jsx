@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -18,7 +18,11 @@ import {
     Layout,
     Info,
     Palette,
-    Sparkles
+    Sparkles,
+    Upload,
+    FileImage,
+    FileText as FileTextIcon,
+    Trash2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -40,7 +44,9 @@ import CropImageDialog from '@/app/components/CropImageDialog';
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
+import { extractTemplatePlaceholders } from '@/lib/certificate-template-mapping';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const formSchema = z.object({
     name: z.string().min(3, 'Name must be at least 3 characters'),
@@ -152,7 +158,8 @@ export default function CreateTemplatePage() {
     const [editorConfig, setEditorConfig] = useState({
         elements: [],
         canvasSize: getDefaultSize(),
-        backgroundImage: ''
+        backgroundImage: '',
+        backgroundAsset: null
     });
 
     const [uploading, setUploading] = useState(false);
@@ -162,6 +169,12 @@ export default function CreateTemplatePage() {
     const [resetKeys, setResetKeys] = useState({
         background: 0,
     });
+    const [uploadThemeOpen, setUploadThemeOpen] = useState(false);
+    const [themeUploadFile, setThemeUploadFile] = useState(null);
+    const [themeUploadName, setThemeUploadName] = useState('');
+    const [themeUploadDescription, setThemeUploadDescription] = useState('');
+    const [uploadingThemeAsset, setUploadingThemeAsset] = useState(false);
+    const [savedUploadedThemes, setSavedUploadedThemes] = useState([]);
 
     const {
         register,
@@ -180,6 +193,27 @@ export default function CreateTemplatePage() {
     });
 
     const watchedValues = watch();
+    const uploadedThemesStorageKey = useMemo(() => {
+        if (!schoolId || !templateType) return null;
+        return `uploaded-template-themes:${schoolId}:${templateType}`;
+    }, [schoolId, templateType]);
+
+    useEffect(() => {
+        if (!uploadedThemesStorageKey || typeof window === 'undefined') return;
+        try {
+            const stored = window.localStorage.getItem(uploadedThemesStorageKey);
+            setSavedUploadedThemes(stored ? JSON.parse(stored) : []);
+        } catch (error) {
+            console.error('Failed to load uploaded themes', error);
+            setSavedUploadedThemes([]);
+        }
+    }, [uploadedThemesStorageKey]);
+
+    const persistUploadedThemes = (themes) => {
+        setSavedUploadedThemes(themes);
+        if (!uploadedThemesStorageKey || typeof window === 'undefined') return;
+        window.localStorage.setItem(uploadedThemesStorageKey, JSON.stringify(themes));
+    };
 
     const handleThemeSelect = async (template) => {
         setLoadingTheme(true);
@@ -190,7 +224,8 @@ export default function CreateTemplatePage() {
         setEditorConfig({
             elements: template.layoutConfig.elements || [],
             canvasSize: template.layoutConfig.canvasSize || getDefaultSize(),
-            backgroundImage: template.layoutConfig.backgroundImage || ''
+            backgroundImage: template.layoutConfig.backgroundImage || '',
+            backgroundAsset: template.layoutConfig.backgroundAsset || null,
         });
 
         if (template.name && !watchedValues.name) {
@@ -207,7 +242,9 @@ export default function CreateTemplatePage() {
             const layoutConfig = {
                 elements: editorConfig.elements,
                 canvasSize: editorConfig.canvasSize,
-                backgroundImage: editorConfig.backgroundImage
+                backgroundImage: editorConfig.backgroundImage,
+                backgroundAsset: editorConfig.backgroundAsset || null,
+                mappingPlaceholders: extractTemplatePlaceholders(editorConfig.elements || []),
             };
 
             const res = await fetch(`/api/documents/${schoolId}/${config.apiEndpoint}`, {
@@ -249,20 +286,166 @@ export default function CreateTemplatePage() {
         createMutation.mutate(data);
     };
 
+    const handleThemeUploadApply = async () => {
+        if (!themeUploadFile) {
+            toast.error('Please choose a PDF, JPG, JPEG, or PNG file');
+            return;
+        }
+        if (!themeUploadName.trim()) {
+            toast.error('Please enter a template name before uploading');
+            return;
+        }
+
+        try {
+            setUploadingThemeAsset(true);
+            const res = await uploadFilesToR2('templates', { files: [themeUploadFile] });
+            const uploadedUrl = res?.[0]?.url;
+            if (!uploadedUrl) {
+                toast.error('Upload failed');
+                return;
+            }
+
+            const mimeType = themeUploadFile.type || (themeUploadFile.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+            const uploadedAsset = {
+                url: uploadedUrl,
+                mimeType,
+                fileName: themeUploadFile.name,
+                name: themeUploadName.trim(),
+                description: themeUploadDescription.trim(),
+            };
+
+            const uploadedTheme = {
+                id: `uploaded-theme-${Date.now()}`,
+                name: themeUploadName.trim(),
+                description: themeUploadDescription.trim(),
+                source: 'uploaded',
+                type: watchedValues.type,
+                createdAt: new Date().toISOString(),
+                layoutConfig: {
+                    elements: [],
+                    canvasSize: getDefaultSize(),
+                    backgroundImage: mimeType.startsWith('image/') ? uploadedUrl : '',
+                    backgroundAsset: uploadedAsset,
+                    mappingPlaceholders: [],
+                },
+            };
+
+            setEditorConfig({
+                elements: [],
+                canvasSize: getDefaultSize(),
+                backgroundImage: mimeType.startsWith('image/') ? uploadedUrl : '',
+                backgroundAsset: uploadedAsset,
+            });
+            persistUploadedThemes([uploadedTheme, ...savedUploadedThemes]);
+            setValue('name', themeUploadName.trim(), { shouldDirty: true });
+            setValue('description', themeUploadDescription.trim(), { shouldDirty: true });
+            setUploadThemeOpen(false);
+            setThemeUploadFile(null);
+            setThemeUploadName('');
+            setThemeUploadDescription('');
+            setActiveTab('builder');
+            toast.success(`${mimeType === 'application/pdf' ? 'PDF' : 'Image'} theme uploaded. You can now map fields on top of it.`);
+        } catch (error) {
+            console.error(error);
+            toast.error('Something went wrong during theme upload');
+        } finally {
+            setUploadingThemeAsset(false);
+        }
+    };
+
+    const handleDeleteUploadedTheme = (themeId) => {
+        const nextThemes = savedUploadedThemes.filter(theme => theme.id !== themeId);
+        persistUploadedThemes(nextThemes);
+        toast.success('Uploaded theme removed');
+    };
+
     if (!templateType || !config) {
         return <div className="flex items-center justify-center min-h-screen">Invalid template type</div>;
     }
 
     const Icon = config.icon;
-    // For certificates, show ALL type-specific themes so users can browse them all
-    const allCertTypes = ['transfer', 'character', 'bonafide', 'school-leaving', 'competition', 'custom'];
+    const activeCertificateSubtype = watchedValues.type || config.defaultType;
     const availableTemplates = templateType === 'certificate'
-        ? allCertTypes.flatMap(t => (DEFAULT_TEMPLATES[t] || []))
-            .concat((DEFAULT_TEMPLATES['certificate'] || []).filter(g => !allCertTypes.some(t => (DEFAULT_TEMPLATES[t] || []).some(s => s.id === g.id))))
+        ? (DEFAULT_TEMPLATES[activeCertificateSubtype] || []).map((template) => ({
+            ...template,
+            type: activeCertificateSubtype,
+            layoutConfig: {
+                ...template.layoutConfig,
+                mappingPlaceholders: template.layoutConfig?.mappingPlaceholders || extractTemplatePlaceholders(template.layoutConfig?.elements || []),
+            },
+        }))
         : (DEFAULT_TEMPLATES[templateType] || []);
+    const filteredUploadedThemes = savedUploadedThemes
+        .filter((theme) => !theme.type || theme.type === activeCertificateSubtype)
+        .map((theme) => ({
+            ...theme,
+            layoutConfig: {
+                ...theme.layoutConfig,
+                mappingPlaceholders: theme.layoutConfig?.mappingPlaceholders || extractTemplatePlaceholders(theme.layoutConfig?.elements || []),
+            },
+        }));
+    const allThemeCards = [...filteredUploadedThemes, ...availableTemplates];
 
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)]">
+            <Dialog open={uploadThemeOpen} onOpenChange={(open) => { if (!uploadingThemeAsset) setUploadThemeOpen(open); }}>
+                <DialogContent className="sm:max-w-[560px]">
+                    <DialogHeader>
+                        <DialogTitle>Upload School Theme</DialogTitle>
+                        <DialogDescription>
+                            Upload a Canva-exported PDF or JPG/PNG certificate design, then map fields on top of it in the builder.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="theme-upload-name">Template Name</Label>
+                            <Input
+                                id="theme-upload-name"
+                                value={themeUploadName}
+                                onChange={(e) => setThemeUploadName(e.target.value)}
+                                placeholder="e.g., DAV Transfer Certificate 2026"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="theme-upload-description">Description</Label>
+                            <Textarea
+                                id="theme-upload-description"
+                                value={themeUploadDescription}
+                                onChange={(e) => setThemeUploadDescription(e.target.value)}
+                                placeholder="Optional notes about this uploaded school design..."
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="theme-upload-file">Design File</Label>
+                            <Input
+                                id="theme-upload-file"
+                                type="file"
+                                accept=".pdf,.png,.jpg,.jpeg"
+                                onChange={(e) => setThemeUploadFile(e.target.files?.[0] || null)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Best format: PDF. Also supported: PNG, JPG, JPEG.
+                            </p>
+                            {themeUploadFile && (
+                                <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                                    {themeUploadFile.name}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setUploadThemeOpen(false)} disabled={uploadingThemeAsset}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleThemeUploadApply} disabled={uploadingThemeAsset}>
+                            {uploadingThemeAsset ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                            Upload and Open Builder
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Crop Dialog */}
             {cropDialogOpen && rawImage && currentField && (
                 <CropImageDialog
@@ -282,7 +465,7 @@ export default function CreateTemplatePage() {
                             const res = await uploadFilesToR2("templates", { files: [file] });
                             if (res && res[0]?.url) {
                                 if (currentField === 'backgroundImage') {
-                                    setEditorConfig(prev => ({ ...prev, backgroundImage: res[0].url }));
+                                    setEditorConfig(prev => ({ ...prev, backgroundImage: res[0].url, backgroundAsset: null }));
                                 }
                                 toast.success("Image uploaded successfully!");
                             } else {
@@ -390,10 +573,18 @@ export default function CreateTemplatePage() {
                     <div className="h-full bg-muted/30 overflow-auto flex flex-col">
                         <div className="p-6 border-b bg-background">
                             <div className="max-w-6xl mx-auto">
-                                <h2 className="text-2xl font-bold mb-2">Choose a Theme</h2>
-                                <p className="text-sm text-muted-foreground">
-                                    Select a pre-designed template to get started quickly, or continue with your blank canvas
-                                </p>
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-2">Choose a Theme</h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            Select a pre-designed template, start blank, or upload a school PDF/image and map fields on top of it.
+                                        </p>
+                                    </div>
+                                    <Button onClick={() => setUploadThemeOpen(true)} className="w-full md:w-auto">
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        Upload School Theme
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 
@@ -401,6 +592,32 @@ export default function CreateTemplatePage() {
                             <div className="p-6">
                                 <div className="max-w-6xl mx-auto">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <Card
+                                            className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group relative overflow-hidden border-dashed"
+                                            onClick={() => setUploadThemeOpen(true)}
+                                        >
+                                            <div className="aspect-video bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-blue-50/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <div className="relative z-10 flex flex-col items-center gap-3 text-center px-6">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border flex items-center justify-center">
+                                                            <FileTextIcon className="w-5 h-5 text-emerald-600" />
+                                                        </div>
+                                                        <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border flex items-center justify-center">
+                                                            <FileImage className="w-5 h-5 text-blue-600" />
+                                                        </div>
+                                                    </div>
+                                                    <Upload className="w-6 h-6 text-primary" />
+                                                </div>
+                                            </div>
+                                            <CardContent className="p-4">
+                                                <h3 className="font-bold text-lg mb-1">Upload School Design</h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Upload PDF or JPG/PNG, add name and description, then map fields in the builder.
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+
                                         {/* Blank Canvas Option */}
                                         <Card
                                             className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group relative overflow-hidden"
@@ -408,7 +625,8 @@ export default function CreateTemplatePage() {
                                                 setEditorConfig({
                                                     elements: [],
                                                     canvasSize: getDefaultSize(),
-                                                    backgroundImage: ''
+                                                    backgroundImage: '',
+                                                    backgroundAsset: null,
                                                 });
                                                 setActiveTab('builder');
                                                 toast.success('Blank canvas ready');
@@ -429,8 +647,8 @@ export default function CreateTemplatePage() {
                                             </CardContent>
                                         </Card>
 
-                                        {/* Pre-built Templates */}
-                                        {availableTemplates.map((template) => (
+                                        {/* Uploaded + Pre-built Templates */}
+                                        {allThemeCards.map((template) => (
                                             <Card
                                                 key={template.id}
                                                 className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group relative overflow-hidden"
@@ -438,11 +656,26 @@ export default function CreateTemplatePage() {
                                             >
                                                 <div className="aspect-video bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
                                                     <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-purple-50/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    <div className="absolute inset-3 bg-white shadow-md rounded transform group-hover:scale-[1.02] transition-transform"
+                                                    <div className="absolute inset-3 bg-white shadow-md rounded transform group-hover:scale-[1.02] transition-transform overflow-hidden"
                                                         style={{
                                                             aspectRatio: template.layoutConfig.canvasSize.width / template.layoutConfig.canvasSize.height
                                                         }}
                                                     >
+                                                        {template.layoutConfig.backgroundAsset?.mimeType?.startsWith('image/') && (
+                                                            <img
+                                                                src={template.layoutConfig.backgroundAsset.url}
+                                                                alt={template.name}
+                                                                className="absolute inset-0 h-full w-full object-cover"
+                                                            />
+                                                        )}
+                                                        {template.layoutConfig.backgroundAsset?.mimeType === 'application/pdf' && (
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-emerald-50 to-blue-50">
+                                                                <div className="flex flex-col items-center gap-2 text-emerald-700">
+                                                                    <FileTextIcon className="h-10 w-10" />
+                                                                    <span className="text-[11px] font-medium">PDF Theme</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                         {template.layoutConfig.elements.slice(0, 5).map((el, i) => (
                                                             <div
                                                                 key={i}
@@ -461,6 +694,20 @@ export default function CreateTemplatePage() {
                                                             Click to apply
                                                         </div>
                                                     </div>
+                                                    {template.source === 'uploaded' && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="absolute bottom-2 right-2 h-8 w-8 bg-white/95 hover:bg-white z-10"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteUploadedTheme(template.id);
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 <CardContent className="p-4">
                                                     <h3 className="font-bold text-lg mb-1">{template.name}</h3>
@@ -556,7 +803,7 @@ export default function CreateTemplatePage() {
                                                 variant="destructive"
                                                 size="icon"
                                                 className="absolute -top-2 -right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => setEditorConfig(prev => ({ ...prev, backgroundImage: '' }))}
+                                                onClick={() => setEditorConfig(prev => ({ ...prev, backgroundImage: '', backgroundAsset: null }))}
                                             >
                                                 <X className="h-4 w-4" />
                                             </Button>

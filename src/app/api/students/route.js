@@ -85,8 +85,17 @@ export async function GET(req) {
                     },
                     class: {
                         select: {
+                            id: true,
                             className: true,
+                            teachingStaffUserId: true,
                             sections: { select: { id: true, name: true } },
+                        },
+                    },
+                    section: {
+                        select: {
+                            id: true,
+                            name: true,
+                            teachingStaffUserId: true,
                         },
                     },
                     studentFees: {

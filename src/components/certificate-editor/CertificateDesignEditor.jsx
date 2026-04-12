@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Rnd } from 'react-rnd';
 import { QRCodeSVG } from 'qrcode.react';
+import { useQuery } from '@tanstack/react-query';
 import {
     Type,
     Image as ImageIcon,
@@ -35,6 +37,7 @@ import {
     Minus,
     Plus,
     RotateCcw,
+    AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +53,17 @@ import { cn } from '@/lib/utils';
 import { PLACEHOLDER_CATEGORIES, ALL_PLACEHOLDERS, IMAGE_PLACEHOLDERS } from '@/lib/placeholder-docs';
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
+import {
+    buildSignatureWarning,
+    normalizeSignaturePlaceholderKey,
+    pickBestSignature,
+    SIGNATURE_PLACEHOLDER_KEYS,
+} from '@/lib/document-signature-library';
+
+const PdfCanvasPreview = dynamic(() => import('@/components/certificate-editor/PdfCanvasPreview'), {
+    ssr: false,
+});
 
 const FONT_LIST = [
     'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana',
@@ -75,6 +89,7 @@ const PAGE_PRESETS = [
 ];
 
 const MAX_HISTORY = 50;
+const CURVED_TEXT_MIN_WIDTH = 120;
 
 const ELEMENT_TYPES = {
     TEXT: 'text',
@@ -82,6 +97,7 @@ const ELEMENT_TYPES = {
     QRCODE: 'qrcode',
     SHAPE: 'shape',
     TABLE: 'table',
+    GROUP: 'group',
 };
 
 const DEFAULT_ELEMENTS = {
@@ -100,6 +116,10 @@ const DEFAULT_ELEMENTS = {
         backgroundColor: 'transparent',
         lineHeight: 1.4,
         letterSpacing: 0,
+        curved: false,
+        curveAmount: 30,
+        curveBaseWidth: null,
+        curveBaseHeight: null,
     },
     [ELEMENT_TYPES.IMAGE]: {
         type: ELEMENT_TYPES.IMAGE,
@@ -151,10 +171,13 @@ const DEFAULT_ELEMENTS = {
 const MemoizedRndElement = React.memo(({
     el,
     isSelected,
+    isEditing,
     readOnly,
+    canvasScale,
     callbacksRef,
     resizeHandleStyles,
-    noResizeHandles
+    noResizeHandles,
+    signaturePreviewMap,
 }) => {
     return (
         <Rnd
@@ -162,12 +185,14 @@ const MemoizedRndElement = React.memo(({
             size={{ width: el.width, height: el.height }}
             position={{ x: el.x, y: el.y }}
             bounds="parent"
+            scale={canvasScale}
+            onDragStart={!readOnly && !el.locked ? (e, d) => callbacksRef.current.handleDragStart(el.id, d) : undefined}
             onDrag={!readOnly && !el.locked ? (e, d) => callbacksRef.current.handleDrag(el.id, d) : undefined}
             onDragStop={!readOnly && !el.locked ? (e, d) => callbacksRef.current.handleDragStop(el.id, d) : undefined}
             onResizeStop={!readOnly && !el.locked ? (e, direction, ref, delta, position) => callbacksRef.current.handleResizeStop(el.id, ref, position) : undefined}
-            onClick={!readOnly ? () => callbacksRef.current.setSelectedId(el.id) : undefined}
-            disableDragging={readOnly || el.locked}
-            enableResizing={!readOnly && !el.locked && isSelected}
+            onClick={!readOnly ? (e) => callbacksRef.current.setSelectedId(el.id, e) : undefined}
+            disableDragging={readOnly || el.locked || isEditing}
+            enableResizing={!readOnly && !el.locked && isSelected && !isEditing}
             resizeHandleStyles={isSelected ? resizeHandleStyles : noResizeHandles}
             className={cn(
                 "transition-opacity",
@@ -180,8 +205,12 @@ const MemoizedRndElement = React.memo(({
             <ElementRenderer 
                 element={el}
                 isSelected={isSelected}
+                isEditing={isEditing}
                 readOnly={readOnly}
+                signaturePreviewMap={signaturePreviewMap}
                 onUpdate={(updates) => callbacksRef.current.updateElement(el.id, updates)}
+                onStartEditing={() => callbacksRef.current.setEditingId(el.id)}
+                onStopEditing={() => callbacksRef.current.setEditingId(null)}
             />
         </Rnd>
     );
@@ -189,8 +218,11 @@ const MemoizedRndElement = React.memo(({
     return (
         prevProps.el === nextProps.el &&
         prevProps.isSelected === nextProps.isSelected &&
+        prevProps.isEditing === nextProps.isEditing &&
         prevProps.readOnly === nextProps.readOnly &&
-        prevProps.resizeHandleStyles === nextProps.resizeHandleStyles
+        prevProps.canvasScale === nextProps.canvasScale &&
+        prevProps.resizeHandleStyles === nextProps.resizeHandleStyles &&
+        prevProps.signaturePreviewMap === nextProps.signaturePreviewMap
     );
 });
 
@@ -222,6 +254,33 @@ const DebouncedColorPicker = ({ value, onChange, className, title }) => {
     );
 };
 
+function getCurvedTextMinHeight(element) {
+    const fontSize = Number(element.fontSize) || 16;
+    const curveAmount = Math.abs(Number(element.curveAmount) || 0);
+    return Math.max(
+        Math.ceil(fontSize * 1.9 + curveAmount * 0.55 + 20),
+        Math.ceil(fontSize * 2.2)
+    );
+}
+
+function normalizeElementLayout(element, previousElement) {
+    if (element.type !== ELEMENT_TYPES.TEXT) return element;
+
+    const next = { ...element };
+
+    if (next.curved) {
+        next.width = Math.max(Number(next.width) || 0, CURVED_TEXT_MIN_WIDTH);
+        next.height = Math.max(Number(next.height) || 0, getCurvedTextMinHeight(next));
+        next.curveBaseWidth = previousElement?.curveBaseWidth || next.curveBaseWidth || previousElement?.width || next.width;
+        next.curveBaseHeight = previousElement?.curveBaseHeight || next.curveBaseHeight || previousElement?.height || next.height;
+    } else {
+        next.curveBaseWidth = null;
+        next.curveBaseHeight = null;
+    }
+
+    return next;
+}
+
 export default function CertificateDesignEditor({
     initialConfig = {},
     onChange,
@@ -229,11 +288,15 @@ export default function CertificateDesignEditor({
     placeholders = [],
     readOnly = false
 }) {
+    const { fullUser } = useAuth();
+    const schoolId = fullUser?.schoolId;
     const safeConfig = initialConfig || {};
     const [elements, setElements] = useState(safeConfig.elements || []);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [editingTextId, setEditingTextId] = useState(null);
     const [canvasSize, setCanvasSize] = useState(safeConfig.canvasSize || { width: 800, height: 600 });
     const [backgroundImage, setBackgroundImage] = useState(safeConfig.backgroundImage || '');
+    const [backgroundAsset, setBackgroundAsset] = useState(safeConfig.backgroundAsset || null);
     const [backgroundColor, setBackgroundColor] = useState(safeConfig.backgroundColor || '#ffffff');
     const [customFonts, setCustomFonts] = useState(safeConfig.customFonts || []);
     const containerRef = useRef(null);
@@ -242,12 +305,59 @@ export default function CertificateDesignEditor({
     const onChangeRef = useRef(onChange);
     const [canvasScale, setCanvasScale] = useState(1);
     const [isAutoFit, setIsAutoFit] = useState(true);
+    const [signatureSearch, setSignatureSearch] = useState('');
+    const [signatureUploadDraft, setSignatureUploadDraft] = useState({
+        name: '',
+        designation: '',
+        teacherUserId: '',
+        tags: '',
+        file: null,
+    });
     const guideXRef = useRef(null);
     const guideYRef = useRef(null);
+    const dragSelectionRef = useRef(null);
+    const [marqueePreviewIds, setMarqueePreviewIds] = useState([]);
+    const [marquee, setMarquee] = useState(null);
+    const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+    const marqueeMetaRef = useRef(null);
+    const marqueeRectRef = useRef(null);
     const SNAP_THRESHOLD = 6;
     onChangeRef.current = onChange;
 
-    const callbacksRef = useRef({ handleDrag: () => { }, handleDragStop: () => { }, handleResizeStop: () => { }, setSelectedId: () => { } });
+    const { data: documentSettings = {}, refetch: refetchDocumentSettings } = useQuery({
+        queryKey: ['document-settings', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`);
+            if (!res.ok) throw new Error('Failed to fetch document settings');
+            return res.json();
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const { data: teacherLibrary = [] } = useQuery({
+        queryKey: ['teachers', schoolId, 'signature-library'],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/teachers`);
+            if (!res.ok) throw new Error('Failed to fetch teachers');
+            const data = await res.json();
+            return Array.isArray(data?.teachers) ? data.teachers : [];
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const signatureLibrary = useMemo(
+        () => Array.isArray(documentSettings?.signatures) ? documentSettings.signatures : [],
+        [documentSettings]
+    );
+
+    const signaturePreviewMap = useMemo(() => ({
+        principalSignature: pickBestSignature(signatureLibrary, { placeholderKey: 'principalSignature' })?.imageUrl || '',
+        classTeacherSignature: pickBestSignature(signatureLibrary, { placeholderKey: 'classTeacherSignature' })?.imageUrl || '',
+    }), [signatureLibrary]);
+
+    const callbacksRef = useRef({ handleDragStart: () => { }, handleDrag: () => { }, handleDragStop: () => { }, handleResizeStop: () => { }, setSelectedId: () => { }, setEditingId: () => { }, updateElement: () => { } });
 
     // Undo/Redo history
     const [history, setHistory] = useState([]);
@@ -355,7 +465,10 @@ export default function CertificateDesignEditor({
                 }));
             }
             // Escape = Deselect
-            if (e.key === 'Escape') setSelectedIds([]);
+            if (e.key === 'Escape') {
+                setEditingTextId(null);
+                setSelectedIds([]);
+            }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
@@ -367,6 +480,7 @@ export default function CertificateDesignEditor({
             if (initialConfig.elements) setElements(initialConfig.elements);
             if (initialConfig.canvasSize) setCanvasSize(initialConfig.canvasSize);
             if (initialConfig.backgroundImage !== undefined) setBackgroundImage(initialConfig.backgroundImage);
+            if (initialConfig.backgroundAsset !== undefined) setBackgroundAsset(initialConfig.backgroundAsset || null);
             if (initialConfig.backgroundColor) setBackgroundColor(initialConfig.backgroundColor);
             if (initialConfig.customFonts) setCustomFonts(initialConfig.customFonts);
             setIsInitialized(true);
@@ -376,6 +490,7 @@ export default function CertificateDesignEditor({
             setElements(initialConfig.elements || []);
             setCanvasSize(initialConfig.canvasSize || { width: 800, height: 600 });
             setBackgroundImage(initialConfig.backgroundImage || '');
+            setBackgroundAsset(initialConfig.backgroundAsset || null);
             setBackgroundColor(initialConfig.backgroundColor || '#ffffff');
         }
     }, [initialConfig, readOnly, isInitialized]);
@@ -388,13 +503,14 @@ export default function CertificateDesignEditor({
                     elements,
                     canvasSize,
                     backgroundImage,
+                    backgroundAsset,
                     backgroundColor,
                     customFonts,
                 });
             }, 300);
             return () => clearTimeout(timer);
         }
-    }, [elements, canvasSize, backgroundImage, backgroundColor, customFonts, readOnly, isInitialized]);
+    }, [elements, canvasSize, backgroundImage, backgroundAsset, backgroundColor, customFonts, readOnly, isInitialized]);
 
     // Auto-scale canvas to fit the available area (edit mode only)
     useEffect(() => {
@@ -417,19 +533,23 @@ export default function CertificateDesignEditor({
     }, [canvasSize, readOnly, isAutoFit]);
 
     const addElement = (type) => {
-        const newElement = {
+        const baseElement = {
             id: `${type}-${Date.now()}`,
             x: 50,
             y: 50,
             zIndex: elements.length + 1,
             ...DEFAULT_ELEMENTS[type],
         };
+        const newElement = normalizeElementLayout(baseElement);
         setElements(prev => [...prev, newElement]);
         setSelectedIds([newElement.id]);
     };
 
     const updateElement = useCallback((id, updates) => {
-        setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
+        setElements(prev => prev.map(el => {
+            if (el.id !== id) return el;
+            return normalizeElementLayout({ ...el, ...updates }, el);
+        }));
     }, []);
 
     const removeElement = (id) => {
@@ -461,8 +581,12 @@ export default function CertificateDesignEditor({
         });
     }, []);
 
+    const duplicateElement = useCallback((id) => {
+        duplicateElements([id]);
+    }, [duplicateElements]);
+
     // Find the single closest snap per axis — no React state, pure DOM
-    const findSnap = useCallback((dragId, x, y, w, h) => {
+    const findSnap = useCallback((dragId, x, y, w, h, ignoreIds = []) => {
         const cw = canvasSize.width;
         const ch = canvasSize.height;
 
@@ -474,6 +598,7 @@ export default function CertificateDesignEditor({
         // Add other element edges/centers
         elements.forEach(el => {
             if (el.id === dragId) return;
+            if (ignoreIds.includes(el.id)) return;
             xTargets.push(el.x, el.x + el.width / 2, el.x + el.width);
             yTargets.push(el.y, el.y + el.height / 2, el.y + el.height);
         });
@@ -531,46 +656,314 @@ export default function CertificateDesignEditor({
         if (guideYRef.current) guideYRef.current.style.display = 'none';
     }, []);
 
+    const handleDragStart = useCallback((id, d) => {
+        const activeIds = selectedIds.includes(id) ? selectedIds : [id];
+        dragSelectionRef.current = {
+            anchorId: id,
+            anchorStart: { x: d.x, y: d.y },
+            itemStarts: activeIds
+                .map(selectedId => elements.find(e => e.id === selectedId))
+                .filter(Boolean)
+                .map(el => ({ id: el.id, x: el.x, y: el.y, width: el.width, height: el.height })),
+        };
+    }, [elements, selectedIds]);
+
     const handleDrag = useCallback((id, d) => {
         const el = elements.find(e => e.id === id);
         if (!el) return;
+        const dragState = dragSelectionRef.current;
+        if (dragState?.itemStarts?.length > 1 && dragState.anchorId === id) {
+            const deltaX = d.x - dragState.anchorStart.x;
+            const deltaY = d.y - dragState.anchorStart.y;
+            const groupBounds = dragState.itemStarts.reduce((acc, item) => {
+                acc.minX = Math.min(acc.minX, item.x);
+                acc.minY = Math.min(acc.minY, item.y);
+                acc.maxX = Math.max(acc.maxX, item.x + item.width);
+                acc.maxY = Math.max(acc.maxY, item.y + item.height);
+                return acc;
+            }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+            const proposedX = groupBounds.minX + deltaX;
+            const proposedY = groupBounds.minY + deltaY;
+            const { snappedX, snappedY, showX, showY } = findSnap(
+                id,
+                proposedX,
+                proposedY,
+                groupBounds.maxX - groupBounds.minX,
+                groupBounds.maxY - groupBounds.minY,
+                dragState.itemStarts.map(item => item.id)
+            );
+            const snappedDeltaX = snappedX - groupBounds.minX;
+            const snappedDeltaY = snappedY - groupBounds.minY;
+            setElements(prev => prev.map(item => {
+                const start = dragState.itemStarts.find(s => s.id === item.id);
+                if (!start) return item;
+                return {
+                    ...item,
+                    x: start.x + snappedDeltaX,
+                    y: start.y + snappedDeltaY,
+                };
+            }));
+            showGuides(showX, showY);
+            return;
+        }
         const { showX, showY } = findSnap(id, d.x, d.y, el.width, el.height);
         showGuides(showX, showY);
     }, [elements, findSnap, showGuides]);
 
-    const handleDragStop = (id, d) => {
+    const handleDragStop = useCallback((id, d) => {
         const el = elements.find(e => e.id === id);
+        const dragState = dragSelectionRef.current;
+        if (dragState?.itemStarts?.length > 1 && dragState.anchorId === id) {
+            const groupBounds = dragState.itemStarts.reduce((acc, item) => {
+                acc.minX = Math.min(acc.minX, item.x);
+                acc.minY = Math.min(acc.minY, item.y);
+                acc.maxX = Math.max(acc.maxX, item.x + item.width);
+                acc.maxY = Math.max(acc.maxY, item.y + item.height);
+                return acc;
+            }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+            const deltaX = d.x - dragState.anchorStart.x;
+            const deltaY = d.y - dragState.anchorStart.y;
+            const proposedX = groupBounds.minX + deltaX;
+            const proposedY = groupBounds.minY + deltaY;
+            const { snappedX, snappedY } = findSnap(
+                id,
+                proposedX,
+                proposedY,
+                groupBounds.maxX - groupBounds.minX,
+                groupBounds.maxY - groupBounds.minY,
+                dragState.itemStarts.map(item => item.id)
+            );
+            const boundedX = Math.max(0, Math.min(snappedX, canvasSize.width - (groupBounds.maxX - groupBounds.minX)));
+            const boundedY = Math.max(0, Math.min(snappedY, canvasSize.height - (groupBounds.maxY - groupBounds.minY)));
+            const finalDeltaX = boundedX - groupBounds.minX;
+            const finalDeltaY = boundedY - groupBounds.minY;
+            setElements(prev => prev.map(item => {
+                const start = dragState.itemStarts.find(s => s.id === item.id);
+                if (!start) return item;
+                return {
+                    ...item,
+                    x: start.x + finalDeltaX,
+                    y: start.y + finalDeltaY,
+                };
+            }));
+            dragSelectionRef.current = null;
+            hideGuides();
+            return;
+        }
         if (!el) { updateElement(id, { x: d.x, y: d.y }); hideGuides(); return; }
-        if (el.locked) { hideGuides(); return; }
+        if (el.locked) { dragSelectionRef.current = null; hideGuides(); return; }
         const { snappedX, snappedY } = findSnap(id, d.x, d.y, el.width, el.height);
-        // Clamp within canvas bounds
         const clampedX = Math.max(0, Math.min(snappedX, canvasSize.width - el.width));
         const clampedY = Math.max(0, Math.min(snappedY, canvasSize.height - el.height));
         updateElement(id, { x: clampedX, y: clampedY });
+        dragSelectionRef.current = null;
         hideGuides();
-    };
+    }, [canvasSize.height, canvasSize.width, elements, findSnap, hideGuides, updateElement]);
 
     const handleResizeStop = (id, ref, position) => {
         const newWidth = parseInt(ref.style.width);
         const newHeight = parseInt(ref.style.height);
+        const currentElement = elements.find(el => el.id === id);
         // Clamp size and position within canvas
-        const clampedW = Math.min(newWidth, canvasSize.width);
-        const clampedH = Math.min(newHeight, canvasSize.height);
-        updateElement(id, {
+        const nextX = Math.max(0, Math.min(position?.x ?? currentElement?.x ?? 0, canvasSize.width));
+        const nextY = Math.max(0, Math.min(position?.y ?? currentElement?.y ?? 0, canvasSize.height));
+        const clampedW = Math.min(newWidth, canvasSize.width - nextX);
+        const clampedH = Math.min(newHeight, canvasSize.height - nextY);
+        updateElement(id, normalizeElementLayout({
+            x: nextX,
+            y: nextY,
             width: clampedW,
             height: clampedH,
-        });
+        }, currentElement));
     };
 
     const handleSelect = useCallback((id, e) => {
-        if (e && e.shiftKey) {
+        if (editingTextId && editingTextId !== id) {
+            setEditingTextId(null);
+        }
+        if (e?.shiftKey || e?.metaKey || e?.ctrlKey) {
             setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
         } else {
             setSelectedIds([id]);
         }
-    }, []);
+    }, [editingTextId]);
+
+    const getCanvasPoint = useCallback((event) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return null;
+        return {
+            x: Math.max(0, Math.min((event.clientX - rect.left) / canvasScale, canvasSize.width)),
+            y: Math.max(0, Math.min((event.clientY - rect.top) / canvasScale, canvasSize.height)),
+        };
+    }, [canvasScale, canvasSize.height, canvasSize.width]);
+
+    const getIntersectingElementIds = useCallback((rect) => {
+         if (!rect) return [];
+         return elements
+             .filter(el => !el.hidden)
+             .filter(el => {
+                 const elRight = el.x + el.width;
+                 const elBottom = el.y + el.height;
+                 const rectRight = rect.x + rect.width;
+                 const rectBottom = rect.y + rect.height;
+                 return el.x < rectRight && elRight > rect.x && el.y < rectBottom && elBottom > rect.y;
+             })
+             .map(el => el.id);
+    }, [elements]);
+
+    const handleCanvasPointerDown = useCallback((e) => {
+        if (readOnly) return;
+        if (e.target !== containerRef.current) return;
+        const point = getCanvasPoint(e);
+        if (!point) return;
+        marqueeMetaRef.current = {
+            start: point,
+            additive: e.shiftKey || e.metaKey || e.ctrlKey,
+        };
+        marqueeRectRef.current = { x: point.x, y: point.y, width: 0, height: 0 };
+        setMarquee({ x: point.x, y: point.y, width: 0, height: 0 });
+        setMarqueePreviewIds([]);
+        setIsMarqueeSelecting(true);
+        if (!marqueeMetaRef.current.additive) setSelectedIds([]);
+    }, [getCanvasPoint, readOnly]);
+
+    useEffect(() => {
+        if (!isMarqueeSelecting || !marqueeMetaRef.current) return undefined;
+
+        const onPointerMove = (e) => {
+            const point = getCanvasPoint(e);
+            const start = marqueeMetaRef.current?.start;
+            if (!point || !start) return;
+            const next = {
+                x: Math.min(start.x, point.x),
+                y: Math.min(start.y, point.y),
+                width: Math.abs(point.x - start.x),
+                height: Math.abs(point.y - start.y),
+            };
+            marqueeRectRef.current = next;
+            setMarquee(next);
+            setMarqueePreviewIds(getIntersectingElementIds(next));
+        };
+
+        const onPointerUp = () => {
+            const currentMarquee = marqueeMetaRef.current;
+            if (!currentMarquee) return;
+            const rect = marqueeRectRef.current || { x: currentMarquee.start.x, y: currentMarquee.start.y, width: 0, height: 0 };
+            const hitIds = getIntersectingElementIds(rect);
+
+            setSelectedIds(prev => currentMarquee.additive ? Array.from(new Set([...prev, ...hitIds])) : hitIds);
+            setMarquee(null);
+            setMarqueePreviewIds([]);
+            setIsMarqueeSelecting(false);
+            marqueeMetaRef.current = null;
+            marqueeRectRef.current = null;
+        };
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        return () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+    }, [getCanvasPoint, getIntersectingElementIds, isMarqueeSelecting]);
 
     const selectedElement = selectedIds.length === 1 ? elements.find(el => el.id === selectedIds[0]) : null;
+    const selectedImageSourceKey = useMemo(
+        () => selectedElement?.type === ELEMENT_TYPES.IMAGE
+            ? normalizeSignaturePlaceholderKey(selectedElement.url?.replace(/[{}]/g, '').trim())
+            : '',
+        [selectedElement]
+    );
+    const signatureLibraryForSelection = useMemo(
+        () => selectedImageSourceKey
+            ? signatureLibrary.filter(signature => normalizeSignaturePlaceholderKey(signature.placeholderKey) === selectedImageSourceKey)
+            : [],
+        [selectedImageSourceKey, signatureLibrary]
+    );
+    const filteredSignatureLibrary = useMemo(() => {
+        if (!signatureSearch.trim()) return signatureLibraryForSelection;
+        const query = signatureSearch.trim().toLowerCase();
+        return signatureLibraryForSelection.filter(signature => {
+            const haystack = [
+                signature.name,
+                signature.designation,
+                signature.teacher?.name,
+                signature.class?.className,
+                signature.section?.name,
+                ...(Array.isArray(signature.tags) ? signature.tags : []),
+            ].filter(Boolean).join(' ').toLowerCase();
+            return haystack.includes(query);
+        });
+    }, [signatureLibraryForSelection, signatureSearch]);
+    const selectedImageWarning = useMemo(
+        () => buildSignatureWarning({
+            placeholderKey: selectedImageSourceKey,
+            resolvedUrl: signaturePreviewMap[selectedImageSourceKey],
+            signatures: signatureLibrary,
+        }),
+        [selectedImageSourceKey, signaturePreviewMap, signatureLibrary]
+    );
+
+    const handleSignatureLibraryUpload = useCallback(async () => {
+        if (!schoolId) {
+            toast.error('School context is missing');
+            return;
+        }
+        if (!selectedImageSourceKey || !SIGNATURE_PLACEHOLDER_KEYS.includes(selectedImageSourceKey)) {
+            toast.error('Select a signature image placeholder first');
+            return;
+        }
+        if (!signatureUploadDraft.file) {
+            toast.error('Choose a signature image to upload');
+            return;
+        }
+
+        try {
+            const uploaded = await uploadFilesToR2('signatures', { files: [signatureUploadDraft.file] });
+            const uploadedUrl = uploaded?.[0]?.url;
+            if (!uploadedUrl) throw new Error('Upload failed');
+
+            const teacherMatch = teacherLibrary.find(teacher => teacher.userId === signatureUploadDraft.teacherUserId);
+            const fallbackName = selectedImageSourceKey === 'classTeacherSignature'
+                ? `${teacherMatch?.name || 'Class Teacher'} Signature`
+                : 'Principal Signature';
+
+            const res = await fetch(`/api/documents/signatures/${schoolId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: signatureUploadDraft.name.trim() || fallbackName,
+                    designation: signatureUploadDraft.designation.trim() || teacherMatch?.designation || '',
+                    imageUrl: uploadedUrl,
+                    placeholderKey: selectedImageSourceKey,
+                    teacherUserId: selectedImageSourceKey === 'classTeacherSignature'
+                        ? (signatureUploadDraft.teacherUserId || null)
+                        : null,
+                    tags: signatureUploadDraft.tags,
+                    isDefault: signatureLibraryForSelection.length === 0,
+                    isActive: true,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.error || 'Failed to save signature');
+            }
+
+            toast.success('Signature saved to library');
+            setSignatureUploadDraft({
+                name: '',
+                designation: '',
+                teacherUserId: '',
+                tags: '',
+                file: null,
+            });
+            await refetchDocumentSettings();
+        } catch (error) {
+            console.error('Signature library upload failed:', error);
+            toast.error(error.message || 'Failed to upload signature');
+        }
+    }, [schoolId, selectedImageSourceKey, signatureUploadDraft, teacherLibrary, signatureLibraryForSelection.length, refetchDocumentSettings]);
 
     const computeSelectionBBox = () => {
          if (selectedIds.length === 0) return null;
@@ -641,13 +1034,15 @@ export default function CertificateDesignEditor({
 
     useEffect(() => {
         callbacksRef.current = {
+            handleDragStart,
             handleDrag,
             handleDragStop,
             handleResizeStop,
             setSelectedId: handleSelect,
+            setEditingId: setEditingTextId,
             updateElement
         };
-    }, [handleDrag, handleDragStop, handleResizeStop, handleSelect, updateElement]);
+    }, [handleDrag, handleDragStart, handleDragStop, handleResizeStop, handleSelect, updateElement]);
 
     // Canvas alignment helpers
     const alignElement = (alignment) => {
@@ -758,13 +1153,13 @@ export default function CertificateDesignEditor({
                             <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
                                 const input = document.createElement('input');
                                 input.type = 'file'; input.accept = 'image/*';
-                                input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => setBackgroundImage(ev.target.result); reader.readAsDataURL(file); } };
+                                input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => { setBackgroundAsset(null); setBackgroundImage(ev.target.result); }; reader.readAsDataURL(file); } };
                                 input.click();
                             }}>
                                 <ImageIcon className="h-3.5 w-3.5 mr-1" /> BG Image
                             </Button>
                             {backgroundImage && (
-                                <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => setBackgroundImage('')}>Clear BG</Button>
+                                <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setBackgroundImage(''); setBackgroundAsset(null); }}>Clear BG</Button>
                             )}
                             {/* Custom dimensions */}
                             <div className="h-5 w-px bg-border mx-1" />
@@ -890,16 +1285,14 @@ export default function CertificateDesignEditor({
                                 width: canvasSize.width,
                                 height: canvasSize.height,
                                 backgroundColor: backgroundColor,
-                                backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+                                backgroundImage: backgroundAsset?.mimeType?.startsWith('image/') ? `url(${backgroundAsset.url})` : (backgroundImage ? `url(${backgroundImage})` : 'none'),
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
                                                             transform: readOnly ? 'scale(1)' : `scale(${canvasScale})`,
                                 transformOrigin: 'top left',
                                 overflow: 'hidden',
                             }}
-                            onClick={(e) => {
-                                if (!readOnly && e.target === containerRef.current) setSelectedIds([]);
-                            }}
+                            onPointerDown={handleCanvasPointerDown}
                         >
                             {/* Alignment guide lines */}
                             {!readOnly && (
@@ -908,20 +1301,40 @@ export default function CertificateDesignEditor({
                                     <div ref={guideYRef} style={{ display: 'none', position: 'absolute', left: 0, height: 1, width: '100%', background: '#3b82f6', opacity: 0.8, zIndex: 9999, pointerEvents: 'none' }} />
                                 </>
                             )}
-                            {elements.map((el) => {
-                                const isSelected = selectedIds.includes(el.id) && !readOnly;
+                            {backgroundAsset?.mimeType === 'application/pdf' && (
+                                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                                    <PdfCanvasPreview file={backgroundAsset.url} width={canvasSize.width} />
+                                </div>
+                            )}
+                            {elements.filter(el => !el.hidden).map((el) => {
+                                const isSelected = (selectedIds.includes(el.id) || marqueePreviewIds.includes(el.id)) && !readOnly;
                                 return (
                                     <MemoizedRndElement
                                         key={el.id}
                                         el={el}
                                         isSelected={isSelected}
+                                        isEditing={editingTextId === el.id}
                                         readOnly={readOnly}
+                                        canvasScale={canvasScale}
                                         callbacksRef={callbacksRef}
                                         resizeHandleStyles={resizeHandleStyles}
                                         noResizeHandles={noResizeHandles}
+                                        signaturePreviewMap={signaturePreviewMap}
                                     />
                                 );
                             })}
+
+                            {!readOnly && marquee && (
+                                <div
+                                    className="absolute border border-blue-500 bg-blue-500/5 pointer-events-none z-[9997]"
+                                    style={{
+                                        left: marquee.x,
+                                        top: marquee.y,
+                                        width: Math.max(marquee.width, 1),
+                                        height: Math.max(marquee.height, 1),
+                                    }}
+                                />
+                            )}
 
                             {/* Floating Context Toolbar */}
                             {!readOnly && selectedIds.length > 0 && (() => {
@@ -1002,6 +1415,16 @@ export default function CertificateDesignEditor({
                                             placeholders={placeholders}
                                             allFonts={allFonts}
                                             onCustomFontUpload={handleCustomFontUpload}
+                                            selectedImageSourceKey={selectedImageSourceKey}
+                                            selectedImageWarning={selectedImageWarning}
+                                            signatureLibraryForSelection={signatureLibraryForSelection}
+                                            signatureSearch={signatureSearch}
+                                            setSignatureSearch={setSignatureSearch}
+                                            filteredSignatureLibrary={filteredSignatureLibrary}
+                                            signatureUploadDraft={signatureUploadDraft}
+                                            setSignatureUploadDraft={setSignatureUploadDraft}
+                                            teacherLibrary={teacherLibrary}
+                                            handleSignatureLibraryUpload={handleSignatureLibraryUpload}
                                         />
                                     ) : (
                                         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
@@ -1087,16 +1510,24 @@ export default function CertificateDesignEditor({
                                             <Button variant="outline" size="sm" className="flex-1" onClick={() => {
                                                 const input = document.createElement('input');
                                                 input.type = 'file'; input.accept = 'image/*';
-                                                input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => setBackgroundImage(ev.target.result); reader.readAsDataURL(file); } };
+                                                input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => { setBackgroundAsset(null); setBackgroundImage(ev.target.result); }; reader.readAsDataURL(file); } };
                                                 input.click();
                                             }}>
                                                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Upload
                                             </Button>
                                             {backgroundImage && (
-                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setBackgroundImage('')}>Clear</Button>
+                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setBackgroundImage(''); setBackgroundAsset(null); }}>Clear</Button>
                                             )}
                                         </div>
-                                        {backgroundImage && (
+                                        {backgroundAsset?.mimeType === 'application/pdf' ? (
+                                            <div className="w-full h-20 rounded border overflow-hidden bg-white">
+                                                <PdfCanvasPreview
+                                                    file={backgroundAsset.url}
+                                                    width={220}
+                                                    error={<div className="text-xs p-2 text-muted-foreground">PDF preview unavailable</div>}
+                                                />
+                                            </div>
+                                        ) : backgroundImage && (
                                             <img src={backgroundImage} alt="Background" className="w-full h-20 object-cover rounded border mt-1" />
                                         )}
                                     </div>
@@ -1139,34 +1570,58 @@ function ToolButton({ icon: Icon, label, onClick }) {
     );
 }
 
-function ElementRenderer({ element, isSelected, readOnly, onUpdate }) {
+function ElementRenderer({ element, isSelected, isEditing, readOnly, onUpdate, onStartEditing, onStopEditing, signaturePreviewMap = {} }) {
     const style = {
         width: '100%',
         height: '100%',
         ...getElementStyle(element)
     };
+    const [imageFailed, setImageFailed] = useState(false);
+
+    useEffect(() => {
+        setImageFailed(false);
+    }, [element.url]);
 
     switch (element.type) {
         case ELEMENT_TYPES.TEXT:
             return (
-                <div style={style} className="flex items-center overflow-hidden">
-                    {element.content}
-                </div>
+                <EditableTextElement
+                    element={element}
+                    style={style}
+                    isEditing={isEditing}
+                    readOnly={readOnly}
+                    onUpdate={onUpdate}
+                    onStartEditing={onStartEditing}
+                    onStopEditing={onStopEditing}
+                />
             );
         case ELEMENT_TYPES.IMAGE: {
-            const isPlaceholder = !element.url || (element.url.startsWith('{{ ') && element.url.endsWith('}}'));
+            const isPlaceholder = !element.url || (element.url.includes('{{') && element.url.includes('}}'));
+            const placeholderKey = isPlaceholder
+                ? normalizeSignaturePlaceholderKey(element.url?.replace(/[{}]/g, '').trim())
+                : '';
+            const previewUrl = placeholderKey ? signaturePreviewMap[placeholderKey] : '';
+            const isSignaturePlaceholder = SIGNATURE_PLACEHOLDER_KEYS.includes(placeholderKey);
             const placeholderLabel = isPlaceholder && element.url
                 ? element.url.replace(/[{ }]/g, '').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()
                 : 'Image';
             return (
                 <div style={style} className="overflow-hidden">
-                    {isPlaceholder ? (
+                    {((isPlaceholder && !previewUrl) || imageFailed) ? (
                         <div className="w-full h-full bg-muted/60 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded">
-                            <ImageIcon className="h-6 w-6 mb-1" />
+                            {isSignaturePlaceholder ? <AlertTriangle className="h-6 w-6 mb-1 text-amber-500" /> : <ImageIcon className="h-6 w-6 mb-1" />}
                             <span className="text-[10px] font-medium text-center px-1 leading-tight">{placeholderLabel}</span>
+                            {isSignaturePlaceholder && (
+                                <span className="text-[9px] text-center px-2 mt-1 text-amber-600">Image missing in library</span>
+                            )}
                         </div>
                     ) : (
-                        <img src={element.url} alt="" className="w-full h-full object-cover" />
+                        <img
+                            src={isPlaceholder ? previewUrl : element.url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={() => setImageFailed(true)}
+                        />
                     )}
                 </div>
             );
@@ -1187,7 +1642,7 @@ function ElementRenderer({ element, isSelected, readOnly, onUpdate }) {
                 <div style={{ ...style, position: 'relative', width: '100%', height: '100%' }}>
                     {element.items && element.items.map(child => (
                         <div key={child.id} style={{ position: 'absolute', left: child.x, top: child.y, width: child.width, height: child.height }}>
-                             <ElementRenderer element={child} readOnly={readOnly} />
+                             <ElementRenderer element={child} readOnly={readOnly} signaturePreviewMap={signaturePreviewMap} />
                         </div>
                     ))}
                 </div>
@@ -1366,6 +1821,119 @@ function ElementRenderer({ element, isSelected, readOnly, onUpdate }) {
     }
 }
 
+function EditableTextElement({ element, style, isEditing, readOnly, onUpdate, onStartEditing, onStopEditing }) {
+    const textareaRef = useRef(null);
+
+    useEffect(() => {
+        if (!isEditing) return;
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        textarea.select();
+    }, [isEditing]);
+
+    if (isEditing && !readOnly) {
+        return (
+            <textarea
+                ref={textareaRef}
+                value={element.content || ''}
+                onChange={(e) => onUpdate({ content: e.target.value })}
+                onBlur={() => onStopEditing?.()}
+                onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        onStopEditing?.();
+                    }
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        onStopEditing?.();
+                    }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="w-full h-full resize-none border-none outline-none bg-white/90 rounded-sm px-2 py-1"
+                style={{
+                    ...style,
+                    overflow: 'hidden',
+                    whiteSpace: 'pre-wrap',
+                }}
+            />
+        );
+    }
+
+    if (element.curved) {
+        return (
+            <div onDoubleClick={(e) => { e.stopPropagation(); onStartEditing?.(); }}>
+                <CurvedTextElement element={element} />
+            </div>
+        );
+    }
+
+    return (
+        <div
+            style={style}
+            className="flex items-center overflow-hidden"
+            onDoubleClick={(e) => { e.stopPropagation(); onStartEditing?.(); }}
+        >
+            {element.content}
+        </div>
+    );
+}
+
+function CurvedTextElement({ element }) {
+    const width = Math.max(Number(element.width) || 0, CURVED_TEXT_MIN_WIDTH);
+    const height = Math.max(Number(element.height) || 0, 40);
+    const baseWidth = Math.max(Number(element.curveBaseWidth) || width, CURVED_TEXT_MIN_WIDTH);
+    const baseHeight = Math.max(Number(element.curveBaseHeight) || height, 40);
+    const fontSize = Number(element.fontSize) || 16;
+    const padding = Math.max(12, fontSize * 0.8);
+    const midY = baseHeight * 0.64;
+    const maxCurve = Math.max(baseHeight * 1.5, fontSize * 5);
+    const curveAmount = Math.max(-maxCurve, Math.min(maxCurve, Number(element.curveAmount) || 0));
+    const controlY = midY - curveAmount;
+    const pathId = `curve-path-${element.id}`;
+    const path = `M ${padding} ${midY} Q ${baseWidth / 2} ${controlY} ${Math.max(padding + 1, baseWidth - padding)} ${midY}`;
+    const textAnchor =
+        element.textAlign === 'left'
+            ? 'start'
+            : element.textAlign === 'right'
+                ? 'end'
+                : 'middle';
+    const startOffset =
+        element.textAlign === 'left'
+            ? '0%'
+            : element.textAlign === 'right'
+                ? '100%'
+                : '50%';
+
+    return (
+        <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${baseWidth} ${baseHeight}`}
+            preserveAspectRatio="none"
+            style={{ overflow: 'visible', display: 'block', background: element.backgroundColor || 'transparent' }}
+        >
+            <defs>
+                <path id={pathId} d={path} fill="none" />
+            </defs>
+            <text
+                fill={element.color || '#000000'}
+                fontSize={fontSize}
+                fontFamily={element.fontFamily}
+                fontWeight={element.fontWeight}
+                fontStyle={element.fontStyle}
+                textDecoration={element.textDecoration}
+                letterSpacing={element.letterSpacing || 0}
+                opacity={element.opacity ?? 1}
+            >
+                <textPath href={`#${pathId}`} startOffset={startOffset} textAnchor={textAnchor}>
+                    {element.content}
+                </textPath>
+            </text>
+        </svg>
+    );
+}
+
 function getElementStyle(element) {
     const base = {
         opacity: element.opacity,
@@ -1401,7 +1969,25 @@ function getElementStyle(element) {
 }
 
 
-function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholders, allFonts = [], onCustomFontUpload }) {
+function PropertiesEditor({ 
+    element, 
+    onUpdate, 
+    onDelete, 
+    onDuplicate, 
+    placeholders, 
+    allFonts = [], 
+    onCustomFontUpload,
+    selectedImageSourceKey,
+    selectedImageWarning,
+    signatureLibraryForSelection = [],
+    signatureSearch,
+    setSignatureSearch,
+    filteredSignatureLibrary = [],
+    signatureUploadDraft,
+    setSignatureUploadDraft,
+    teacherLibrary = [],
+    handleSignatureLibraryUpload
+}) {
     const [phSearch, setPhSearch] = React.useState('');
 
     const filtered = PLACEHOLDER_CATEGORIES.map(cat => ({
@@ -1573,6 +2159,33 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
                         <div className="prop-slider-label">Letter Spacing <span>{element.letterSpacing || 0}px</span></div>
                         <Slider value={[element.letterSpacing || 0]} min={-2} max={10} step={0.5} onValueChange={([v]) => onUpdate({ letterSpacing: v })} />
                     </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label>Curved Text</Label>
+                            <Switch
+                                checked={!!element.curved}
+                                onCheckedChange={(checked) => onUpdate({ curved: checked })}
+                            />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">Turn this on to bend the text into an arc like a certificate seal heading.</p>
+                    </div>
+
+                    {element.curved && (
+                        <div className="space-y-1.5">
+                            <div className="prop-slider-label">Curve Amount <span>{element.curveAmount || 0}</span></div>
+                            <Slider
+                                value={[element.curveAmount || 0]}
+                                min={-280}
+                                max={280}
+                                step={1}
+                                onValueChange={([v]) => onUpdate({ curveAmount: v })}
+                            />
+                            <p className="text-[11px] text-muted-foreground">Positive bends upward, negative bends downward.</p>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1583,7 +2196,10 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
                         <Label>Image Source</Label>
                         <Select
                             value={element.url?.replace(/[{}]/g, '') || '_custom_'}
-                            onValueChange={(value) => onUpdate({ url: value === '_custom_' ? '' : `{{${value}}}` })}
+                            onValueChange={(value) => {
+                                setSignatureSearch('');
+                                onUpdate({ url: value === '_custom_' ? '' : `{{${value}}}` });
+                            }}
                         >
                             <SelectTrigger><SelectValue placeholder="Select image source" /></SelectTrigger>
                             <SelectContent>
@@ -1595,6 +2211,117 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
                         </Select>
                         <Input value={element.url || ''} onChange={e => onUpdate({ url: e.target.value })} placeholder="Or enter image URL" className="h-8 text-xs" />
                     </div>
+
+                    {SIGNATURE_PLACEHOLDER_KEYS.includes(selectedImageSourceKey) && (
+                        <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                            <div className="flex items-start gap-2">
+                                <AlertTriangle className={`h-4 w-4 mt-0.5 ${selectedImageWarning ? 'text-amber-500' : 'text-emerald-500'}`} />
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-medium">
+                                        {signatureLibraryForSelection.length > 0
+                                            ? `${signatureLibraryForSelection.length} signature${signatureLibraryForSelection.length > 1 ? 's' : ''} in library`
+                                            : 'No signature saved yet'}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        {selectedImageWarning || 'This placeholder will use the saved signature library during preview and generation.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label>Search Signature Library</Label>
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                                    <Input
+                                        value={signatureSearch}
+                                        onChange={e => setSignatureSearch(e.target.value)}
+                                        placeholder="Search teacher, class, section..."
+                                        className="h-8 pl-7 text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {filteredSignatureLibrary.length > 0 ? filteredSignatureLibrary.map(signature => (
+                                    <div key={signature.id} className="flex items-center gap-2 rounded-md border bg-background p-2">
+                                        <img
+                                            src={signature.imageUrl}
+                                            alt={signature.name}
+                                            className="h-10 w-16 rounded object-contain bg-muted"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-xs font-medium">{signature.name}</p>
+                                            <p className="truncate text-[11px] text-muted-foreground">
+                                                {[signature.teacher?.name, signature.class?.className, signature.section?.name].filter(Boolean).join(' • ') || signature.designation || 'Reusable library asset'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rounded-md border border-dashed p-3 text-[11px] text-muted-foreground">
+                                        No saved signature matches this search yet.
+                                    </div>
+                                )}
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                                <Label>Upload To Signature Library</Label>
+                                <Input
+                                    value={signatureUploadDraft.name}
+                                    onChange={e => setSignatureUploadDraft(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Signature name"
+                                    className="h-8 text-xs"
+                                />
+                                <Input
+                                    value={signatureUploadDraft.designation}
+                                    onChange={e => setSignatureUploadDraft(prev => ({ ...prev, designation: e.target.value }))}
+                                    placeholder="Designation"
+                                    className="h-8 text-xs"
+                                />
+                                {selectedImageSourceKey === 'classTeacherSignature' && (
+                                    <Select
+                                        value={signatureUploadDraft.teacherUserId || '_none'}
+                                        onValueChange={(value) => setSignatureUploadDraft(prev => ({ ...prev, teacherUserId: value === '_none' ? '' : value }))}
+                                    >
+                                        <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue placeholder="Link teacher (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-56">
+                                            <SelectItem value="_none">No teacher linked</SelectItem>
+                                            {teacherLibrary.map(teacher => (
+                                                <SelectItem key={teacher.userId} value={teacher.userId}>
+                                                    {teacher.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                                <Input
+                                    value={signatureUploadDraft.tags}
+                                    onChange={e => setSignatureUploadDraft(prev => ({ ...prev, tags: e.target.value }))}
+                                    placeholder="Tags (comma separated)"
+                                    className="h-8 text-xs"
+                                />
+                                <Input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                                    className="h-8 text-xs"
+                                    onChange={e => setSignatureUploadDraft(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={handleSignatureLibraryUpload}
+                                >
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Upload And Save For Future Use
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-1.5">
                         <div className="prop-slider-label">Opacity <span>{Math.round((element.opacity ?? 1) * 100)}%</span></div>
                         <Slider value={[(element.opacity ?? 1) * 100]} min={0} max={100} step={1} onValueChange={([v]) => onUpdate({ opacity: v / 100 })} />

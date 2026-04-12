@@ -130,7 +130,10 @@ export async function DELETE(request, props) {
 
         await prisma.documentTemplate.update({
             where: { id },
-            data: { isActive: false },
+            data: { 
+                isActive: false,
+                name: `${template.name}_deleted_${Date.now()}`
+            },
         });
 
         return NextResponse.json({ message: 'Template deleted successfully' });

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { toBase64 } from '@/lib/utils';
 
 export async function generatePDF({ template, student, certificateNumber, issueDate, customFields, verificationUrl }) {
     try {
@@ -107,9 +108,18 @@ export async function generatePDF({ template, student, certificateNumber, issueD
                     case 'image': {
                         if (el.url) {
                             let imgUrl = el.url;
-                            // Handle dynamic images if needed (e.g. {{studentPhoto}})
-                            if (imgUrl.includes('{{studentPhoto}}') && student.photoUrl) {
-                                imgUrl = student.photoUrl;
+                            Object.entries(data).forEach(([key, value]) => {
+                                imgUrl = imgUrl.replace(new RegExp(key, 'g'), value || '');
+                            });
+
+                            if (!imgUrl) break;
+                            if (!imgUrl.startsWith('data:')) {
+                                try {
+                                    imgUrl = await toBase64(imgUrl);
+                                } catch (error) {
+                                    console.error('Error converting image to base64:', error);
+                                    break;
+                                }
                             }
 
                             doc.addImage(imgUrl, 'PNG', x, y, w, h);

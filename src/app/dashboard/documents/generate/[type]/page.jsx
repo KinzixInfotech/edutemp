@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
@@ -42,9 +42,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
+import {
+    applyMappingsToTemplateElements,
+    buildCertificateMappingContext,
+    buildResolvedMappings,
+    extractTemplatePlaceholders,
+} from '@/lib/certificate-template-mapping';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 
@@ -112,6 +119,8 @@ export default function GenerateCertificatePage() {
     const params = useParams();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [studentSearch, setStudentSearch] = useState('');
@@ -120,6 +129,8 @@ export default function GenerateCertificatePage() {
     const [previewConfig, setPreviewConfig] = useState(null);
     const [fieldOverrides, setFieldOverrides] = useState({});
     const [showFieldMapper, setShowFieldMapper] = useState(false);
+    const [showStudentFilters, setShowStudentFilters] = useState(true);
+    const [templateSearch, setTemplateSearch] = useState('');
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
@@ -128,7 +139,7 @@ export default function GenerateCertificatePage() {
     const {
         register,
         handleSubmit,
-        watch,
+        control,
         setValue,
         formState: { errors },
     } = useForm({
@@ -141,7 +152,76 @@ export default function GenerateCertificatePage() {
         },
     });
 
-    const watchedValues = watch();
+    const [
+        watchedStudentId,
+        watchedTemplateId,
+        watchedIssueDate,
+        watchedConduct,
+        watchedRemarks,
+        watchedPurpose,
+        watchedAcademicYear,
+        watchedDateOfLeaving,
+        watchedReason,
+        watchedEventName,
+        watchedPosition,
+        watchedDate,
+        watchedTitle,
+        watchedContent,
+        watchedShowToParent,
+    ] = useWatch({
+        control,
+        name: [
+            'studentId',
+            'templateId',
+            'issueDate',
+            'conduct',
+            'remarks',
+            'purpose',
+            'academicYear',
+            'dateOfLeaving',
+            'reason',
+            'eventName',
+            'position',
+            'date',
+            'title',
+            'content',
+            'showToParent',
+        ],
+    });
+
+    const watchedValues = useMemo(() => ({
+        studentId: watchedStudentId || '',
+        templateId: watchedTemplateId || '',
+        issueDate: watchedIssueDate || '',
+        conduct: watchedConduct || '',
+        remarks: watchedRemarks || '',
+        purpose: watchedPurpose || '',
+        academicYear: watchedAcademicYear || '',
+        dateOfLeaving: watchedDateOfLeaving || '',
+        reason: watchedReason || '',
+        eventName: watchedEventName || '',
+        position: watchedPosition || '',
+        date: watchedDate || '',
+        title: watchedTitle || '',
+        content: watchedContent || '',
+        showToParent: !!watchedShowToParent,
+    }), [
+        watchedStudentId,
+        watchedTemplateId,
+        watchedIssueDate,
+        watchedConduct,
+        watchedRemarks,
+        watchedPurpose,
+        watchedAcademicYear,
+        watchedDateOfLeaving,
+        watchedReason,
+        watchedEventName,
+        watchedPosition,
+        watchedDate,
+        watchedTitle,
+        watchedContent,
+        watchedShowToParent,
+    ]);
 
     // Fetch students
     const { data: students, isLoading: loadingStudents } = useQuery({
@@ -205,6 +285,11 @@ export default function GenerateCertificatePage() {
         return filtered;
     }, [students, studentSearch, classFilter, sectionFilter]);
 
+    const selectedStudent = useMemo(
+        () => students?.find(s => s.userId === watchedValues.studentId) || null,
+        [students, watchedValues.studentId]
+    );
+
 
     // Fetch saved templates for this certificate type
     const { data: savedTemplates, isLoading: loadingTemplates } = useQuery({
@@ -220,135 +305,113 @@ export default function GenerateCertificatePage() {
 
     // Merge saved DB templates with built-in default templates
     const templates = useMemo(() => {
-        const saved = savedTemplates || [];
-        // Get built-in templates for this certificate type + generic fallbacks
-        const builtIn = [
-            ...(DEFAULT_TEMPLATES[certificateType] || []),
-            ...(DEFAULT_TEMPLATES['certificate'] || [])
-        ].filter(bi => !saved.some(s => s.id === bi.id))
+        const saved = Array.isArray(savedTemplates)
+            ? savedTemplates.filter((template) => template?.type === config?.apiType)
+            : [];
+        const builtIn = (DEFAULT_TEMPLATES[certificateType] || [])
+            .filter(bi => !saved.some(s => s.id === bi.id))
             .map(t => ({ ...t, isBuiltIn: true }));
         return [...saved, ...builtIn];
-    }, [savedTemplates, certificateType]);
+    }, [savedTemplates, certificateType, config?.apiType]);
 
-    // Get default template
-    useEffect(() => {
-        if (templates?.length > 0 && !watchedValues.templateId) {
-            const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
-            setValue('templateId', defaultTemplate.id);
-        }
-    }, [templates, setValue, watchedValues.templateId]);
+    const filteredTemplates = useMemo(() => {
+        if (!templateSearch.trim()) return templates;
+        const search = templateSearch.toLowerCase();
+        return templates.filter((template) =>
+            [template.name, template.description, template.type]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(search))
+        );
+    }, [templateSearch, templates]);
 
-    // Update preview when form values or template changes
-    useEffect(() => {
-        if (!templates || !students || !watchedValues.templateId) return;
+    const selectedTemplate = useMemo(
+        () => templates?.find(t => t.id === watchedValues.templateId) || null,
+        [templates, watchedValues.templateId]
+    );
 
-        const template = templates.find(t => t.id === watchedValues.templateId);
-        if (!template || !template.layoutConfig) return;
+    const conductLabels = useMemo(() => ({
+        'excellent': 'Excellent',
+        'very-good': 'Very Good',
+        'good': 'Good',
+        'satisfactory': 'Satisfactory',
+    }), []);
 
-        const student = students.find(s => s.userId === watchedValues.studentId) || {};
+    const placeholderKeys = useMemo(() => {
+        if (!selectedTemplate?.layoutConfig?.elements) return [];
+        return extractTemplatePlaceholders(selectedTemplate.layoutConfig.elements);
+    }, [selectedTemplate]);
 
-        // Create a deep copy of elements to avoid mutating original
-        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
-
-        // Map conduct enum values to display labels
-        const conductLabels = { 'excellent': 'Excellent', 'very-good': 'Very Good', 'good': 'Good', 'satisfactory': 'Satisfactory' };
-        const conductDisplay = conductLabels[watchedValues.conduct] || watchedValues.conduct || '';
-
-        // Generate a certificate number for QR / verification
+    const certificateMeta = useMemo(() => {
         const certNumber = `CERT-${Date.now()}`;
-        const verificationUrl = typeof window !== 'undefined' ? `${window.location.origin}/verify/certificate/${certNumber}` : '';
-
-        // Auto replacements from student/school/form data
-        const autoReplacements = {
-            '{{studentName}}': student.name || '',
-            '{{rollNumber}}': student.rollNumber || '',
-            '{{admissionNo}}': student.admissionNo || '',
-            '{{class}}': student.class?.className || '',
-            '{{section}}': student.section?.sectionName || '',
-            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
-            '{{fatherName}}': student.fatherName || '',
-            '{{motherName}}': student.motherName || '',
-            '{{address}}': student.address || '',
-            '{{schoolName}}': fullUser?.schoolName || '',
-            '{{schoolAddress}}': fullUser?.school?.address || '',
-            '{{issueDate}}': watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : new Date().toLocaleDateString(),
-            '{{conduct}}': conductDisplay,
-            '{{purpose}}': watchedValues.purpose || '',
-            '{{academicYear}}': watchedValues.academicYear || '',
-            '{{dateOfLeaving}}': watchedValues.dateOfLeaving ? new Date(watchedValues.dateOfLeaving).toLocaleDateString() : '',
-            '{{reason}}': watchedValues.reason || '',
-            '{{eventName}}': watchedValues.eventName || '',
-            '{{position}}': watchedValues.position || '',
-            '{{title}}': watchedValues.title || '',
-            '{{content}}': watchedValues.content || '',
-            '{{remarks}}': watchedValues.remarks || '',
-            '{{verificationUrl}}': verificationUrl,
-            '{{certificateNumber}}': certNumber,
-            '{{tcNumber}}': `TC-${Date.now()}`,
-            '{{nationality}}': student.nationality || '',
-            '{{religion}}': student.religion || '',
-            '{{category}}': student.category || '',
-            '{{bloodGroup}}': student.bloodGroup || '',
-            '{{gender}}': student.gender || '',
-            '{{admissionDate}}': student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : '',
-            '{{parentContact}}': student.parentContact || student.fatherPhone || '',
+        return {
+            certificateNumber: certNumber,
+            tcNumber: `TC-${Date.now()}`,
+            verificationUrl: typeof window !== 'undefined' ? `${window.location.origin}/verify/certificate/${certNumber}` : '',
         };
+    }, [selectedTemplate?.id, watchedValues.studentId, watchedValues.templateId]);
 
-        // Merge with user overrides (overrides win)
-        const replacements = { ...autoReplacements };
-        Object.entries(fieldOverrides).forEach(([key, value]) => {
-            if (value !== undefined && value !== '') {
-                replacements[`{{${key}}}`] = value;
-            }
-        });
+    const mappingContext = useMemo(() => buildCertificateMappingContext({
+        student: selectedStudent || {},
+        formValues: {
+            ...watchedValues,
+            conductLabel: conductLabels[watchedValues.conduct] || watchedValues.conduct || '',
+        },
+        fullUser,
+        selectedYear,
+        docSettings,
+        certificateMeta,
+    }), [certificateMeta, conductLabels, docSettings, fullUser, selectedStudent, selectedYear, watchedValues]);
 
-        // Image replacements (URLs)
-        const imageReplacements = {
-            '{{studentPhoto}}': student?.user?.profilePicture || student.photoUrl || 'https://placehold.co/100x100?text=Photo',
-            '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
-            '{{principalSignature}}': docSettings?.signatureUrl || fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
-            '{{schoolStamp}}': docSettings?.stampUrl || fullUser?.school?.stampUrl || 'https://placehold.co/100x50?text=Stamp',
-        };
+    const resolvedMappings = useMemo(
+        () => buildResolvedMappings(placeholderKeys, mappingContext, fieldOverrides),
+        [fieldOverrides, mappingContext, placeholderKeys]
+    );
 
-        const processedElements = elements.map(el => {
-            if (el.type === 'text' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'qrcode' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'image') {
-                let url = el.url || '';
-                Object.entries(imageReplacements).forEach(([key, value]) => {
-                    if (url.includes(key) || url === key) {
-                        url = value;
-                    }
-                });
-                if (!url || url.startsWith('{{')) {
-                    url = 'https://placehold.co/100x100?text=Image';
-                }
-                return { ...el, url };
-            }
-            return el;
-        });
+    const missingPlaceholders = useMemo(
+        () => placeholderKeys.filter(key => !resolvedMappings[key]),
+        [placeholderKeys, resolvedMappings]
+    );
+
+    const hasTemplateSelection = !!selectedTemplate;
+    const mappingReady = hasTemplateSelection && missingPlaceholders.length === 0;
+    const canGenerate = !!previewConfig && mappingReady && !!watchedValues.studentId && !generating;
+    const selectedTemplateEditUrl = selectedTemplate
+        ? `/dashboard/documents/templates/certificate/${selectedTemplate.id}?mode=edit`
+        : null;
+
+    useEffect(() => {
+        if (!selectedTemplate?.layoutConfig) {
+            setPreviewConfig(null);
+            return;
+        }
 
         setPreviewConfig({
-            elements: processedElements,
-            canvasSize: template.layoutConfig.canvasSize,
-            backgroundImage: template.layoutConfig.backgroundImage
+            elements: applyMappingsToTemplateElements(
+                JSON.parse(JSON.stringify(selectedTemplate.layoutConfig.elements || [])),
+                resolvedMappings
+            ),
+            canvasSize: selectedTemplate.layoutConfig.canvasSize,
+            backgroundImage: selectedTemplate.layoutConfig.backgroundImage,
+            backgroundAsset: selectedTemplate.layoutConfig.backgroundAsset || null,
         });
-
-    }, [JSON.stringify(watchedValues), templates, students, fullUser, docSettings, fieldOverrides]);
+    }, [resolvedMappings, selectedTemplate]);
 
     const handleGeneratePDF = async () => {
+        if (!selectedTemplate) {
+            toast.error('Choose a certificate template first.');
+            return;
+        }
+
+        if (missingPlaceholders.length > 0) {
+            toast.error(`Complete required mapping first. Missing: ${missingPlaceholders.slice(0, 3).join(', ')}${missingPlaceholders.length > 3 ? '...' : ''}`);
+            setShowFieldMapper(true);
+            return;
+        }
+
+        if (!watchedValues.studentId) {
+            toast.error('Choose a student after mapping is resolved.');
+            return;
+        }
         // Target the specific content div
         const element = document.getElementById('certificate-capture-target');
         if (!element) {
@@ -445,7 +508,7 @@ export default function GenerateCertificatePage() {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => router.push('/dashboard/documents')}
+                        onClick={() => router.push('/dashboard/documents/generate')}
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
@@ -473,7 +536,7 @@ export default function GenerateCertificatePage() {
                     )}
                     <Button
                         onClick={handleSubmit(handleGeneratePDF)}
-                        disabled={generating || !previewConfig}
+                        disabled={!canGenerate}
                         size="sm"
                     >
                         {generating ? (
@@ -486,95 +549,39 @@ export default function GenerateCertificatePage() {
                 </div>
             </div>
 
+
             {/* Main Content - Sidebar + Preview */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 {/* Left Sidebar - Form */}
-                <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col">
+                <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r bg-background flex-shrink-0 flex flex-col max-h-[48vh] lg:max-h-none">
                     <ScrollArea className="flex-1">
                         <div className="p-4 space-y-4">
-                            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Details</h2>
+                            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Generation Steps</h2>
 
-                            {/* Student Selection */}
-                            <div className="space-y-1.5">
-                                <Label htmlFor="studentId" className="text-xs flex items-center gap-1.5">
-                                    <User className="h-3.5 w-3.5" />
-                                    Select Student *
-                                </Label>
-                                <Select
-                                    value={watchedValues.studentId}
-                                    onValueChange={(value) => setValue('studentId', value)}
-                                >
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <SelectValue placeholder="Choose a student..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <div className="p-2 pb-1 space-y-1.5">
-                                            <div className="flex gap-1.5">
-                                                <select
-                                                    value={classFilter}
-                                                    onChange={(e) => { setClassFilter(e.target.value); setSectionFilter(''); }}
-                                                    className="h-7 text-xs rounded border bg-background px-1.5 flex-1 min-w-0"
-                                                >
-                                                    <option value="">All Classes</option>
-                                                    {availableClasses.map(c => (
-                                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                                    ))}
-                                                </select>
-                                                {classFilter && availableSections.length > 0 && (
-                                                    <select
-                                                        value={sectionFilter}
-                                                        onChange={(e) => setSectionFilter(e.target.value)}
-                                                        className="h-7 text-xs rounded border bg-background px-1.5 w-20"
-                                                    >
-                                                        <option value="">All</option>
-                                                        {availableSections.map(s => (
-                                                            <option key={s.id} value={s.id}>{s.name}</option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                            </div>
-                                            <Input
-                                                placeholder="Search students..."
-                                                value={studentSearch}
-                                                onChange={(e) => setStudentSearch(e.target.value)}
-                                                className="h-7 text-xs"
-                                            />
-                                        </div>
-                                        {filteredStudents?.map((student) => (
-                                            <SelectItem key={student.userId} value={student.userId}>
-                                                <div className="flex flex-col text-left">
-                                                    <span>{student.name || student.user?.name}</span>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        Roll: {student.rollNumber} | {student.class?.className}{student.section?.sectionName ? ` - ${student.section.sectionName}` : ''}
-                                                    </span>
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                        {filteredStudents?.length === 0 && (
-                                            <div className="text-center text-xs text-muted-foreground py-3">No students found</div>
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                                {errors.studentId && (
-                                    <p className="text-xs text-red-500">{errors.studentId.message}</p>
-                                )}
-                            </div>
-
-                            {/* Template Selection */}
                             <div className="space-y-1.5">
                                 <Label htmlFor="templateId" className="text-xs flex items-center gap-1.5">
                                     <FileText className="h-3.5 w-3.5" />
                                     Certificate Template
                                 </Label>
+                                <Input
+                                    value={templateSearch}
+                                    onChange={(e) => setTemplateSearch(e.target.value)}
+                                    placeholder="Search templates..."
+                                    className="h-9 text-sm"
+                                />
                                 <Select
                                     value={watchedValues.templateId}
-                                    onValueChange={(value) => setValue('templateId', value)}
+                                    onValueChange={(value) => {
+                                        setValue('templateId', value);
+                                        setValue('studentId', '');
+                                        setFieldOverrides({});
+                                    }}
                                 >
                                     <SelectTrigger className="h-9 text-sm">
                                         <SelectValue placeholder="Choose a template..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {templates?.map((template) => (
+                                        {filteredTemplates?.map((template) => (
                                             <SelectItem key={template.id} value={template.id}>
                                                 {template.name}
                                                 {template.isDefault && (
@@ -585,281 +592,371 @@ export default function GenerateCertificatePage() {
                                                 )}
                                             </SelectItem>
                                         ))}
+                                        {filteredTemplates?.length === 0 && (
+                                            <div className="px-2 py-3 text-xs text-muted-foreground">
+                                                No templates found for this certificate type.
+                                            </div>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            {/* Issue Date */}
-                            <div className="space-y-1.5">
-                                <Label htmlFor="issueDate" className="text-xs flex items-center gap-1.5">
-                                    <Calendar className="h-3.5 w-3.5" />
-                                    Issue Date *
-                                </Label>
-                                <Input
-                                    id="issueDate"
-                                    type="date"
-                                    {...register('issueDate')}
-                                    className="h-9 text-sm"
-                                />
-                                {errors.issueDate && (
-                                    <p className="text-xs text-red-500">{errors.issueDate.message}</p>
-                                )}
-                            </div>
-
-                            <div className="h-px bg-border my-2" />
-
-                            {/* Dynamic Fields Based on Certificate Type */}
-                            {config.fields.includes('conduct') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="conduct" className="text-xs">Conduct</Label>
-                                    <Select
-                                        value={watchedValues.conduct}
-                                        onValueChange={(value) => setValue('conduct', value)}
-                                    >
-                                        <SelectTrigger className="h-9 text-sm">
-                                            <SelectValue placeholder="Select conduct..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="excellent">Excellent</SelectItem>
-                                            <SelectItem value="very-good">Very Good</SelectItem>
-                                            <SelectItem value="good">Good</SelectItem>
-                                            <SelectItem value="satisfactory">Satisfactory</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-
-                            {config.fields.includes('purpose') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="purpose" className="text-xs">Purpose</Label>
-                                    <Input
-                                        id="purpose"
-                                        {...register('purpose')}
-                                        placeholder="e.g., Bank account, Passport"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('academicYear') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="academicYear" className="text-xs">Academic Year</Label>
-                                    <Input
-                                        id="academicYear"
-                                        {...register('academicYear')}
-                                        placeholder="e.g., 2023-2024"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('dateOfLeaving') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="dateOfLeaving" className="text-xs">Date of Leaving</Label>
-                                    <Input
-                                        id="dateOfLeaving"
-                                        type="date"
-                                        {...register('dateOfLeaving')}
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('reason') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="reason" className="text-xs">Reason</Label>
-                                    <Input
-                                        id="reason"
-                                        {...register('reason')}
-                                        placeholder="Reason for leaving/transfer"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('eventName') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="eventName" className="text-xs">Event/Competition Name *</Label>
-                                    <Input
-                                        id="eventName"
-                                        {...register('eventName')}
-                                        placeholder="e.g., Science Fair 2024"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('position') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="position" className="text-xs">Position/Achievement</Label>
-                                    <Input
-                                        id="position"
-                                        {...register('position')}
-                                        placeholder="e.g., 1st Place, Gold Medal"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('title') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="title" className="text-xs">Certificate Title</Label>
-                                    <Input
-                                        id="title"
-                                        {...register('title')}
-                                        placeholder="Enter certificate title"
-                                        className="h-9 text-sm"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('content') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="content" className="text-xs">Certificate Content</Label>
-                                    <Textarea
-                                        id="content"
-                                        {...register('content')}
-                                        placeholder="Enter certificate content..."
-                                        rows={5}
-                                        className="text-sm resize-none"
-                                    />
-                                </div>
-                            )}
-
-                            {config.fields.includes('remarks') && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="remarks" className="text-xs">Remarks (Optional)</Label>
-                                    <Textarea
-                                        id="remarks"
-                                        {...register('remarks')}
-                                        placeholder="Any additional remarks..."
-                                        rows={3}
-                                        className="text-sm resize-none"
-                                    />
-                                </div>
+                            {!hasTemplateSelection && (
+                                <Alert>
+                                    <FileText className="h-4 w-4" />
+                                    <AlertTitle>Choose a template first</AlertTitle>
+                                    <AlertDescription>
+                                        The admin should select the template first, verify the mapping, and only then move to student generation.
+                                    </AlertDescription>
+                                </Alert>
                             )}
 
                             <div className="h-px bg-border my-2" />
 
                             {/* Field Mapping Panel */}
-                            {watchedValues.templateId && templates && (() => {
-                                const template = templates.find(t => t.id === watchedValues.templateId);
-                                if (!template?.layoutConfig?.elements) return null;
-                                // Detect all {{...}} placeholders from the template
-                                const placeholderSet = new Set();
-                                template.layoutConfig.elements.forEach(el => {
-                                    const text = el.content || el.url || '';
-                                    const matches = text.match(/\{\{([^}]+)\}\}/g);
-                                    if (matches) matches.forEach(m => placeholderSet.add(m.replace(/[{}]/g, '')));
-                                });
-                                const placeholders = Array.from(placeholderSet).sort();
-                                if (placeholders.length === 0) return null;
+                            {placeholderKeys.length > 0 && (
+                                <div className="space-y-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowFieldMapper(!showFieldMapper)}
+                                        className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                            <Settings2 className="h-3.5 w-3.5" />
+                                            Field Mapping ({placeholderKeys.length})
+                                            {missingPlaceholders.length > 0 && (
+                                                <Badge variant="destructive" className="ml-1 text-[10px] h-4">
+                                                    {missingPlaceholders.length} missing
+                                                </Badge>
+                                            )}
+                                        </span>
+                                        {showFieldMapper ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                    </button>
+                                    {missingPlaceholders.length > 0 && (
+                                        <Alert variant="destructive" className="py-2">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertTitle className="text-xs">Missing Required Mapping</AlertTitle>
+                                            <AlertDescription className="text-xs">
+                                                Complete all unresolved placeholders before generating. Missing: {missingPlaceholders.slice(0, 5).map(ph => `{{${ph}}}`).join(', ')}{missingPlaceholders.length > 5 ? '...' : ''}
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {missingPlaceholders.length > 0 && selectedTemplateEditUrl && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => router.push(selectedTemplateEditUrl)}
+                                        >
+                                            Edit Template Mapping
+                                        </Button>
+                                    )}
+                                    {showFieldMapper && (
+                                        <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                                            {placeholderKeys.map(ph => {
+                                                const resolved = resolvedMappings[ph] || '';
+                                                const isMapped = !!resolved;
+                                                const isOverridden = !!fieldOverrides[ph];
+                                                return (
+                                                    <div
+                                                        key={ph}
+                                                        className={`flex items-start gap-1.5 p-2 rounded text-xs border ${isMapped
+                                                            ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20'
+                                                            : 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20'
+                                                            }`}
+                                                    >
+                                                        {isMapped ? (
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 flex-shrink-0" />
+                                                        ) : (
+                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium text-[11px] text-foreground truncate">
+                                                                {`{{${ph}}}`}
+                                                            </div>
+                                                            {!isOverridden && resolved && (
+                                                                <div className="text-[10px] text-muted-foreground truncate" title={resolved}>
+                                                                    Auto: {resolved}
+                                                                </div>
+                                                            )}
+                                                            {!resolved && !isOverridden && (
+                                                                <div className="text-[10px] text-amber-700 dark:text-amber-400">
+                                                                    Not found in current student/template data
+                                                                </div>
+                                                            )}
+                                                            <input
+                                                                type="text"
+                                                                placeholder={resolved || 'Enter value to override missing mapping...'}
+                                                                value={fieldOverrides[ph] || ''}
+                                                                onChange={(e) => setFieldOverrides(prev => ({ ...prev, [ph]: e.target.value }))}
+                                                                className="mt-1 w-full h-7 text-[11px] px-2 rounded border bg-background focus:ring-1 focus:ring-primary/30 outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                const student = students?.find(s => s.userId === watchedValues.studentId) || {};
-                                const conductLabels = { 'excellent': 'Excellent', 'very-good': 'Very Good', 'good': 'Good', 'satisfactory': 'Satisfactory' };
-                                // Get auto-resolved values for display
-                                const autoValues = {
-                                    studentName: student.name || '',
-                                    rollNumber: student.rollNumber || '',
-                                    admissionNo: student.admissionNo || '',
-                                    class: student.class?.className || '',
-                                    section: student.section?.sectionName || '',
-                                    dob: student.dob ? new Date(student.dob).toLocaleDateString() : '',
-                                    fatherName: student.fatherName || '',
-                                    motherName: student.motherName || '',
-                                    address: student.address || '',
-                                    schoolName: fullUser?.schoolName || '',
-                                    schoolAddress: fullUser?.school?.address || '',
-                                    issueDate: watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : '',
-                                    conduct: conductLabels[watchedValues.conduct] || watchedValues.conduct || '',
-                                    purpose: watchedValues.purpose || '',
-                                    academicYear: watchedValues.academicYear || '',
-                                    dateOfLeaving: watchedValues.dateOfLeaving ? new Date(watchedValues.dateOfLeaving).toLocaleDateString() : '',
-                                    reason: watchedValues.reason || '',
-                                    eventName: watchedValues.eventName || '',
-                                    position: watchedValues.position || '',
-                                    title: watchedValues.title || '',
-                                    content: watchedValues.content || '',
-                                    remarks: watchedValues.remarks || '',
-                                    nationality: student.nationality || '',
-                                    religion: student.religion || '',
-                                    category: student.category || '',
-                                    bloodGroup: student.bloodGroup || '',
-                                    gender: student.gender || '',
-                                };
+                            {mappingReady ? (
+                                <>
+                                    <div className="h-px bg-border my-2" />
 
-                                return (
-                                    <div className="space-y-2">
+                                    <div className="rounded-lg border dark:bg-muted/30 bg-[#f4f4f4] p-3 space-y-3">
                                         <button
                                             type="button"
-                                            onClick={() => setShowFieldMapper(!showFieldMapper)}
-                                            className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+                                            onClick={() => setShowStudentFilters(prev => !prev)}
+                                            className="flex w-full items-center justify-between text-sm font-medium"
                                         >
-                                            <span className="flex items-center gap-1.5">
-                                                <Settings2 className="h-3.5 w-3.5" />
-                                                Field Mapping ({placeholders.length})
-                                            </span>
-                                            {showFieldMapper ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                            <span>Student Filters</span>
+                                            {showStudentFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                         </button>
-                                        {showFieldMapper && (
-                                            <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                                                {placeholders.map(ph => {
-                                                    const resolved = fieldOverrides[ph] || autoValues[ph] || '';
-                                                    const isMapped = !!resolved;
-                                                    const isOverridden = !!fieldOverrides[ph];
-                                                    return (
-                                                        <div key={ph} className={`flex items-start gap-1.5 p-1.5 rounded text-xs border ${isMapped ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20' : 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20'
-                                                            }`}>
-                                                            {isMapped ? (
-                                                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 flex-shrink-0" />
-                                                            ) : (
-                                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
-                                                            )}
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="font-medium text-[11px] text-foreground truncate">
-                                                                    {`{{${ph}}}`}
-                                                                </div>
-                                                                {!isOverridden && resolved && (
-                                                                    <div className="text-[10px] text-muted-foreground truncate" title={resolved}>
-                                                                        → {resolved}
-                                                                    </div>
-                                                                )}
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder={resolved || 'Enter value...'}
-                                                                    value={fieldOverrides[ph] || ''}
-                                                                    onChange={(e) => setFieldOverrides(prev => ({ ...prev, [ph]: e.target.value }))}
-                                                                    className="mt-0.5 w-full h-6 text-[11px] px-1.5 rounded border bg-background focus:ring-1 focus:ring-primary/30 outline-none"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                        {showStudentFilters && (
+                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <Select value={classFilter || 'all'} onValueChange={(value) => { setClassFilter(value === 'all' ? '' : value); setSectionFilter(''); }}>
+                                                    <SelectTrigger className="h-9 text-sm">
+                                                        <SelectValue placeholder="All Classes" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">All Classes</SelectItem>
+                                                        {availableClasses.map(c => (
+                                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Select value={sectionFilter || 'all'} onValueChange={(value) => setSectionFilter(value === 'all' ? '' : value)} disabled={!classFilter}>
+                                                    <SelectTrigger className="h-9 text-sm">
+                                                        <SelectValue placeholder="All Sections" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">All Sections</SelectItem>
+                                                        {availableSections.map(s => (
+                                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <div className="sm:col-span-2">
+                                                    <Input
+                                                        placeholder="Search student by name or roll number..."
+                                                        value={studentSearch}
+                                                        onChange={(e) => setStudentSearch(e.target.value)}
+                                                        className="h-9 text-sm"
+                                                    />
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })()}
 
-                            <div className="h-px bg-border my-2" />
-
-                            {/* Parent Sharing */}
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</Label>
-                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                    <div className="space-y-0.5">
-                                        <Label className="text-sm dark:text-black font-medium">Push to Parents</Label>
-                                        <p className="text-[10px] dark:text-muted-foreground">
-                                            Send notification & make visible in parent app
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="studentId" className="text-xs flex items-center gap-1.5">
+                                            <User className="h-3.5 w-3.5" />
+                                            Select Student *
+                                        </Label>
+                                        <Select
+                                            value={watchedValues.studentId}
+                                            onValueChange={(value) => setValue('studentId', value)}
+                                        >
+                                            <SelectTrigger className="h-9 text-sm">
+                                                <SelectValue placeholder="Choose a student..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[320px]">
+                                                {filteredStudents?.map((student) => (
+                                                    <SelectItem key={student.userId} value={student.userId}>
+                                                        <div className="flex flex-col text-left">
+                                                            <span>{student.name || student.user?.name}</span>
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                Roll: {student.rollNumber} | {student.class?.className}{student.section?.sectionName ? ` - ${student.section.sectionName}` : ''}
+                                                            </span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                                {filteredStudents?.length === 0 && (
+                                                    <div className="text-center text-xs text-muted-foreground py-3">No students found</div>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        {errors.studentId && (
+                                            <p className="text-xs text-red-500">{errors.studentId.message}</p>
+                                        )}
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {filteredStudents?.length || 0} students visible
                                         </p>
                                     </div>
-                                    <input
-                                        type="checkbox"
-                                        {...register('showToParent')}
-                                        className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
+
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="issueDate" className="text-xs flex items-center gap-1.5">
+                                            <Calendar className="h-3.5 w-3.5" />
+                                            Issue Date *
+                                        </Label>
+                                        <Input
+                                            id="issueDate"
+                                            type="date"
+                                            {...register('issueDate')}
+                                            className="h-9 text-sm"
+                                        />
+                                        {errors.issueDate && (
+                                            <p className="text-xs text-red-500">{errors.issueDate.message}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="h-px bg-border my-2" />
+
+                                    {config.fields.includes('conduct') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="conduct" className="text-xs">Conduct</Label>
+                                            <Select
+                                                value={watchedValues.conduct}
+                                                onValueChange={(value) => setValue('conduct', value)}
+                                            >
+                                                <SelectTrigger className="h-9 text-sm">
+                                                    <SelectValue placeholder="Select conduct..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="excellent">Excellent</SelectItem>
+                                                    <SelectItem value="very-good">Very Good</SelectItem>
+                                                    <SelectItem value="good">Good</SelectItem>
+                                                    <SelectItem value="satisfactory">Satisfactory</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('purpose') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="purpose" className="text-xs">Purpose</Label>
+                                            <Input
+                                                id="purpose"
+                                                {...register('purpose')}
+                                                placeholder="e.g., Bank account, Passport"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('academicYear') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="academicYear" className="text-xs">Academic Year</Label>
+                                            <Input
+                                                id="academicYear"
+                                                {...register('academicYear')}
+                                                placeholder="e.g., 2023-2024"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('dateOfLeaving') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="dateOfLeaving" className="text-xs">Date of Leaving</Label>
+                                            <Input
+                                                id="dateOfLeaving"
+                                                type="date"
+                                                {...register('dateOfLeaving')}
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('reason') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="reason" className="text-xs">Reason</Label>
+                                            <Input
+                                                id="reason"
+                                                {...register('reason')}
+                                                placeholder="Reason for leaving/transfer"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('eventName') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="eventName" className="text-xs">Event/Competition Name *</Label>
+                                            <Input
+                                                id="eventName"
+                                                {...register('eventName')}
+                                                placeholder="e.g., Science Fair 2024"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('position') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="position" className="text-xs">Position/Achievement</Label>
+                                            <Input
+                                                id="position"
+                                                {...register('position')}
+                                                placeholder="e.g., 1st Place, Gold Medal"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('title') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="title" className="text-xs">Certificate Title</Label>
+                                            <Input
+                                                id="title"
+                                                {...register('title')}
+                                                placeholder="Enter certificate title"
+                                                className="h-9 text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('content') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="content" className="text-xs">Certificate Content</Label>
+                                            <Textarea
+                                                id="content"
+                                                {...register('content')}
+                                                placeholder="Enter certificate content..."
+                                                rows={5}
+                                                className="text-sm resize-none"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {config.fields.includes('remarks') && (
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="remarks" className="text-xs">Remarks (Optional)</Label>
+                                            <Textarea
+                                                id="remarks"
+                                                {...register('remarks')}
+                                                placeholder="Any additional remarks..."
+                                                rows={3}
+                                                className="text-sm resize-none"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="h-px bg-border my-2" />
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</Label>
+                                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                            <div className="space-y-0.5">
+                                                <Label className="text-sm dark:text-black font-medium">Push to Parents</Label>
+                                                <p className="text-[10px] dark:text-muted-foreground">
+                                                    Send notification & make visible in parent app
+                                                </p>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                {...register('showToParent')}
+                                                className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                    Student selection and certificate details unlock only after the selected template mapping is fully resolved.
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </ScrollArea>
                 </div>
@@ -871,12 +968,14 @@ export default function GenerateCertificatePage() {
                             <Award className="h-16 w-16 text-muted-foreground mb-4" />
                             <h3 className="text-lg font-semibold mb-2">No Preview Available</h3>
                             <p className="text-sm text-muted-foreground">
-                                Select a student and template to see the preview
+                                {hasTemplateSelection
+                                    ? 'Resolve template mapping first, then choose a student to continue.'
+                                    : 'Choose a certificate type and template to start the guided generation flow.'}
                             </p>
                         </div>
                     ) : (
                         <div className="min-h-full p-8 flex items-start justify-center">
-                            <div id="certificate-capture-target" className="bg-white">
+                            <div id="certificate-capture-target" className="bg-white max-w-full">
                                 <CertificateDesignEditor
                                     key={JSON.stringify(previewConfig)}
                                     initialConfig={previewConfig}
