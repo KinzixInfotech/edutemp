@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function PrivacyPolicy() {
     return (
-        <div className="max-w-4xl mt-5 mx-auto px-4 py-16 text-gray-800">
+        <div className="max-w-4xl mt-25 mx-auto px-4 py-16 text-gray-800">
             <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
             <p className="text-sm text-gray-500 mb-6">
                 Last updated: February 24, 2026
