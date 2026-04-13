@@ -131,9 +131,7 @@ export default function Footer() {
                                 height={130}
                             />
                         </a>
-                        <a onClick={() => {
-                            alert('Coming Soon!')
-                        }}>
+                        <a href="https://apps.apple.com/us/app/edubreezy-school-erp/id6761730373" target="_blank" >
                             <img
                                 src="/buttons/appstore.svg"
                                 alt="App Store"
