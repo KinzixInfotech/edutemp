@@ -59,6 +59,8 @@ const FIELD_LABELS = {
     boards: 'Educational Boards',
     genderType: 'Gender Focus',
     religiousAffiliation: 'Religious Affiliation',
+    atlasClassFrom: 'Admissions From',
+    atlasClassTo: 'Admissions To',
     socials: 'Social Links',
     leadership: 'Leadership Team',
 };
@@ -450,6 +452,37 @@ export default function PublicProfileSettings() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
+                                <Label htmlFor="atlasClassFrom">Admissions From</Label>
+                                <Input
+                                    id="atlasClassFrom"
+                                    type="text"
+                                    value={formData.atlasClassFrom || ''}
+                                    onChange={(e) => handleChange('atlasClassFrom', e.target.value)}
+                                    placeholder="e.g. Nursery"
+                                    className="mt-2"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Lowest class offered on your public profile
+                                </p>
+                            </div>
+                            <div>
+                                <Label htmlFor="atlasClassTo">Admissions To</Label>
+                                <Input
+                                    id="atlasClassTo"
+                                    type="text"
+                                    value={formData.atlasClassTo || ''}
+                                    onChange={(e) => handleChange('atlasClassTo', e.target.value)}
+                                    placeholder="e.g. Class 12"
+                                    className="mt-2"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Highest class offered on your public profile
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
                                 <Label htmlFor="boards">Educational Boards</Label>
                                 <Input 
                                     id="boards" 
@@ -491,7 +524,7 @@ export default function PublicProfileSettings() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            </div>
+                        </div>
                     </div>
                 </Card>
 

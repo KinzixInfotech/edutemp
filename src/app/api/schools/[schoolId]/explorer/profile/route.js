@@ -18,6 +18,11 @@ const PROFILE_FIELDS = [
     'boards', 'genderType', 'religiousAffiliation', 'socials', 'leadership'
 ];
 
+const SCHOOL_ATLAS_FIELDS = {
+    atlasClassFrom: 'atlas_classFrom',
+    atlasClassTo: 'atlas_classTo',
+};
+
 export async function GET(req, props) {
     try {
         const params = await props.params;
@@ -29,6 +34,8 @@ export async function GET(req, props) {
                 location: true,
                 profilePicture: true,
                 contactNumber: true,
+                atlas_classFrom: true,
+                atlas_classTo: true,
             }
         });
 
@@ -41,6 +48,8 @@ export async function GET(req, props) {
                         location: true,
                         profilePicture: true,
                         contactNumber: true,
+                        atlas_classFrom: true,
+                        atlas_classTo: true,
                     }
                 }
             }
@@ -58,7 +67,14 @@ export async function GET(req, props) {
                 },
                 include: {
                     school: {
-                        select: { name: true, location: true, profilePicture: true, contactNumber: true }
+                        select: {
+                            name: true,
+                            location: true,
+                            profilePicture: true,
+                            contactNumber: true,
+                            atlas_classFrom: true,
+                            atlas_classTo: true,
+                        }
                     }
                 }
             });
@@ -78,7 +94,12 @@ export async function GET(req, props) {
             orderBy: { createdAt: 'desc' },
         });
 
-        return NextResponse.json({ ...profile, pendingChanges });
+        return NextResponse.json({
+            ...profile,
+            atlasClassFrom: profile.school?.atlas_classFrom || currentSchool?.atlas_classFrom || '',
+            atlasClassTo: profile.school?.atlas_classTo || currentSchool?.atlas_classTo || '',
+            pendingChanges,
+        });
 
     } catch (error) {
         console.error('[PUBLIC PROFILE API ERROR]', error);
@@ -107,6 +128,13 @@ export async function PATCH(req, props) {
         let currentProfile = await prisma.schoolPublicProfile.findUnique({
             where: { schoolId },
         });
+        const currentSchool = await prisma.school.findUnique({
+            where: { id: schoolId },
+            select: {
+                atlas_classFrom: true,
+                atlas_classTo: true,
+            },
+        });
 
         if (!currentProfile) {
             currentProfile = await prisma.schoolPublicProfile.create({
@@ -125,6 +153,16 @@ export async function PATCH(req, props) {
                 const newStr = JSON.stringify(newVal ?? null);
                 if (oldStr !== newStr) {
                     changes[field] = { old: oldVal ?? null, new: newVal ?? null };
+                }
+            }
+        }
+
+        for (const [requestField, schoolField] of Object.entries(SCHOOL_ATLAS_FIELDS)) {
+            if (requestField in updateData) {
+                const oldVal = currentSchool?.[schoolField] ?? null;
+                const normalizedNewVal = updateData[requestField]?.trim?.() || null;
+                if (JSON.stringify(oldVal) !== JSON.stringify(normalizedNewVal)) {
+                    changes[requestField] = { old: oldVal, new: normalizedNewVal };
                 }
             }
         }

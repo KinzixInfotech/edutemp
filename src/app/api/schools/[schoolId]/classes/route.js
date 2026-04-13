@@ -5,6 +5,46 @@ import { remember, generateKey, invalidatePattern } from "@/lib/cache"
 
 const normalizeClassName = (value) => value?.trim().replace(/\s+/g, " ") || "";
 
+const getClassStudentCount = (cls) => {
+  if (typeof cls?._count?.students === "number") return cls._count.students;
+  if (Array.isArray(cls?.students)) return cls.students.length;
+  if (Array.isArray(cls?.sections)) {
+    return cls.sections.reduce((sum, sec) => sum + (sec?._count?.students || 0), 0);
+  }
+  return 0;
+};
+
+const dedupeClassesByName = (classes = []) => {
+  const deduped = new Map();
+
+  for (const cls of classes) {
+    const key = normalizeClassName(cls?.className).toLowerCase();
+    if (!key) continue;
+
+    const existing = deduped.get(key);
+    if (!existing) {
+      deduped.set(key, cls);
+      continue;
+    }
+
+    const existingStudents = getClassStudentCount(existing);
+    const currentStudents = getClassStudentCount(cls);
+    const existingSections = existing?.sections?.length || 0;
+    const currentSections = cls?.sections?.length || 0;
+
+    const shouldReplace =
+      currentStudents > existingStudents ||
+      (currentStudents === existingStudents && currentSections > existingSections) ||
+      (currentStudents === existingStudents && currentSections === existingSections && cls.id > existing.id);
+
+    if (shouldReplace) {
+      deduped.set(key, cls);
+    }
+  }
+
+  return Array.from(deduped.values());
+};
+
 // 👉 Create new class and automatically connect to active academic year
 export async function POST(req, props) {
   const params = await props.params
@@ -247,6 +287,8 @@ export async function GET(req, props) {
         ]);
       }
 
+      classes = dedupeClassesByName(classes);
+
       // Post-process: capacity filter (can't be done in Prisma where easily)
       if (capacityFilter === "OVER") {
         classes = classes.filter(cls => {
@@ -286,10 +328,10 @@ export async function GET(req, props) {
       return {
         data: processedClasses,
         meta: {
-          total,
+          total: processedClasses.length,
           page,
           limit,
-          totalPages: Math.ceil(total / (limit || 1)),
+          totalPages: Math.ceil(processedClasses.length / (limit || 1)),
         }
       };
 

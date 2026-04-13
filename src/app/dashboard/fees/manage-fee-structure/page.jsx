@@ -705,11 +705,11 @@ export default function FeeStructuresManagement() {
                           <DropdownMenuContent align="end" className="w-44">
                             <DropdownMenuItem onClick={() => { setSelected(s); setViewOpen(true); }}><Eye className="w-4 h-4 mr-2" />View Details</DropdownMenuItem>
                             {isDraft && <DropdownMenuItem onClick={() => openEdit(s)}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>}
-                            <DropdownMenuItem onClick={() => { setCloneTarget(s); setCloneName(`${s.name} (Copy)`); setCloneYearId(academicYearId); setCloneOpen(true); }}><Copy className="w-4 h-4 mr-2" />Clone</DropdownMenuItem>
+                            {/* <DropdownMenuItem onClick={() => { setCloneTarget(s); setCloneName(`${s.name} (Copy)`); setCloneYearId(academicYearId); setCloneOpen(true); }}><Copy className="w-4 h-4 mr-2" />Clone</DropdownMenuItem> */}
                             <DropdownMenuSeparator />
-                            {isActive && <DropdownMenuItem onClick={() => archiveMutation.mutate(s.id)} className="text-orange-600"><Archive className="w-4 h-4 mr-2" />Archive</DropdownMenuItem>}
-                            {isArchived && <DropdownMenuItem onClick={() => unarchiveMutation.mutate(s.id)} className="text-green-600"><CheckCircle className="w-4 h-4 mr-2" />Restore</DropdownMenuItem>}
-                            {isDraft && <DropdownMenuItem onClick={() => { if (confirm('Delete this draft?')) deleteMutation.mutate(s.id); }} className="text-red-600"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>}
+                            {/* {isActive && <DropdownMenuItem onClick={() => archiveMutation.mutate(s.id)} className="text-orange-600"><Archive className="w-4 h-4 mr-2" />Archive</DropdownMenuItem>} */}
+                            {/* {isArchived && <DropdownMenuItem onClick={() => unarchiveMutation.mutate(s.id)} className="text-green-600"><CheckCircle className="w-4 h-4 mr-2" />Restore</DropdownMenuItem>} */}
+                            {/* {isDraft && <DropdownMenuItem onClick={() => { if (confirm('Delete this draft?')) deleteMutation.mutate(s.id); }} className="text-red-600"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>} */}
                             {(isActive || isArchived) && <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />{isArchived ? 'Read only' : `${assigned} students`}</div>}
                           </DropdownMenuContent>
                         </DropdownMenu>

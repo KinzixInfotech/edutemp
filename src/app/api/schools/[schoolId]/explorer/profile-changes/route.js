@@ -7,6 +7,11 @@ import prisma from '@/lib/prisma';
 import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
+const SCHOOL_ATLAS_FIELDS = {
+    atlasClassFrom: 'atlas_classFrom',
+    atlasClassTo: 'atlas_classTo',
+};
+
 export async function GET(req, props) {
     try {
         const params = await props.params;
@@ -125,15 +130,36 @@ export async function POST(req, props) {
                 // Apply the changes to the actual profile
                 const changes = changeRequest.changes;
                 const updateData = {};
+                const schoolUpdateData = {};
                 for (const [field, diff] of Object.entries(changes)) {
-                    updateData[field] = diff.new;
+                    if (SCHOOL_ATLAS_FIELDS[field]) {
+                        schoolUpdateData[SCHOOL_ATLAS_FIELDS[field]] = diff.new;
+                    } else {
+                        updateData[field] = diff.new;
+                    }
                 }
 
-                updatedProfile = await prisma.schoolPublicProfile.update({
-                    where: { schoolId: changeRequest.schoolId },
-                    data: updateData,
-                    select: { id: true, schoolId: true, slug: true },
-                });
+                if (Object.keys(updateData).length > 0) {
+                    updatedProfile = await prisma.schoolPublicProfile.update({
+                        where: { schoolId: changeRequest.schoolId },
+                        data: updateData,
+                        select: { id: true, schoolId: true, slug: true },
+                    });
+                }
+
+                if (Object.keys(schoolUpdateData).length > 0) {
+                    await prisma.school.update({
+                        where: { id: changeRequest.schoolId },
+                        data: schoolUpdateData,
+                    });
+                }
+
+                if (!updatedProfile) {
+                    updatedProfile = await prisma.schoolPublicProfile.findUnique({
+                        where: { schoolId: changeRequest.schoolId },
+                        select: { id: true, schoolId: true, slug: true },
+                    });
+                }
 
             } else if (changeRequest.type === 'VERIFICATION_REQUEST') {
                 // Set isVerified = true on the profile

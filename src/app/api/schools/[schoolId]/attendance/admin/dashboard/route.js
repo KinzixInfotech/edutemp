@@ -22,6 +22,8 @@ export async function GET(req, props) {
     : null;
 
   const status = searchParams.get('status');
+  const requestedAcademicYearId = searchParams.get('academicYearId');
+  const classId = searchParams.get('classId');
   const trendRange = searchParams.get('trendRange') || '30d'; // 30d, 2m, 6m, 1y
 
   try {
@@ -58,6 +60,8 @@ export async function GET(req, props) {
     if (!academicYear) {
       return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
     }
+
+    const effectiveAcademicYearId = requestedAcademicYearId || academicYear.id;
 
     // Day info
     const dayOfWeek = today.getDay();
@@ -163,6 +167,8 @@ export async function GET(req, props) {
         LEFT JOIN "Student" s ON s."classId" = c.id AND s."schoolId" = ${schoolId}::uuid
         LEFT JOIN "Attendance" a ON a."userId" = s."userId" AND a.date = ${todayStr}::date
         WHERE c."schoolId" = ${schoolId}::uuid
+          AND c."academicYearId" = ${effectiveAcademicYearId}::uuid
+          AND (${classId || null}::text IS NULL OR c.id = (${classId || null})::int)
         GROUP BY c.id, c."className"
         ORDER BY c."className"
       `,

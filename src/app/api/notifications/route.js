@@ -5,15 +5,16 @@ import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 /**
  * GET - Fetch notifications for a user
- * Query params: userId, schoolId, unreadOnly, page, limit
+ * Query params: userId, schoolId, unreadOnly, page, offset, limit
  */
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const schoolId = searchParams.get("schoolId");
     const unreadOnly = searchParams.get("unreadOnly") === "true";
-    const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const offsetParam = searchParams.get("offset");
+    const pageParam = searchParams.get("page");
     const type = searchParams.get("type");
 
     if (!userId) {
@@ -21,10 +22,21 @@ export async function GET(req) {
     }
 
     try {
-        const cacheKey = generateKey('notifications:list', { userId, schoolId, unreadOnly, page, limit, type });
+        const offset = offsetParam !== null
+            ? Math.max(parseInt(offsetParam || "0", 10), 0)
+            : (Math.max(parseInt(pageParam || "1", 10), 1) - 1) * limit;
+        const page = Math.floor(offset / limit) + 1;
+
+        const cacheKey = generateKey('notifications:list', {
+            userId,
+            schoolId,
+            unreadOnly,
+            offset,
+            limit,
+            type,
+        });
 
         const result = await remember(cacheKey, async () => {
-            const skip = (page - 1) * limit;
             const where = {
                 receiverId: userId,
                 ...(schoolId && { schoolId }),
@@ -53,27 +65,35 @@ export async function GET(req) {
                     { isRead: 'asc' },
                     { createdAt: 'desc' }
                 ],
-                skip,
+                skip: offset,
                 take: limit,
             });
 
             // Get total count
             const totalCount = await prisma.notification.count({ where });
             const unreadCount = await prisma.notification.count({
-                where: { receiverId: userId, isRead: false }
+                where: {
+                    receiverId: userId,
+                    isRead: false,
+                    ...(schoolId && { schoolId }),
+                }
             });
 
             // Group by date for better UX
             const grouped = groupNotificationsByDate(notifications);
+            const hasMore = offset + notifications.length < totalCount;
 
             return {
                 success: true,
                 notifications: grouped,
                 pagination: {
                     page,
+                    offset,
                     limit,
                     total: totalCount,
                     totalPages: Math.ceil(totalCount / limit),
+                    hasMore,
+                    nextOffset: hasMore ? offset + notifications.length : null,
                 },
                 unreadCount,
             };
@@ -132,7 +152,7 @@ export async function HEAD(req) {
 export async function PUT(req) {
     try {
         const body = await req.json();
-        const { notificationIds, markAllAsRead, userId, type } = body;
+        const { notificationIds, markAllAsRead, userId, schoolId, type } = body;
 
         if (markAllAsRead && userId) {
             // Mark all as read for a user (optionally filtered by type)
@@ -140,6 +160,7 @@ export async function PUT(req) {
                 where: {
                     receiverId: userId,
                     isRead: false,
+                    ...(schoolId && { schoolId }),
                     ...(type && { type }),
                 },
                 data: {
@@ -166,6 +187,8 @@ export async function PUT(req) {
         // Mark specific notifications as read
         await prisma.notification.updateMany({
             where: {
+                receiverId: userId,
+                ...(schoolId && { schoolId }),
                 id: { in: notificationIds },
             },
             data: {
@@ -191,17 +214,25 @@ export async function PUT(req) {
 
 /**
  * DELETE - Delete notifications
- * Body: { notificationIds: string[] }
+ * Body: { notificationIds: string[], userId: string } or { clearAll: true, userId: string }
  */
 export async function DELETE(req) {
     try {
         const body = await req.json();
-        const { notificationIds, clearAll, userId } = body;
+        const { notificationIds, clearAll, userId, schoolId } = body;
+
+        if (!userId) {
+            return NextResponse.json(
+                { error: "userId is required" },
+                { status: 400 }
+            );
+        }
 
         if (clearAll && userId) {
             await prisma.notification.deleteMany({
                 where: {
-                    receiverId: userId
+                    receiverId: userId,
+                    ...(schoolId && { schoolId }),
                 }
             });
 
@@ -222,11 +253,13 @@ export async function DELETE(req) {
 
         await prisma.notification.deleteMany({
             where: {
+                receiverId: userId,
+                ...(schoolId && { schoolId }),
                 id: { in: notificationIds },
             },
         });
 
-        await invalidatePattern('notifications:*');
+        await invalidatePattern(`notifications:*${userId}*`);
 
         return NextResponse.json({
             success: true,

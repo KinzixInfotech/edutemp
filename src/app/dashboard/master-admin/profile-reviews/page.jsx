@@ -58,7 +58,10 @@ const FIELD_LABELS = {
     totalStudents: 'Students', totalTeachers: 'Teachers', studentTeacherRatio: 'Ratio',
     isPubliclyVisible: 'Visible', isFeatured: 'Featured', isVerified: 'Verified',
     boards: 'Educational Boards', genderType: 'Gender Focus',
-    religiousAffiliation: 'Religious Affiliation', socials: 'Social Links',
+    religiousAffiliation: 'Religious Affiliation',
+    atlasClassFrom: 'Admissions From',
+    atlasClassTo: 'Admissions To',
+    socials: 'Social Links',
     leadership: 'Leadership Team',
 };
 

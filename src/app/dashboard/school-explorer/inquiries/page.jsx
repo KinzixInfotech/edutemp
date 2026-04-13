@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,13 +65,14 @@ const statCardConfig = [
 
 export default function AdmissionInquiries() {
     const { fullUser } = useAuth();
+    const router = useRouter();
     const queryClient = useQueryClient();
     const [statusFilter, setStatusFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(1);
     const [selectedInquiry, setSelectedInquiry] = useState(null);
-    const [updatingStatus, setUpdatingStatus] = useState('');
     const [notes, setNotes] = useState('');
+    const [draftStatus, setDraftStatus] = useState('');
 
     const { data, isLoading } = useQuery({
         queryKey: ['school-inquiries', fullUser?.schoolId, statusFilter, page],
@@ -142,6 +144,7 @@ export default function AdmissionInquiries() {
             queryClient.invalidateQueries(['school-explorer-analytics']);
             setSelectedInquiry(null);
             setNotes('');
+            setDraftStatus('');
             toast.success('Inquiry updated successfully');
         },
         onError: () => {
@@ -149,14 +152,32 @@ export default function AdmissionInquiries() {
         },
     });
 
-    const handleStatusChange = (status) => {
-        setUpdatingStatus(status);
-        updateMutation.mutate({
-            inquiryId: selectedInquiry.id,
-            status,
-            notes,
-        });
-    };
+    const convertMutation = useMutation({
+        mutationFn: async ({ inquiryId, notes: inquiryNotes }) => {
+            const response = await fetch(`/api/schools/${fullUser.schoolId}/explorer/inquiries`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ inquiryId, notes: inquiryNotes, convertToLead: true }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to move inquiry');
+            return result;
+        },
+        onSuccess: (result) => {
+            queryClient.invalidateQueries(['school-inquiries']);
+            queryClient.invalidateQueries(['school-inquiries-all']);
+            queryClient.invalidateQueries(['school-explorer-analytics']);
+            queryClient.invalidateQueries(['applications']);
+            setSelectedInquiry(null);
+            setNotes('');
+            setDraftStatus('');
+            toast.success(result.created ? 'Moved to admission leads' : 'Lead already exists in admissions');
+            router.push('/dashboard/schools/admissions/applications');
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to move inquiry to admissions');
+        },
+    });
 
     const pagination = data?.pagination;
     const totalPages = pagination?.totalPages || 1;
@@ -340,6 +361,7 @@ export default function AdmissionInquiries() {
                                             onClick={() => {
                                                 setSelectedInquiry(inquiry);
                                                 setNotes(inquiry.notes || '');
+                                                setDraftStatus(inquiry.status || 'New');
                                             }}
                                         >
                                             <TableCell className="px-4 py-3">
@@ -389,6 +411,7 @@ export default function AdmissionInquiries() {
                                                         e.stopPropagation();
                                                         setSelectedInquiry(inquiry);
                                                         setNotes(inquiry.notes || '');
+                                                        setDraftStatus(inquiry.status || 'New');
                                                     }}
                                                 >
                                                     View
@@ -444,7 +467,16 @@ export default function AdmissionInquiries() {
             </Card>
 
             {/* Inquiry Detail Dialog */}
-            <Dialog open={!!selectedInquiry} onOpenChange={() => setSelectedInquiry(null)}>
+            <Dialog
+                open={!!selectedInquiry}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSelectedInquiry(null);
+                        setNotes('');
+                        setDraftStatus('');
+                    }
+                }}
+            >
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-lg">Inquiry Details</DialogTitle>
@@ -531,29 +563,42 @@ export default function AdmissionInquiries() {
                                     {STATUSES.map(status => (
                                         <Button
                                             key={status}
-                                            variant={selectedInquiry.status === status ? 'default' : 'outline'}
+                                            variant={draftStatus === status ? 'default' : 'outline'}
                                             size="sm"
-                                            onClick={() => handleStatusChange(status)}
-                                            disabled={updateMutation.isPending && updatingStatus === status}
+                                            onClick={() => setDraftStatus(status)}
+                                            disabled={updateMutation.isPending || convertMutation.isPending}
                                         >
-                                            {updateMutation.isPending && updatingStatus === status ? 'Updating...' : status}
+                                            {status}
                                         </Button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Save Notes */}
-                            <Button
-                                onClick={() => updateMutation.mutate({
-                                    inquiryId: selectedInquiry.id,
-                                    status: selectedInquiry.status,
-                                    notes,
-                                })}
-                                disabled={updateMutation.isPending}
-                                className="w-full"
-                            >
-                                {updateMutation.isPending ? 'Saving...' : 'Save Notes'}
-                            </Button>
+                            <div className="flex flex-col gap-3 pt-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => convertMutation.mutate({
+                                        inquiryId: selectedInquiry.id,
+                                        notes,
+                                    })}
+                                    disabled={convertMutation.isPending}
+                                    className="w-full"
+                                >
+                                    {convertMutation.isPending ? 'Moving...' : 'Move to Admission Lead'}
+                                </Button>
+                                <Button
+                                    onClick={() => updateMutation.mutate({
+                                        inquiryId: selectedInquiry.id,
+                                        status: draftStatus || selectedInquiry.status,
+                                        notes,
+                                    })}
+                                    disabled={updateMutation.isPending || convertMutation.isPending}
+                                    className="w-full"
+                                >
+                                    {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </DialogContent>
