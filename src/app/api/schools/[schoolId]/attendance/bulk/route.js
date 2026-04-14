@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { notifyBulkAttendanceMarked } from '@/lib/notifications/notificationHelper';
 import { remember, generateKey, invalidatePattern } from '@/lib/cache';
+import { getAttendanceConfigSnapshot, requiresApprovalForDate } from '@/lib/attendance/config';
 
 const CACHE_TTL = 120; // 2 minutes (short because attendance can change)
 
@@ -410,9 +411,13 @@ export async function POST(req, props) {
     });
 
     const today = ISTDate();
-    const requiresApproval = attendanceDate < today;
-
     const config = await prisma.attendanceConfig.findUnique({ where: { schoolId } });
+    const configSnapshot = config ? getAttendanceConfigSnapshot(config) : null;
+    const requiresApproval = requiresApprovalForDate(
+      attendanceDate,
+      configSnapshot?.approvalAfterDays ?? 0,
+      today
+    );
 
     const results = { success: [], failed: [], skipped: [] };
     let providedAttendance = Array.isArray(attendance) ? attendance : [];

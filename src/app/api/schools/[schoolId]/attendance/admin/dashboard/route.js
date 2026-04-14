@@ -41,8 +41,8 @@ export async function GET(req, props) {
     ));
     const todayStr = today.toISOString().split('T')[0];
 
-    // PARALLEL BATCH 1: Calendar, Academic Year, Today Stats
-    const [calendar, academicYear, todayStats] = await Promise.all([
+    // PARALLEL BATCH 1: Calendar, Academic Year, Today Stats, Config
+    const [calendar, academicYear, todayStats, attendanceConfig] = await Promise.all([
       prisma.schoolCalendar.findUnique({
         where: { schoolId_date: { schoolId, date: today } }
       }),
@@ -54,6 +54,12 @@ export async function GET(req, props) {
         by: ['status'],
         where: { schoolId, date: today },
         _count: { id: true },
+      }),
+      prisma.attendanceConfig.upsert({
+        where: { schoolId },
+        update: {},
+        create: { schoolId },
+        select: { minAttendancePercent: true }
       })
     ]);
 
@@ -62,6 +68,7 @@ export async function GET(req, props) {
     }
 
     const effectiveAcademicYearId = requestedAcademicYearId || academicYear.id;
+    const attendanceThreshold = attendanceConfig.minAttendancePercent;
 
     // Day info
     const dayOfWeek = today.getDay();
@@ -266,7 +273,7 @@ export async function GET(req, props) {
             academicYearId: academicYear.id,
             month: date.getMonth() + 1,
             year: date.getFullYear(),
-            attendancePercentage: { lt: 75 }
+            attendancePercentage: { lt: attendanceThreshold }
           },
           select: {
             attendancePercentage: true,

@@ -205,7 +205,7 @@ export default function SelfAttendancePage() {
                     );
                     setDistanceToSchool(Math.round(distance));
 
-                    const allowedRadius = data.config.allowedRadius || 500;
+                    const allowedRadius = data.config.allowedRadius;
                     setIsWithinRadius(distance <= allowedRadius);
                 } else {
                     // No school coordinates configured - allow attendance
@@ -236,7 +236,7 @@ export default function SelfAttendancePage() {
             }
 
             if (!isWithinRadius) {
-                const radius = data?.config?.allowedRadius || 500;
+                const radius = data?.config?.allowedRadius;
                 toast.error(`You are too far from school. Please be within ${radius}m to mark attendance.`);
                 return;
             }
@@ -292,7 +292,7 @@ export default function SelfAttendancePage() {
         const start = new Date(windows.checkIn.start).getTime();
         const end = new Date(windows.checkIn.end).getTime();
         const shiftStart = config?.startTime ? new Date(`${currentTime.toDateString()} ${config.startTime}`).getTime() : start;
-        const graceEnd = shiftStart + (config?.gracePeriod || 0) * 60 * 1000;
+        const graceEnd = shiftStart + (config?.lateGraceMinutes ?? config?.gracePeriod ?? 0) * 60 * 1000;
 
         if (isCheckedIn && !isCheckedOut) {
             // Working state
@@ -493,7 +493,7 @@ export default function SelfAttendancePage() {
                         <AlertDescription className="text-rose-700 dark:text-rose-300">
                             {locationError
                                 ? "Unable to access your location. Please enable location services and refresh the page."
-                                : `You are ${distanceToSchool ? formatDistance(distanceToSchool) : 'too far'} from school. You need to be within ${config?.allowedRadius || 500}m to mark attendance.`
+                                : `You are ${distanceToSchool ? formatDistance(distanceToSchool) : 'too far'} from school. You need to be within ${config?.allowedRadius}m to mark attendance.`
                             }
                         </AlertDescription>
                     </Alert>
@@ -655,11 +655,11 @@ export default function SelfAttendancePage() {
                                             <TooltipTrigger asChild>
                                                 <p className="text-sm text-amber-600 flex items-center justify-center gap-1 cursor-help underline underline-offset-4 decoration-dotted">
                                                     <Info className="w-4 h-4" />
-                                                    Grace period ended at {windows?.checkIn?.start && config?.gracePeriod && formatTime(new Date(new Date(windows.checkIn.start).getTime() + config.gracePeriod * 60000))}
+                                                    Grace period ended at {windows?.checkIn?.start && (config?.lateGraceMinutes ?? config?.gracePeriod) && formatTime(new Date(new Date(windows.checkIn.start).getTime() + (config?.lateGraceMinutes ?? config?.gracePeriod) * 60000))}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                <p>You are checking in after the allowed grace period of {config?.gracePeriod} minutes.</p>
+                                                <p>You are checking in after the allowed grace period of {config?.lateGraceMinutes ?? config?.gracePeriod} minutes.</p>
                                             </TooltipContent>
                                         </Tooltip>
                                     )}
@@ -767,7 +767,7 @@ export default function SelfAttendancePage() {
                                 <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
                                     <p className="text-xs text-muted-foreground uppercase font-medium">Grace Period</p>
                                     <p className="text-lg font-semibold mt-1 flex items-center justify-center gap-1">
-                                        {config?.gracePeriod || 0}
+                                        {config?.lateGraceMinutes ?? config?.gracePeriod ?? 0}
                                         <span className="text-xs font-normal text-muted-foreground">mins</span>
                                     </p>
                                 </div>

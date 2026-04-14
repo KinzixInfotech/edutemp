@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCache, setCache, generateKey, invalidatePattern } from '@/lib/cache';
+import { getAttendanceConfigSnapshot, getCheckoutAttendanceStatus } from '@/lib/attendance/config';
 
 // Configuration
 const CONFIG = {
@@ -247,27 +248,20 @@ async function finalizeSchoolAttendance(school, date) {
 function calculateFinalStatus(record, config) {
     const updates = {};
 
-    if (!record.checkInTime) {
+    if (!record.checkInTime || !config) {
         return updates; // No check-in, already marked present somehow
     }
 
+    const snapshot = getAttendanceConfigSnapshot(config);
     const checkInTime = new Date(record.checkInTime);
     const checkInIST = new Date(checkInTime.getTime() + IST_OFFSET_MS);
 
-    // Parse config times
-    const startTime = config?.defaultStartTime || '09:00';
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    const gracePeriod = config?.gracePeriodMinutes || 15;
-    const halfDayHours = config?.halfDayHours || 4;
-    const fullDayHours = config?.fullDayHours || 8;
-
-    // Calculate scheduled start time
+    const [startHour, startMin] = snapshot.defaultStartTime.split(':').map(Number);
     const eventDate = new Date(record.date);
     const scheduledStart = new Date(eventDate);
     scheduledStart.setUTCHours(startHour, startMin, 0, 0);
 
-    // Check if late
-    const lateThreshold = new Date(scheduledStart.getTime() + gracePeriod * 60 * 1000);
+    const lateThreshold = new Date(scheduledStart.getTime() + snapshot.lateGraceMinutes * 60 * 1000);
     const checkInTimeOnly = new Date(eventDate);
     checkInTimeOnly.setUTCHours(checkInIST.getUTCHours(), checkInIST.getUTCMinutes(), 0, 0);
 
@@ -279,17 +273,9 @@ function calculateFinalStatus(record, config) {
     updates.isLateCheckIn = isLate;
     updates.lateByMinutes = lateByMinutes;
 
-    // Check working hours for half-day
     const workingHours = record.workingHours || 0;
-
-    if (workingHours < halfDayHours && workingHours > 0) {
-        updates.status = 'HALF_DAY';
-    } else if (isLate && lateByMinutes > gracePeriod * 2) {
-        // Very late (more than 2x grace period) might be half-day
-        updates.status = 'LATE';
-    } else {
-        updates.status = 'PRESENT';
-    }
+    const checkoutStatus = getCheckoutAttendanceStatus(workingHours, config);
+    updates.status = checkoutStatus === 'PRESENT' && isLate ? 'LATE' : checkoutStatus;
 
     return updates;
 }

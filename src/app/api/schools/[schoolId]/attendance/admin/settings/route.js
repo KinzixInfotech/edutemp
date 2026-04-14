@@ -1,29 +1,8 @@
 // app/api/schools/[schoolId]/attendance/admin/settings/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-
-// Default attendance config values
-// Note: Fields with schema defaults like autoMarkTime, reminderTime are omitted
-// so Prisma uses the schema-defined defaults
-const DEFAULT_ATTENDANCE_CONFIG = {
-  defaultStartTime: '09:00',
-  defaultEndTime: '17:00',
-  gracePeriodMinutes: 15,
-  halfDayHours: 4,
-  fullDayHours: 8,
-  enableGeoFencing: false,
-  allowedRadiusMeters: 500,
-  autoMarkAbsent: true,
-  autoMarkTime: '10:00',
-  requireApprovalDays: 3,
-  autoApproveLeaves: false,
-  sendDailyReminders: true,
-  reminderTime: '08:30',
-  notifyParents: true,
-  enableBiometricAttendance: false,
-  calculateOnWeekends: false,
-  minAttendancePercent: 75,
-};
+import { getAttendanceConfigSnapshot } from '@/lib/attendance/config';
+import { getSchoolTimezone } from '@/lib/attendance/timezone';
 
 // GET - Fetch current attendance config (auto-creates if not exists)
 export async function GET(req, props) {
@@ -35,53 +14,59 @@ export async function GET(req, props) {
     let config = await prisma.attendanceConfig.findUnique({
       where: { schoolId }
     });
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { websiteConfig: true }
+    });
 
-    // Auto-create default config if not found
+    // Auto-create config row so schema defaults are persisted as DB values.
     if (!config) {
-      console.log('No attendance config found, creating defaults for:', schoolId);
+      console.log('No attendance config found, creating config row for:', schoolId);
       config = await prisma.attendanceConfig.create({
         data: {
           school: { connect: { id: schoolId } },
-          ...DEFAULT_ATTENDANCE_CONFIG,
         }
       });
-      console.log('Default attendance config created');
+      console.log('Attendance config row created from schema defaults');
     }
+
+    const snapshot = getAttendanceConfigSnapshot({ ...config, school });
 
     return NextResponse.json({
       config: {
-        // Working Hours
-        defaultStartTime: config.defaultStartTime,
-        defaultEndTime: config.defaultEndTime,
-        gracePeriodMinutes: config.gracePeriodMinutes,
-        halfDayHours: config.halfDayHours,
-        fullDayHours: config.fullDayHours,
+        defaultStartTime: snapshot.defaultStartTime,
+        defaultEndTime: snapshot.defaultEndTime,
+        timezone: snapshot.timezone,
+        schoolTimezone: snapshot.timezone,
+        lateGraceMinutes: snapshot.lateGraceMinutes,
+        gracePeriodMinutes: snapshot.lateGraceMinutes,
+        minHalfDayHours: snapshot.minHalfDayHours,
+        minFullDayHours: snapshot.minFullDayHours,
+        halfDayHours: snapshot.minHalfDayHours,
+        fullDayHours: snapshot.minFullDayHours,
 
-        // Geo-fencing
-        enableGeoFencing: config.enableGeoFencing,
-        schoolLatitude: config.schoolLatitude,
-        schoolLongitude: config.schoolLongitude,
-        allowedRadiusMeters: config.allowedRadiusMeters,
+        enableGeoFencing: snapshot.enableGeoFencing,
+        schoolLatitude: snapshot.schoolLatitude,
+        schoolLongitude: snapshot.schoolLongitude,
+        allowedRadius: snapshot.allowedRadius,
+        allowedRadiusMeters: snapshot.allowedRadius,
 
-        // Auto-marking
         autoMarkAbsent: config.autoMarkAbsent,
         autoMarkTime: config.autoMarkTime,
 
-        // Approval
-        requireApprovalDays: config.requireApprovalDays,
-        autoApproveLeaves: config.autoApproveLeaves,
+        approvalAfterDays: snapshot.approvalAfterDays,
+        requireApprovalDays: snapshot.approvalAfterDays,
+        autoApproveLeaves: snapshot.autoApproveLeaves,
 
-        // Notifications
         sendDailyReminders: config.sendDailyReminders,
         reminderTime: config.reminderTime,
         notifyParents: config.notifyParents,
 
-        // Biometric
         enableBiometricAttendance: config.enableBiometricAttendance,
 
-        // Stats
         calculateOnWeekends: config.calculateOnWeekends,
-        minAttendancePercent: config.minAttendancePercent
+        attendanceThreshold: snapshot.attendanceThreshold,
+        minAttendancePercent: snapshot.attendanceThreshold
       },
       isNewlyCreated: !config.createdAt || config.createdAt.getTime() === config.updatedAt.getTime()
     });
@@ -98,7 +83,7 @@ export async function GET(req, props) {
 export async function PUT(req, props) {
   const params = await props.params;
   const { schoolId } = params;
-  const updates = await req.json();
+    const updates = await req.json();
 
   try {
     // Validate time format
@@ -114,26 +99,60 @@ export async function PUT(req, props) {
       }, { status: 400 });
     }
 
-    // Validate hours
-    if (updates.halfDayHours && (updates.halfDayHours < 0 || updates.halfDayHours > 24)) {
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.lateGraceMinutes !== undefined && { gracePeriodMinutes: updates.lateGraceMinutes }),
+      ...(updates.minHalfDayHours !== undefined && { halfDayHours: updates.minHalfDayHours }),
+      ...(updates.minFullDayHours !== undefined && { fullDayHours: updates.minFullDayHours }),
+      ...(updates.allowedRadius !== undefined && { allowedRadiusMeters: updates.allowedRadius }),
+      ...(updates.approvalAfterDays !== undefined && { requireApprovalDays: updates.approvalAfterDays }),
+      ...(updates.attendanceThreshold !== undefined && { minAttendancePercent: updates.attendanceThreshold }),
+    };
+
+    delete normalizedUpdates.lateGraceMinutes;
+    delete normalizedUpdates.minHalfDayHours;
+    delete normalizedUpdates.minFullDayHours;
+    delete normalizedUpdates.allowedRadius;
+    delete normalizedUpdates.approvalAfterDays;
+    delete normalizedUpdates.attendanceThreshold;
+
+    let updatedSchool = null;
+    if (updates.timezone || updates.schoolTimezone) {
+      const timezone = updates.timezone || updates.schoolTimezone;
+      const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { websiteConfig: true }
+      });
+      updatedSchool = await prisma.school.update({
+        where: { id: schoolId },
+        data: {
+          websiteConfig: {
+            ...(school?.websiteConfig || {}),
+            timezone
+          }
+        }
+      });
+    }
+
+    if (normalizedUpdates.halfDayHours !== undefined && (normalizedUpdates.halfDayHours < 0 || normalizedUpdates.halfDayHours > 24)) {
       return NextResponse.json({
         error: 'Half day hours must be between 0 and 24'
       }, { status: 400 });
     }
-    if (updates.fullDayHours && (updates.fullDayHours < 0 || updates.fullDayHours > 24)) {
+    if (normalizedUpdates.fullDayHours !== undefined && (normalizedUpdates.fullDayHours < 0 || normalizedUpdates.fullDayHours > 24)) {
       return NextResponse.json({
         error: 'Full day hours must be between 0 and 24'
       }, { status: 400 });
     }
 
     // Validate geofencing
-    if (updates.enableGeoFencing) {
-      if (!updates.schoolLatitude || !updates.schoolLongitude) {
+    if (normalizedUpdates.enableGeoFencing) {
+      if (!normalizedUpdates.schoolLatitude || !normalizedUpdates.schoolLongitude) {
         return NextResponse.json({
           error: 'School coordinates required when geofencing is enabled'
         }, { status: 400 });
       }
-      if (Math.abs(updates.schoolLatitude) > 90 || Math.abs(updates.schoolLongitude) > 180) {
+      if (Math.abs(normalizedUpdates.schoolLatitude) > 90 || Math.abs(normalizedUpdates.schoolLongitude) > 180) {
         return NextResponse.json({
           error: 'Invalid coordinates'
         }, { status: 400 });
@@ -143,15 +162,15 @@ export async function PUT(req, props) {
     // Update config
     const updatedConfig = await prisma.attendanceConfig.upsert({
       where: { schoolId },
-      update: updates,
+      update: normalizedUpdates,
       create: {
         schoolId,
-        ...updates
+        ...normalizedUpdates
       }
     });
 
     // Update school calendar with new working hours if provided
-    if (updates.defaultStartTime || updates.defaultEndTime) {
+    if (normalizedUpdates.defaultStartTime || normalizedUpdates.defaultEndTime) {
       const academicYear = await prisma.academicYear.findFirst({
         where: { schoolId, isActive: true }
       });
@@ -167,8 +186,8 @@ export async function PUT(req, props) {
             }
           },
           data: {
-            ...(updates.defaultStartTime && { startTime: updates.defaultStartTime }),
-            ...(updates.defaultEndTime && { endTime: updates.defaultEndTime })
+            ...(normalizedUpdates.defaultStartTime && { startTime: normalizedUpdates.defaultStartTime }),
+            ...(normalizedUpdates.defaultEndTime && { endTime: normalizedUpdates.defaultEndTime })
           }
         });
       }
@@ -177,7 +196,10 @@ export async function PUT(req, props) {
     return NextResponse.json({
       success: true,
       message: 'Attendance settings updated successfully',
-      config: updatedConfig
+      config: {
+        ...updatedConfig,
+        timezone: getSchoolTimezone(updatedSchool || { websiteConfig: { timezone: updates.timezone || updates.schoolTimezone } })
+      }
     });
 
   } catch (error) {

@@ -31,16 +31,23 @@ export async function GET(req, props) {
                 }
             });
 
-            // If no config exists, return defaults
+            // If no config exists, create a persisted row so schema defaults
+            // become the database source of truth.
             if (!attendanceConfig) {
-                attendanceConfig = {
-                    adminCanApproveLeaves: true,
-                    principalCanApproveLeaves: true,
-                    directorCanApproveLeaves: true,
-                    directorOverridesAll: false,
-                    principalOverridesAdmin: false,
-                    autoApproveLeaves: false
-                };
+                attendanceConfig = await prisma.attendanceConfig.create({
+                    data: {
+                        schoolId,
+                    },
+                    select: {
+                        id: true,
+                        adminCanApproveLeaves: true,
+                        principalCanApproveLeaves: true,
+                        directorCanApproveLeaves: true,
+                        directorOverridesAll: true,
+                        principalOverridesAdmin: true,
+                        autoApproveLeaves: true
+                    }
+                });
             }
 
             return attendanceConfig;

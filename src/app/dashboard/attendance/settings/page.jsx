@@ -193,7 +193,7 @@ export default function AttendanceSettings() {
                                     <Label>Check-in Start Time</Label>
                                     <Input
                                         type="time"
-                                        value={settings.defaultStartTime || '09:00'}
+                                        value={settings.defaultStartTime ?? ''}
                                         onChange={(e) => handleChange('defaultStartTime', e.target.value)}
                                         className="mt-1"
                                     />
@@ -206,7 +206,7 @@ export default function AttendanceSettings() {
                                     <Label>Check-out End Time</Label>
                                     <Input
                                         type="time"
-                                        value={settings.defaultEndTime || '17:00'}
+                                        value={settings.defaultEndTime ?? ''}
                                         onChange={(e) => handleChange('defaultEndTime', e.target.value)}
                                         className="mt-1"
                                     />
@@ -216,13 +216,26 @@ export default function AttendanceSettings() {
                                 </div>
 
                                 <div>
+                                    <Label>School Timezone</Label>
+                                    <Input
+                                        value={settings.timezone ?? settings.schoolTimezone ?? 'Asia/Kolkata'}
+                                        onChange={(e) => handleChange('timezone', e.target.value)}
+                                        className="mt-1"
+                                        placeholder="Asia/Kolkata"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Used for attendance day boundaries, late windows, and offline sync validation
+                                    </p>
+                                </div>
+
+                                <div>
                                     <Label>Grace Period (minutes)</Label>
                                     <Input
                                         type="number"
                                         min="0"
                                         max="60"
-                                        value={settings.gracePeriodMinutes || 15}
-                                        onChange={(e) => handleChange('gracePeriodMinutes', parseInt(e.target.value))}
+                                        value={settings.lateGraceMinutes ?? settings.gracePeriodMinutes ?? ''}
+                                        onChange={(e) => handleChange('lateGraceMinutes', parseInt(e.target.value))}
                                         className="mt-1"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -237,8 +250,8 @@ export default function AttendanceSettings() {
                                         min="1"
                                         max="24"
                                         step="0.5"
-                                        value={settings.fullDayHours || 8}
-                                        onChange={(e) => handleChange('fullDayHours', parseFloat(e.target.value))}
+                                        value={settings.minFullDayHours ?? settings.fullDayHours ?? ''}
+                                        onChange={(e) => handleChange('minFullDayHours', parseFloat(e.target.value))}
                                         className="mt-1"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -253,8 +266,8 @@ export default function AttendanceSettings() {
                                         min="1"
                                         max="12"
                                         step="0.5"
-                                        value={settings.halfDayHours || 4}
-                                        onChange={(e) => handleChange('halfDayHours', parseFloat(e.target.value))}
+                                        value={settings.minHalfDayHours ?? settings.halfDayHours ?? ''}
+                                        onChange={(e) => handleChange('minHalfDayHours', parseFloat(e.target.value))}
                                         className="mt-1"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -285,7 +298,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.enableGeoFencing || false}
+                                    checked={settings.enableGeoFencing ?? false}
                                     onCheckedChange={(checked) => handleChange('enableGeoFencing', checked)}
                                 />
                             </div>
@@ -298,7 +311,7 @@ export default function AttendanceSettings() {
                                             <Input
                                                 type="number"
                                                 step="0.000001"
-                                                value={settings.schoolLatitude || ''}
+                                                value={settings.schoolLatitude ?? ''}
                                                 onChange={(e) => handleChange('schoolLatitude', parseFloat(e.target.value))}
                                                 placeholder="e.g., 23.5204"
                                                 className="mt-1"
@@ -310,7 +323,7 @@ export default function AttendanceSettings() {
                                             <Input
                                                 type="number"
                                                 step="0.000001"
-                                                value={settings.schoolLongitude || ''}
+                                                value={settings.schoolLongitude ?? ''}
                                                 onChange={(e) => handleChange('schoolLongitude', parseFloat(e.target.value))}
                                                 placeholder="e.g., 87.3119"
                                                 className="mt-1"
@@ -323,8 +336,8 @@ export default function AttendanceSettings() {
                                                 type="number"
                                                 min="10"
                                                 max="5000"
-                                                value={settings.allowedRadiusMeters || 500}
-                                                onChange={(e) => handleChange('allowedRadiusMeters', parseInt(e.target.value))}
+                                                value={settings.allowedRadius ?? settings.allowedRadiusMeters ?? ''}
+                                                onChange={(e) => handleChange('allowedRadius', parseInt(e.target.value))}
                                                 className="mt-1"
                                             />
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -389,7 +402,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.autoMarkAbsent || false}
+                                    checked={settings.autoMarkAbsent ?? false}
                                     onCheckedChange={(checked) => handleChange('autoMarkAbsent', checked)}
                                 />
                             </div>
@@ -445,7 +458,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.sendDailyReminders || false}
+                                    checked={settings.sendDailyReminders ?? false}
                                     onCheckedChange={(checked) => handleChange('sendDailyReminders', checked)}
                                 />
                             </div>
@@ -455,7 +468,7 @@ export default function AttendanceSettings() {
                                     <Label>Reminder Time</Label>
                                     <Input
                                         type="time"
-                                        value={settings.reminderTime || '08:30'}
+                                        value={settings.reminderTime ?? ''}
                                         onChange={(e) => handleChange('reminderTime', e.target.value)}
                                         className="mt-1"
                                     />
@@ -470,7 +483,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.notifyParents || false}
+                                    checked={settings.notifyParents ?? false}
                                     onCheckedChange={(checked) => handleChange('notifyParents', checked)}
                                 />
                             </div>
@@ -492,8 +505,8 @@ export default function AttendanceSettings() {
                                     type="number"
                                     min="0"
                                     max="30"
-                                    value={settings.requireApprovalDays || 3}
-                                    onChange={(e) => handleChange('requireApprovalDays', parseInt(e.target.value))}
+                                    value={settings.approvalAfterDays ?? settings.requireApprovalDays ?? ''}
+                                    onChange={(e) => handleChange('approvalAfterDays', parseInt(e.target.value))}
                                     className="mt-1"
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
@@ -509,7 +522,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.autoApproveLeaves || false}
+                                    checked={settings.autoApproveLeaves ?? false}
                                     onCheckedChange={(checked) => handleChange('autoApproveLeaves', checked)}
                                 />
                             </div>
@@ -520,8 +533,8 @@ export default function AttendanceSettings() {
                                     type="number"
                                     min="0"
                                     max="100"
-                                    value={settings.minAttendancePercent || 75}
-                                    onChange={(e) => handleChange('minAttendancePercent', parseFloat(e.target.value))}
+                                    value={settings.attendanceThreshold ?? settings.minAttendancePercent ?? ''}
+                                    onChange={(e) => handleChange('attendanceThreshold', parseFloat(e.target.value))}
                                     className="mt-1"
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
@@ -551,7 +564,7 @@ export default function AttendanceSettings() {
                                     </p>
                                 </div>
                                 <Switch
-                                    checked={settings.enableBiometricAttendance || false}
+                                    checked={settings.enableBiometricAttendance ?? false}
                                     onCheckedChange={(checked) => handleChange('enableBiometricAttendance', checked)}
                                 />
                             </div>

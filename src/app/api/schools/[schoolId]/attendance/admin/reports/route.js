@@ -397,6 +397,13 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
     const academicYear = await prisma.academicYear.findFirst({
         where: { schoolId, isActive: true }
     });
+    const config = await prisma.attendanceConfig.upsert({
+        where: { schoolId },
+        update: {},
+        create: { schoolId },
+        select: { minAttendancePercent: true }
+    });
+    const threshold = config.minAttendancePercent;
 
     if (!academicYear) {
         throw new Error('No active academic year found');
@@ -410,7 +417,7 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
     const whereClause = {
         schoolId,
         academicYearId: academicYear.id,
-        attendancePercentage: { lt: 75 }
+        attendancePercentage: { lt: threshold }
     };
 
     if (startMonth === endMonth && startYear === endYear) {
@@ -472,7 +479,7 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
 
     return {
         type: 'DEFAULTERS',
-        threshold: 75,
+        threshold,
         period: { start: startDate, end: endDate },
         count: defaulters.length,
         defaulters: defaulters.map(d => ({

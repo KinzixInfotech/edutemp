@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import { getAttendanceConfigSnapshot } from '@/lib/attendance/config';
 import {
     notifyLeaveRequestCreated,
     notifyLeaveApproved,
@@ -401,6 +402,9 @@ export async function PUT(req, props) {
     try {
         const start = new Date(startDate);
         const end = new Date(endDate);
+        const attendanceConfig = await prisma.attendanceConfig.findUnique({ where: { schoolId } });
+        const configSnapshot = attendanceConfig ? getAttendanceConfigSnapshot(attendanceConfig) : null;
+        const autoApproveLeaves = Boolean(configSnapshot?.autoApproveLeaves);
 
         if (start > end) {
             return NextResponse.json({
@@ -448,7 +452,9 @@ export async function PUT(req, props) {
                 reason,
                 emergencyContact,
                 emergencyContactPhone,
-                status: 'PENDING'
+                status: autoApproveLeaves ? 'APPROVED' : 'PENDING',
+                reviewedAt: autoApproveLeaves ? new Date() : null,
+                reviewRemarks: autoApproveLeaves ? 'Auto-approved by attendance settings' : null,
             }
         });
 
@@ -464,24 +470,70 @@ export async function PUT(req, props) {
             });
         }
 
+        if (autoApproveLeaves) {
+            const leaveTypeKey = leaveType.toLowerCase();
+            const usedField = `${leaveTypeKey}LeaveUsed`;
+            const balanceField = `${leaveTypeKey}LeaveBalance`;
+
+            if (balance) {
+                await prisma.leaveBalance.update({
+                    where: { id: balance.id },
+                    data: {
+                        [usedField]: { increment: totalDays },
+                        [balanceField]: { decrement: totalDays }
+                    }
+                });
+            }
+
+            const dates = [];
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                dates.push(new Date(d));
+            }
+
+            const workingDays = await prisma.schoolCalendar.findMany({
+                where: {
+                    schoolId,
+                    date: { in: dates },
+                    dayType: 'WORKING_DAY'
+                }
+            });
+
+            await prisma.attendance.createMany({
+                data: workingDays.map((day) => ({
+                    userId,
+                    schoolId,
+                    date: day.date,
+                    status: 'ON_LEAVE',
+                    remarks: `${leaveType} Leave: ${reason}`,
+                    leaveRequestId: leaveRequest.id,
+                    markedBy: userId,
+                    requiresApproval: false,
+                    approvalStatus: 'NOT_REQUIRED'
+                })),
+                skipDuplicates: true
+            });
+        }
+
         // Get user name for notification
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { name: true }
         });
 
-        // Notify school admins about the new leave request
+        // Notify school admins only when manual review is required.
         try {
-            await notifyLeaveRequestCreated({
-                schoolId,
-                userId,
-                userName: user?.name || 'Staff Member',
-                leaveType,
-                startDate: start.toISOString(),
-                endDate: end.toISOString(),
-                totalDays,
-                senderId: userId
-            });
+            if (!autoApproveLeaves) {
+                await notifyLeaveRequestCreated({
+                    schoolId,
+                    userId,
+                    userName: user?.name || 'Staff Member',
+                    leaveType,
+                    startDate: start.toISOString(),
+                    endDate: end.toISOString(),
+                    totalDays,
+                    senderId: userId
+                });
+            }
         } catch (notifyError) {
             console.error('Failed to send leave notification to admins:', notifyError);
             // Don't fail the request if notification fails
@@ -491,7 +543,9 @@ export async function PUT(req, props) {
 
         return NextResponse.json({
             success: true,
-            message: 'Leave request submitted successfully',
+            message: autoApproveLeaves
+                ? 'Leave request auto-approved successfully'
+                : 'Leave request submitted successfully',
             leaveRequest
         });
 
