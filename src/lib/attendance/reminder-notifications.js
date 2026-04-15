@@ -4,7 +4,22 @@ import { getDateKey, zonedDateToDbDate } from '@/lib/attendance/timezone';
 
 const DEFAULT_PARENT_NOTIFY_BEFORE_MINUTES = 30;
 const DEFAULT_TRIGGER_WINDOW_MINUTES = 2;
+const PARENT_MORNING_MESSAGES = [
+  (time) => `🌞 Good morning! School starts at ${time}. Time to get your child ready and start the day right ✨ — EduBreezy`,
 
+  (time) => `🌤️ Rise and shine! It's almost school time (${time}). Get your child ready for a great day ahead 🎒 — EduBreezy`,
+
+  (time) => `😊 Good morning! School begins at ${time}. Don’t forget to get your child ready and set the tone for a lovely day 💛 — EduBreezy`,
+
+  (time) => `🎒 A fresh day begins! School starts at ${time}. Time to get your child ready for learning and fun 🌟 — EduBreezy`,
+
+  // 😄 Light fun ones (not over the top)
+  (time) => `😄 Good morning! School starts at ${time}. Time to get your child ready… before the “5 more minutes” turns into 30 😅 — EduBreezy`,
+
+  (time) => `😂 Morning! School begins at ${time}. Get your child ready — we know mornings can feel like a mini battle sometimes! 💪 — EduBreezy`,
+
+  (time) => `😄 Good morning! School starts at ${time}. Time to get your child ready… because alarms clearly don’t work alone ⏰😄 — EduBreezy`,
+];
 function formatTimeLabel(timeString) {
   const [hourRaw = '0', minuteRaw = '0'] = String(timeString || '00:00').split(':');
   const hour = Number(hourRaw);
@@ -43,6 +58,20 @@ function normalizeTriggerRow(row) {
   };
 }
 
+function getDailyMessage(messages, dateKey) {
+  const index = Math.abs(hashCode(dateKey)) % messages.length;
+  return messages[index];
+}
+
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 function getTeacherPlans(trigger) {
   return [
     trigger.teacherCheckInOpen ? {
@@ -75,13 +104,16 @@ function getTeacherPlans(trigger) {
   ].filter(Boolean);
 }
 
-function getParentPlans(trigger) {
+function getParentPlans(trigger, localDateKey) {
+  const timeLabel = formatTimeLabel(trigger.defaultStartTime);
+  const msgTemplate = getDailyMessage(PARENT_MORNING_MESSAGES, localDateKey);
+
   return [
     trigger.parentSchoolStartingSoon ? {
       ruleType: 'ATTENDANCE_PARENT_SCHOOL_STARTING_SOON',
       payloadType: 'PARENT_REMINDER',
       title: 'School Reminder',
-      message: `School will start at ${formatTimeLabel(trigger.defaultStartTime)}. Please get your child ready.`,
+      message: msgTemplate(timeLabel),
       candidateGroup: 'parents',
       triggerTime: trigger.parentStartReminderTime,
       notificationType: 'DAILY_REMINDER',
@@ -339,7 +371,7 @@ async function processSchoolReminderTriggers(trigger, now = new Date()) {
 
   const dayType = calendar?.dayType || 'WORKING_DAY';
   if (dayType !== 'WORKING_DAY') {
-      console.log('[attendance/worker] reminder-skip-non-working-day', {
+    console.log('[attendance/worker] reminder-skip-non-working-day', {
       schoolId: normalizedTrigger.schoolId,
       dayType,
       holidayName: calendar?.holidayName,
@@ -374,7 +406,7 @@ async function processSchoolReminderTriggers(trigger, now = new Date()) {
   const parentPlans = normalizedTrigger.notifyParents ? getParentPlans({
     ...normalizedTrigger,
     parentStartReminderTime: minutesToTimeString(normalizedTrigger.parentStartReminderMinute),
-  }) : [];
+  }, localDateKey) : [];
 
   const plans = [...teacherPlans, ...parentPlans];
   const results = [];
