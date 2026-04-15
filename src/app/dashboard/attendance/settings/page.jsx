@@ -14,6 +14,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import LoaderPage from '@/components/loader-page';
+import GeofenceMapPicker from '@/components/maps/GeofenceMapPicker';
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
+function formatMeters(value) {
+    if (!Number.isFinite(value)) return '--';
+    if (value >= 1000) return `${(value / 1000).toFixed(2)} km`;
+    return `${Math.round(value)} m`;
+}
 
 export default function AttendanceSettings() {
     const { fullUser } = useAuth();
@@ -95,6 +117,9 @@ export default function AttendanceSettings() {
         setSettings(prev => ({ ...prev, [field]: value }));
     };
 
+
+
+
     if (!schoolId) return <LoaderPage />;
 
     if (isLoading) {
@@ -134,6 +159,20 @@ export default function AttendanceSettings() {
             </div>
         );
     }
+
+    const schoolLatitude = Number(settings.schoolLatitude);
+    const schoolLongitude = Number(settings.schoolLongitude);
+    const allowedRadius = Number(settings.allowedRadius ?? settings.allowedRadiusMeters ?? 0);
+    const testLatitude = Number(testLocation.latitude);
+    const testLongitude = Number(testLocation.longitude);
+    const hasSchoolCoordinates = Number.isFinite(schoolLatitude) && Number.isFinite(schoolLongitude);
+    const hasTestCoordinates = Number.isFinite(testLatitude) && Number.isFinite(testLongitude);
+    const liveDistance = hasSchoolCoordinates && hasTestCoordinates
+        ? calculateDistance(schoolLatitude, schoolLongitude, testLatitude, testLongitude)
+        : null;
+    const liveWithinRadius = Number.isFinite(liveDistance) && allowedRadius > 0
+        ? liveDistance <= allowedRadius
+        : null;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -305,6 +344,33 @@ export default function AttendanceSettings() {
 
                             {settings.enableGeoFencing && (
                                 <>
+                                    <div className="space-y-4 rounded-xl border border-dashed bg-muted/20 p-4">
+                                        <div>
+                                            <h4 className="font-semibold">Geofence Map Preview</h4>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Set the school center on the map, preview the allowed radius, and see the red danger buffer around it.
+                                            </p>
+                                        </div>
+
+                                        <GeofenceMapPicker
+                                            latitude={settings.schoolLatitude}
+                                            longitude={settings.schoolLongitude}
+                                            radius={settings.allowedRadius ?? settings.allowedRadiusMeters}
+                                            testLatitude={testLocation.latitude}
+                                            testLongitude={testLocation.longitude}
+                                            onSchoolLocationChange={(lat, lng) => {
+                                                handleChange('schoolLatitude', lat);
+                                                handleChange('schoolLongitude', lng);
+                                            }}
+                                            onTestLocationChange={(lat, lng) => {
+                                                setTestLocation({
+                                                    latitude: lat.toFixed(6),
+                                                    longitude: lng.toFixed(6),
+                                                });
+                                            }}
+                                        />
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
                                             <Label>School Latitude</Label>
@@ -312,7 +378,7 @@ export default function AttendanceSettings() {
                                                 type="number"
                                                 step="0.000001"
                                                 value={settings.schoolLatitude ?? ''}
-                                                onChange={(e) => handleChange('schoolLatitude', parseFloat(e.target.value))}
+                                                onChange={(e) => handleChange('schoolLatitude', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="e.g., 23.5204"
                                                 className="mt-1"
                                             />
@@ -324,7 +390,7 @@ export default function AttendanceSettings() {
                                                 type="number"
                                                 step="0.000001"
                                                 value={settings.schoolLongitude ?? ''}
-                                                onChange={(e) => handleChange('schoolLongitude', parseFloat(e.target.value))}
+                                                onChange={(e) => handleChange('schoolLongitude', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="e.g., 87.3119"
                                                 className="mt-1"
                                             />
@@ -337,7 +403,7 @@ export default function AttendanceSettings() {
                                                 min="10"
                                                 max="5000"
                                                 value={settings.allowedRadius ?? settings.allowedRadiusMeters ?? ''}
-                                                onChange={(e) => handleChange('allowedRadius', parseInt(e.target.value))}
+                                                onChange={(e) => handleChange('allowedRadius', e.target.value === '' ? '' : parseInt(e.target.value))}
                                                 className="mt-1"
                                             />
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -379,6 +445,25 @@ export default function AttendanceSettings() {
                                                 )}
                                             </Button>
                                         </div>
+
+                                        {(hasSchoolCoordinates || hasTestCoordinates) && (
+                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                <div className="rounded-lg border bg-muted/20 p-3">
+                                                    <p className="text-xs text-muted-foreground">Allowed Radius</p>
+                                                    <p className="mt-1 font-semibold">{formatMeters(allowedRadius)}</p>
+                                                </div>
+                                                <div className="rounded-lg border bg-muted/20 p-3">
+                                                    <p className="text-xs text-muted-foreground">Test Distance</p>
+                                                    <p className="mt-1 font-semibold">{formatMeters(liveDistance)}</p>
+                                                </div>
+                                                <div className={`rounded-lg border p-3 ${liveWithinRadius === null ? 'bg-muted/20' : liveWithinRadius ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30' : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30'}`}>
+                                                    <p className="text-xs text-muted-foreground">Live Preview</p>
+                                                    <p className="mt-1 font-semibold">
+                                                        {liveWithinRadius === null ? 'Add radius and coordinates' : liveWithinRadius ? 'Inside allowed zone' : 'In danger zone'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             )}
