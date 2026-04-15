@@ -48,7 +48,9 @@ export default function AttendanceSettings() {
     const { data, isLoading, isError, error } = useQuery({
         queryKey: ['attendance-settings', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/settings`);
+            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/settings`, {
+                cache: 'no-store'
+            });
             if (!res.ok) {
                 const errorData = await res.json();
                 throw new Error(errorData.error || 'Failed to fetch settings');
@@ -56,6 +58,8 @@ export default function AttendanceSettings() {
             return res.json();
         },
         enabled: !!schoolId,
+        staleTime: 0,
+        refetchOnMount: 'always',
     });
 
     // Initialize settings when data is loaded
@@ -82,6 +86,12 @@ export default function AttendanceSettings() {
         },
         onSuccess: (response) => {
             toast.success(response.message || 'Settings updated successfully');
+            if (response?.config) {
+                queryClient.setQueryData(['attendance-settings', schoolId], {
+                    config: response.config
+                });
+                setSettings(response.config);
+            }
             queryClient.invalidateQueries({ queryKey: ['attendance-settings', schoolId] });
         },
         onError: (error) => {
@@ -572,6 +582,23 @@ export default function AttendanceSettings() {
                                     onCheckedChange={(checked) => handleChange('notifyParents', checked)}
                                 />
                             </div>
+
+                            {settings.notifyParents && (
+                                <div>
+                                    <Label>Parent Reminder Lead Time (minutes)</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        max="180"
+                                        value={settings.parentNotifyBeforeMinutes ?? 30}
+                                        onChange={(e) => handleChange('parentNotifyBeforeMinutes', e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                        className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Sends the school-start reminder this many minutes before check-in time.
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

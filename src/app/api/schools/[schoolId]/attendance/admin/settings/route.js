@@ -38,6 +38,7 @@ export async function GET(req, props) {
         defaultEndTime: snapshot.defaultEndTime,
         timezone: snapshot.timezone,
         schoolTimezone: snapshot.timezone,
+        parentNotifyBeforeMinutes: school?.websiteConfig?.parentNotifyBeforeMinutes ?? 30,
         lateGraceMinutes: snapshot.lateGraceMinutes,
         gracePeriodMinutes: snapshot.lateGraceMinutes,
         minHalfDayHours: snapshot.minHalfDayHours,
@@ -83,7 +84,7 @@ export async function GET(req, props) {
 export async function PUT(req, props) {
   const params = await props.params;
   const { schoolId } = params;
-    const updates = await req.json();
+  const updates = await req.json();
 
   try {
     // Validate time format
@@ -100,36 +101,57 @@ export async function PUT(req, props) {
     }
 
     const normalizedUpdates = {
-      ...updates,
-      ...(updates.lateGraceMinutes !== undefined && { gracePeriodMinutes: updates.lateGraceMinutes }),
-      ...(updates.minHalfDayHours !== undefined && { halfDayHours: updates.minHalfDayHours }),
-      ...(updates.minFullDayHours !== undefined && { fullDayHours: updates.minFullDayHours }),
-      ...(updates.allowedRadius !== undefined && { allowedRadiusMeters: updates.allowedRadius }),
-      ...(updates.approvalAfterDays !== undefined && { requireApprovalDays: updates.approvalAfterDays }),
-      ...(updates.attendanceThreshold !== undefined && { minAttendancePercent: updates.attendanceThreshold }),
+      defaultStartTime: updates.defaultStartTime,
+      defaultEndTime: updates.defaultEndTime,
+      gracePeriodMinutes: updates.lateGraceMinutes ?? updates.gracePeriodMinutes,
+      halfDayHours: updates.minHalfDayHours ?? updates.halfDayHours,
+      fullDayHours: updates.minFullDayHours ?? updates.fullDayHours,
+      enableGeoFencing: updates.enableGeoFencing,
+      schoolLatitude: updates.schoolLatitude === '' || updates.schoolLatitude == null ? null : Number(updates.schoolLatitude),
+      schoolLongitude: updates.schoolLongitude === '' || updates.schoolLongitude == null ? null : Number(updates.schoolLongitude),
+      allowedRadiusMeters: updates.allowedRadius === '' || updates.allowedRadius == null
+        ? null
+        : Number(updates.allowedRadius ?? updates.allowedRadiusMeters),
+      autoMarkAbsent: updates.autoMarkAbsent,
+      autoMarkTime: updates.autoMarkTime,
+      requireApprovalDays: updates.approvalAfterDays ?? updates.requireApprovalDays,
+      autoApproveLeaves: updates.autoApproveLeaves,
+      sendDailyReminders: updates.sendDailyReminders,
+      reminderTime: updates.reminderTime,
+      notifyParents: updates.notifyParents,
+      enableBiometricAttendance: updates.enableBiometricAttendance,
+      calculateOnWeekends: updates.calculateOnWeekends,
+      minAttendancePercent: updates.attendanceThreshold ?? updates.minAttendancePercent,
     };
 
-    delete normalizedUpdates.lateGraceMinutes;
-    delete normalizedUpdates.minHalfDayHours;
-    delete normalizedUpdates.minFullDayHours;
-    delete normalizedUpdates.allowedRadius;
-    delete normalizedUpdates.approvalAfterDays;
-    delete normalizedUpdates.attendanceThreshold;
+    Object.keys(normalizedUpdates).forEach((key) => {
+      if (normalizedUpdates[key] === undefined) {
+        delete normalizedUpdates[key];
+      }
+    });
 
     let updatedSchool = null;
-    if (updates.timezone || updates.schoolTimezone) {
+    if (updates.timezone || updates.schoolTimezone || updates.parentNotifyBeforeMinutes !== undefined) {
       const timezone = updates.timezone || updates.schoolTimezone;
       const school = await prisma.school.findUnique({
         where: { id: schoolId },
         select: { websiteConfig: true }
       });
+      const nextWebsiteConfig = {
+        ...(school?.websiteConfig || {}),
+      };
+      if (timezone) {
+        nextWebsiteConfig.timezone = timezone;
+      }
+      if (updates.parentNotifyBeforeMinutes !== undefined) {
+        nextWebsiteConfig.parentNotifyBeforeMinutes = updates.parentNotifyBeforeMinutes === '' || updates.parentNotifyBeforeMinutes == null
+          ? 30
+          : Number(updates.parentNotifyBeforeMinutes);
+      }
       updatedSchool = await prisma.school.update({
         where: { id: schoolId },
         data: {
-          websiteConfig: {
-            ...(school?.websiteConfig || {}),
-            timezone
-          }
+          websiteConfig: nextWebsiteConfig
         }
       });
     }
@@ -147,7 +169,7 @@ export async function PUT(req, props) {
 
     // Validate geofencing
     if (normalizedUpdates.enableGeoFencing) {
-      if (!normalizedUpdates.schoolLatitude || !normalizedUpdates.schoolLongitude) {
+      if (normalizedUpdates.schoolLatitude == null || normalizedUpdates.schoolLongitude == null) {
         return NextResponse.json({
           error: 'School coordinates required when geofencing is enabled'
         }, { status: 400 });
@@ -155,6 +177,11 @@ export async function PUT(req, props) {
       if (Math.abs(normalizedUpdates.schoolLatitude) > 90 || Math.abs(normalizedUpdates.schoolLongitude) > 180) {
         return NextResponse.json({
           error: 'Invalid coordinates'
+        }, { status: 400 });
+      }
+      if (normalizedUpdates.allowedRadiusMeters == null || Number.isNaN(normalizedUpdates.allowedRadiusMeters) || normalizedUpdates.allowedRadiusMeters <= 0) {
+        return NextResponse.json({
+          error: 'Allowed radius must be greater than 0'
         }, { status: 400 });
       }
     }
@@ -198,7 +225,8 @@ export async function PUT(req, props) {
       message: 'Attendance settings updated successfully',
       config: {
         ...updatedConfig,
-        timezone: getSchoolTimezone(updatedSchool || { websiteConfig: { timezone: updates.timezone || updates.schoolTimezone } })
+        timezone: getSchoolTimezone(updatedSchool || { websiteConfig: { timezone: updates.timezone || updates.schoolTimezone } }),
+        parentNotifyBeforeMinutes: updatedSchool?.websiteConfig?.parentNotifyBeforeMinutes ?? updates.parentNotifyBeforeMinutes ?? 30,
       }
     });
 

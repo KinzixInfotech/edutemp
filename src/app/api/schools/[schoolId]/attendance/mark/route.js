@@ -238,6 +238,26 @@ export async function POST(req, props) {
         distance: Math.round(distance),
         allowedRadius: configSnapshot.allowedRadius,
       });
+
+      if (distance > configSnapshot.allowedRadius) {
+        await createAttendanceAuditLog({
+          userId,
+          schoolId,
+          action: `${type}_BLOCKED_OUTSIDE_GEOFENCE`,
+          payload: {
+            date: dateKey,
+            submissionMode,
+            distance: Math.round(distance),
+            allowedRadius: configSnapshot.allowedRadius,
+            location,
+          },
+          error: 'OUTSIDE_GEOFENCE',
+        });
+
+        return NextResponse.json({
+          error: `You are ${Math.round(distance)}m away from school. You must be within ${configSnapshot.allowedRadius}m to mark attendance.`,
+        }, { status: 403 });
+      }
     }
 
     const securityAssessment = getLocationSecuritySignals({

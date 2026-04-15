@@ -876,6 +876,42 @@ async function sendPushNotifications({
     }
 }
 
+export async function sendFcmNotification({
+    userIds = [],
+    userId,
+    schoolId,
+    title,
+    body,
+    type,
+    data = {},
+    imageUrl = null,
+    retryAttempt = 0,
+    maxAttempts = 3,
+}) {
+    const resolvedUserIds = userIds.length > 0
+        ? userIds
+        : (userId ? [userId] : []);
+
+    if (!resolvedUserIds.length) {
+        return { success: true, sent: 0, failed: 0 };
+    }
+
+    return sendPushNotifications({
+        userIds: resolvedUserIds,
+        title,
+        message: body,
+        imageUrl,
+        retryAttempt,
+        maxAttempts,
+        data: {
+            schoolId,
+            type,
+            ...(userId ? { userId } : { targetUserIds: JSON.stringify(resolvedUserIds) }),
+            ...data,
+        },
+    });
+}
+
 /**
  * Process push notification retry job
  * Called by background worker for retry attempts

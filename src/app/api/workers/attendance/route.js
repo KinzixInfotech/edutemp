@@ -3,12 +3,36 @@ import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import prisma from '@/lib/prisma';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 import { createAttendanceAuditLog } from '@/lib/attendance/audit';
+import { processScheduledAttendanceNotifications } from '@/lib/attendance/reminder-notifications';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 
 async function handleWorker(req) {
-  const { schoolId, attendanceId, userId, action, securityAssessment } = await req.json();
+  const body = await req.json();
+  const {
+    schoolId,
+    attendanceId,
+    userId,
+    action,
+    securityAssessment,
+    jobType,
+    windowMinutes,
+    now,
+  } = body;
+
+  if (jobType === 'SCHEDULED_ATTENDANCE_NOTIFICATIONS') {
+    const stats = await processScheduledAttendanceNotifications({
+      now: now || new Date(),
+      windowMinutes,
+    });
+
+    return NextResponse.json({
+      success: true,
+      jobType,
+      stats,
+    });
+  }
 
   if (!schoolId || !attendanceId || !userId || !action) {
     return NextResponse.json({ error: 'schoolId, attendanceId, userId, and action are required' }, { status: 400 });
