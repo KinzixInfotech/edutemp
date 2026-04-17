@@ -10,6 +10,7 @@ import { checkMessageRateLimit, sanitizeMessageContent } from '@/lib/chat/chatHe
 import { PAGINATION, MAX_MESSAGE_LENGTH, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '@/lib/chat/chatConstants';
 import { invalidatePattern } from '@/lib/cache';
 import { enqueueNotificationJob } from '@/lib/notifications/notificationHelper';
+import redis from '@/lib/redis';
 
 /**
  * GET - List messages for a conversation (cursor-based pagination)
@@ -315,6 +316,8 @@ export async function POST(req, { params }) {
 /**
  * Trigger push notification for chat message via existing QStash worker.
  */
+const getActiveConversationKey = (conversationId, userId) => `chat:active:${conversationId}:${userId}`;
+
 async function triggerChatPushNotification(conversationId, sender, content, messageId) {
     // Get all participants except sender, check mute settings
     const participants = await prisma.conversationParticipant.findMany({
@@ -336,6 +339,19 @@ async function triggerChatPushNotification(conversationId, sender, content, mess
 
     if (eligibleUserIds.length === 0) return;
 
+    const activityStates = await Promise.all(
+        eligibleUserIds.map(async (userId) => ({
+            userId,
+            isActiveInConversation: !!(await redis.get(getActiveConversationKey(conversationId, userId))),
+        }))
+    );
+
+    const notificationUserIds = activityStates
+        .filter((entry) => !entry.isActiveInConversation)
+        .map((entry) => entry.userId);
+
+    if (notificationUserIds.length === 0) return;
+
     // Get conversation for title
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
@@ -353,7 +369,7 @@ async function triggerChatPushNotification(conversationId, sender, content, mess
         jobType: 'CHAT_MESSAGE',
         imageUrl: sender.profilePicture || null,
         targetOptions: {
-            userIds: eligibleUserIds,
+            userIds: notificationUserIds,
             excludeUserIds: [sender.id]
         },
         data: {

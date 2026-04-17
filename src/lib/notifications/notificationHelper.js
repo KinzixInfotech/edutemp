@@ -152,6 +152,43 @@ export async function sendNotification(params) {
 }
 
 /**
+ * Notify a user on their existing devices that a new device logged in.
+ * This is intended to be triggered after a new session is created for a user.
+ */
+export async function notifyNewDeviceLogin({
+    schoolId,
+    userId,
+    modelName,
+    deviceName,
+    installationId = null,
+}) {
+    if (!schoolId || !userId) {
+        throw new Error('schoolId and userId are required for new device login notification');
+    }
+
+    const resolvedModelName = modelName || deviceName || 'Unknown Device';
+
+    return sendNotification({
+        schoolId,
+        title: 'New device login',
+        message: `${resolvedModelName} has been logged in to your account`,
+        type: 'SECURITY_LOGIN_ALERT',
+        priority: 'HIGH',
+        icon: '🔐',
+        targetOptions: {
+            userIds: [userId],
+        },
+        senderId: userId,
+        metadata: {
+            model_name: resolvedModelName,
+            deviceName: deviceName || resolvedModelName,
+            installationId,
+        },
+        sendPush: true,
+    });
+}
+
+/**
  * Process notification job (Worker Logic)
  * Contains the original heavy DB and FCM logic
  */

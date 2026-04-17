@@ -194,8 +194,13 @@ export async function POST(req, { params }) {
                     AND: [
                         { participants: { some: { userId: dbUser.id, isActive: true } } },
                         { participants: { some: { userId: participantUserIds[0], isActive: true } } },
+                        { participants: { none: { userId: { notIn: [dbUser.id, participantUserIds[0]] }, isActive: true } } },
                     ],
                 },
+                orderBy: [
+                    { lastMessageAt: 'desc' },
+                    { createdAt: 'desc' },
+                ],
                 include: {
                     participants: {
                         where: { isActive: true },

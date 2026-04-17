@@ -2,6 +2,40 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import redis from "@/lib/redis";
 
+// GET - Fetch specific session status
+export async function GET(req, props) {
+    const params = await props.params;
+    try {
+        const { sessionId } = params;
+        const userId = req.headers.get("x-user-id");
+
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const session = await prisma.userSession.findUnique({
+            where: { id: sessionId },
+        });
+
+        if (!session || session.userId !== userId) {
+            return NextResponse.json({ error: "Session not found" }, { status: 404 });
+        }
+
+        const active = !session.isRevoked && session.expiresAt > new Date();
+
+        return NextResponse.json({
+            session,
+            active,
+        });
+    } catch (error) {
+        console.error("Error fetching session:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch session" },
+            { status: 500 }
+        );
+    }
+}
+
 // DELETE - Revoke specific session
 export async function DELETE(req, props) {
     const params = await props.params;

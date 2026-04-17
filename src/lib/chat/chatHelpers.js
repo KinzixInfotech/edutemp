@@ -237,19 +237,25 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
             conversationId: true,
             conversation: {
                 select: {
+                    lastMessageAt: true,
+                    createdAt: true,
                     participants: {
                         where: { userId: { not: userId }, isActive: true },
                         select: { userId: true }
                     }
                 }
             }
-        }
+        },
+        orderBy: [
+            { conversation: { lastMessageAt: "desc" } },
+            { conversation: { createdAt: "desc" } },
+        ]
     });
 
     const convMap = new Map();
     for (const p of existingConvs) {
         const other = p.conversation.participants[0];
-        if (other) convMap.set(other.userId, p.conversationId);
+        if (other && !convMap.has(other.userId)) convMap.set(other.userId, p.conversationId);
     }
 
     // ── Shared: fetch user details for a set of IDs ──

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseUserAgent, getClientIP, generateSessionToken, getGeoLocation } from "@/lib/device-info";
 import redis from "@/lib/redis";
+import { notifyNewDeviceLogin } from "@/lib/notifications/notificationHelper";
 
 // GET - List user's active sessions
 export async function GET(req) {
@@ -13,6 +14,7 @@ export async function GET(req) {
         }
 
         const currentUA = req.headers.get("user-agent") || "";
+        const currentSessionId = req.headers.get("x-session-id") || null;
         const CACHE_KEY = `sessions:${userId}`;
 
         // Helper to deduplicate sessions by User Agent
@@ -35,7 +37,7 @@ export async function GET(req) {
             // Mark current session dynamically even on cached data
             const sessionsWithCurrent = uniqueSessions.map(s => ({
                 ...s,
-                isCurrent: s.userAgent === currentUA
+                isCurrent: currentSessionId ? s.id === currentSessionId : s.userAgent === currentUA,
             }));
             return NextResponse.json({ sessions: sessionsWithCurrent });
         }
@@ -63,7 +65,7 @@ export async function GET(req) {
         // Add isCurrent flag
         const sessionsWithCurrent = uniqueSessions.map(s => ({
             ...s,
-            isCurrent: s.userAgent === currentUA
+            isCurrent: currentSessionId ? s.id === currentSessionId : s.userAgent === currentUA,
         }));
 
         return NextResponse.json({ sessions: sessionsWithCurrent });
@@ -87,8 +89,8 @@ export async function POST(req) {
         }
 
         // Parse device info from user-agent
-        const userAgent = req.headers.get("user-agent") || "";
-        const deviceInfo = parseUserAgent(userAgent);
+        const rawUserAgent = req.headers.get("user-agent") || "";
+        const deviceInfo = parseUserAgent(rawUserAgent);
         const ipAddress = getClientIP(req);
 
         // Fetch Geolocation
@@ -110,11 +112,14 @@ export async function POST(req) {
         const finalOSVersion = body.osVersion || deviceInfo.osVersion;
         const finalBrowser = body.browser || deviceInfo.browser || 'App';
         const finalBrowserVersion = body.browserVersion || deviceInfo.browserVersion;
+        const finalModelName = body.modelName || body.deviceModel || deviceInfo.deviceModel || finalDeviceName;
+        const installationId = body.installationId || null;
+        const sessionUserAgent = installationId ? `${rawUserAgent}::${installationId}` : rawUserAgent;
 
         const existingSession = await prisma.userSession.findFirst({
             where: {
                 userId,
-                userAgent, // Same browser instance
+                userAgent: sessionUserAgent,
                 isRevoked: false,
                 expiresAt: { gt: new Date() }
             }
@@ -156,7 +161,7 @@ export async function POST(req) {
                     osVersion: finalOSVersion,
                     deviceType: finalDeviceType,
                     ipAddress,
-                    userAgent,
+                    userAgent: sessionUserAgent,
                     location: location,
                     deviceName: finalDeviceName,
                 },
@@ -178,25 +183,40 @@ export async function POST(req) {
 
             isNewDevice = !existingSessions.some(
                 (s) =>
-                    s.deviceType === deviceInfo.deviceType &&
-                    s.os === deviceInfo.os &&
-                    s.browser === deviceInfo.browser
+                    s.deviceType === finalDeviceType &&
+                    s.os === finalOS &&
+                    s.browser === finalBrowser
             );
 
             // Create security event if new device
             if (isNewDevice && existingSessions.length > 0) {
+                const user = await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { schoolId: true },
+                });
+
                 await prisma.securityEvent.create({
                     data: {
                         userId,
                         eventType: "NEW_LOGIN",
                         severity: "INFO",
                         title: "New device login",
-                        description: `Logged in from ${deviceInfo.browser} on ${deviceInfo.os}`,
-                        deviceInfo: `${deviceInfo.deviceType} - ${deviceInfo.browser} ${deviceInfo.browserVersion}`,
+                        description: `Logged in from ${finalBrowser} on ${finalOS}`,
+                        deviceInfo: `${finalDeviceType} - ${finalBrowser} ${finalBrowserVersion || ''}`.trim(),
                         ipAddress,
-                        userAgent,
+                        userAgent: sessionUserAgent,
                     },
                 });
+
+                if (user?.schoolId) {
+                    await notifyNewDeviceLogin({
+                        schoolId: user.schoolId,
+                        userId,
+                        modelName: finalModelName,
+                        deviceName: finalDeviceName,
+                        installationId,
+                    });
+                }
             }
         }
 
