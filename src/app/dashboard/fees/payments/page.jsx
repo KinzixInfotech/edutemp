@@ -46,6 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
 import ReceiptTemplate from '@/components/receipts/ReceiptTemplate';
+import { getReceiptPaperConfig, normalizeReceiptPaperSize } from '@/lib/receipts/receipt-format';
 
 export default function PaymentTracking() {
     const { fullUser } = useAuth();
@@ -99,9 +100,10 @@ export default function PaymentTracking() {
         img.src = dataUrl;
         await new Promise((r) => { img.onload = r; });
 
-        const isThermal = props.settings?.paperSize === 'thermal';
-        const pdfWidth = isThermal ? 80 : 215.9;
-        const pdfHeight = isThermal ? (img.height / img.width) * pdfWidth : 279.4;
+        const paperConfig = getReceiptPaperConfig(normalizeReceiptPaperSize(props.settings?.paperSize));
+        const isThermal = paperConfig.value === 'thermal';
+        const pdfWidth = paperConfig.widthMm;
+        const pdfHeight = isThermal ? Math.max((img.height / img.width) * pdfWidth, paperConfig.heightMm) : paperConfig.heightMm;
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pdfWidth, pdfHeight] });
         const imgHeight = (img.height / img.width) * pdfWidth;
         pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);

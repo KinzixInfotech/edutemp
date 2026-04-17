@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import ReceiptTemplate from './ReceiptTemplate';
 import { Printer } from 'lucide-react';
 import { Button } from '../ui/button';
+import { getReceiptPaperConfig, normalizeReceiptPaperSize } from '@/lib/receipts/receipt-format';
 
 /**
  * Receipt Preview Component
@@ -11,6 +12,8 @@ import { Button } from '../ui/button';
  */
 export default function ReceiptPreview({ schoolData, settings }) {
     const receiptRef = useRef(null);
+    const normalizedPaperSize = normalizeReceiptPaperSize(settings.paperSize);
+    const paperConfig = getReceiptPaperConfig(normalizedPaperSize);
 
     // Sample receipt data with fee head breakup
     const sampleReceiptData = {
@@ -44,7 +47,7 @@ export default function ReceiptPreview({ schoolData, settings }) {
                 <head>
                     <title>Receipt Preview</title>
                     <style>
-                        @page { size: ${settings.paperSize === 'thermal' ? '80mm auto' : '8.5in 11in'}; margin: 0; }
+                        @page { size: ${paperConfig.printPageSize}; margin: 0; }
                         html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact !important; }
                         * { box-sizing: border-box; }
                     </style>
@@ -62,7 +65,7 @@ export default function ReceiptPreview({ schoolData, settings }) {
         }
     };
 
-    const isThermal = settings.paperSize === 'thermal';
+    const isThermal = normalizedPaperSize === 'thermal';
 
     return (
         <div className="space-y-4">
@@ -84,7 +87,7 @@ export default function ReceiptPreview({ schoolData, settings }) {
                         padding: '20px'
                     }}
                 >
-                    <div style={{ transform: isThermal ? 'scale(1)' : 'scale(0.65)', transformOrigin: 'top center' }}>
+                    <div style={{ transform: `scale(${paperConfig.previewScale})`, transformOrigin: 'top center' }}>
                         <ReceiptTemplate
                             ref={receiptRef}
                             schoolData={schoolData}
@@ -95,7 +98,7 @@ export default function ReceiptPreview({ schoolData, settings }) {
                 </div>
                 <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 text-center">
                     <p className="text-xs text-muted-foreground">
-                        Sample Preview • {isThermal ? '80mm Thermal' : '8.5" × 11" (A4/Letter)'} • Updates automatically with settings
+                        Sample Preview • {paperConfig.label} • Updates automatically with settings
                     </p>
                 </div>
             </div>

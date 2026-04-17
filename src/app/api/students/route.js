@@ -54,7 +54,8 @@ export async function GET(req) {
         const classIdParam = searchParams.get("classId");
         const sectionIdParam = searchParams.get("sectionId");
         const admissionNumber = searchParams.get("admissionNumber") || undefined;
-        const academicYearId = searchParams.get("academicYearId") || undefined;  // ADDED
+        const academicYearId = searchParams.get("academicYearId") || undefined;
+        const fetchAll = searchParams.get("all") === "true";
 
         const classId = classIdParam ? parseInt(classIdParam) : undefined;
         const sectionId = sectionIdParam ? parseInt(sectionIdParam) : undefined;
@@ -63,7 +64,7 @@ export async function GET(req) {
             return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
         }
 
-        const { page, limit, skip } = getPagination(req);
+        const { page, limit } = getPagination(req);
 
         const where = {
             schoolId,
@@ -73,10 +74,10 @@ export async function GET(req) {
             ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } }),
         };
 
-        const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit });  // ADDED academicYearId
+        const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit, fetchAll });
 
         const result = await remember(cacheKey, async () => {
-            return await paginate(prisma.student, {
+            const queryArgs = {
                 where,
                 include: {
                     user: {
@@ -95,13 +96,19 @@ export async function GET(req) {
                     section: {
                         select: {
                             id: true,
-                            name: true,          // Prisma field is 'name', renamed below
+                            name: true,
                             teachingStaffUserId: true,
                         },
                     },
                 },
                 orderBy: { user: { name: "asc" } },
-            }, page, limit);
+            };
+
+            if (fetchAll) {
+                return { data: await prisma.student.findMany(queryArgs), meta: null };
+            }
+
+            return paginate(prisma.student, queryArgs, page, limit);
         }, 300);
 
         // Normalize shape for certificate mapper

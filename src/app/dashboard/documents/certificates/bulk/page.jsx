@@ -9,8 +9,6 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 import {
     Save,
     Loader2,
@@ -42,11 +40,10 @@ import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import {
-    applyMappingsToTemplateElements,
+    buildResolvedTemplateConfig,
     buildCertificateMappingContext,
-    buildResolvedMappings,
-    extractTemplatePlaceholders,
 } from '@/lib/certificate-template-mapping';
+import { createPdfBlobFromLayout } from '@/lib/client-document-pdf';
 
 const formSchema = z.object({
     classId: z.string().min(1, 'Class is required'),
@@ -67,7 +64,6 @@ export default function BulkGenerateCertificatesPage() {
     const [progress, setProgress] = useState(0);
     const [statusMessage, setStatusMessage] = useState('');
     const [previewConfig, setPreviewConfig] = useState(null);
-    const [generationConfig, setGenerationConfig] = useState(null);
     const [studentCount, setStudentCount] = useState(0);
     const [loadingCount, setLoadingCount] = useState(false);
     const [templateSearch, setTemplateSearch] = useState('');
@@ -131,7 +127,7 @@ export default function BulkGenerateCertificatesPage() {
         queryKey: ['certificate-templates-all', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('Invalid configuration');
-            const res = await fetch(`/api/documents/${schoolId}/certificate-templates`);
+            const res = await fetch(`/api/documents/${schoolId}/certificate-templates?all=true`);
             if (!res.ok) throw new Error('Failed to fetch templates');
             return res.json();
         },
@@ -205,7 +201,6 @@ export default function BulkGenerateCertificatesPage() {
             motherName: 'Jane Doe',
             photo: 'https://placehold.co/100x100?text=Photo',
         };
-        const placeholderKeys = extractTemplatePlaceholders(template.layoutConfig.elements || []);
         const mappingContext = buildCertificateMappingContext({
             student: sampleStudent,
             formValues: {
@@ -223,16 +218,18 @@ export default function BulkGenerateCertificatesPage() {
                 verificationUrl: 'https://example.com/verify/sample',
             },
         });
-        const resolvedMappings = buildResolvedMappings(placeholderKeys, mappingContext);
+        const resolvedLayout = buildResolvedTemplateConfig({
+            layoutConfig: template.layoutConfig,
+            context: mappingContext,
+        });
 
         setPreviewConfig({
-            elements: applyMappingsToTemplateElements(
-                JSON.parse(JSON.stringify(template.layoutConfig.elements || [])),
-                resolvedMappings
-            ),
-            canvasSize: template.layoutConfig.canvasSize,
-            backgroundImage: template.layoutConfig.backgroundImage,
-            backgroundAsset: template.layoutConfig.backgroundAsset || null,
+            ...resolvedLayout,
+            canvasSize: resolvedLayout.canvasSize,
+            backgroundImage: resolvedLayout.backgroundImage,
+            backgroundAsset: resolvedLayout.backgroundAsset || null,
+            backgroundColor: resolvedLayout.backgroundColor || '#ffffff',
+            customFonts: resolvedLayout.customFonts || [],
         });
 
     }, [templates, classes, sections, watchedValues, fullUser, selectedYear]);
@@ -273,7 +270,6 @@ export default function BulkGenerateCertificatesPage() {
             for (let i = 0; i < students.length; i++) {
                 try {
                     const student = students[i];
-                    const placeholderKeys = extractTemplatePlaceholders(template.layoutConfig.elements || []);
                     const mappingContext = buildCertificateMappingContext({
                         student,
                         formValues: {
@@ -289,51 +285,20 @@ export default function BulkGenerateCertificatesPage() {
                             verificationUrl: '',
                         },
                     });
-                    const resolvedMappings = buildResolvedMappings(placeholderKeys, mappingContext);
+                    const studentConfig = buildResolvedTemplateConfig({
+                        layoutConfig: template.layoutConfig,
+                        context: mappingContext,
+                    });
 
-                    const studentConfig = {
-                        elements: applyMappingsToTemplateElements(
-                            JSON.parse(JSON.stringify(template.layoutConfig.elements)),
-                            resolvedMappings
-                        ),
-                        canvasSize: template.layoutConfig.canvasSize,
-                        backgroundImage: template.layoutConfig.backgroundImage,
-                        backgroundAsset: template.layoutConfig.backgroundAsset || null,
-                    };
+                    const pdfBlob = await createPdfBlobFromLayout(studentConfig);
+                    folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
 
-                    setGenerationConfig(studentConfig);
-                    await new Promise(resolve => setTimeout(resolve, 300));
-
-                    const element = document.getElementById('certificate-generation-canvas');
-                    if (element) {
-                        const dataUrl = await toPng(element, {
-                            quality: 0.95,
-                            skipFonts: true,
-                            preferCanvas: true
-                        });
-
-                        const width = template.layoutConfig.canvasSize.width;
-                        const height = template.layoutConfig.canvasSize.height;
-                        // A4 roughly 595 x 842 pt
-                        // Adjust based on canvasSize logic from generate page
-                        const pdf = new jsPDF({
-                            orientation: width > height ? 'landscape' : 'portrait',
-                            unit: 'px',
-                            format: [width, height]
-                        });
-
-                        pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
-                        const pdfBlob = pdf.output('blob');
-
-                        folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
-
-                        generatedCertificates.push({
-                            studentId: student.id,
-                            customFields: {
-                                layoutConfig: studentConfig // Store basic snapshot
-                            },
-                        });
-                    }
+                    generatedCertificates.push({
+                        studentId: student.id,
+                        customFields: {
+                            layoutConfig: studentConfig
+                        },
+                    });
                 } catch (err) {
                     console.error('Err:', err);
                     failures.push({ name: students[i].name, reason: err.message });
@@ -383,7 +348,6 @@ export default function BulkGenerateCertificatesPage() {
             toast.error('Error: ' + error.message);
         } finally {
             setGenerating(false);
-            setGenerationConfig(null);
             setProgress(0);
         }
     };
@@ -412,15 +376,6 @@ export default function BulkGenerateCertificatesPage() {
                     </Card>
                 </div>
             )}
-
-            {/* Hidden Canvas */}
-            <div className="absolute top-0 left-0 -z-50" style={{ position: 'fixed', left: '-10000px', top: 0 }}>
-                {generationConfig && (
-                    <div id="certificate-generation-canvas" style={{ width: generationConfig.canvasSize?.width, height: generationConfig.canvasSize?.height }}>
-                        <CertificateDesignEditor initialConfig={generationConfig} readOnly={true} templateType="certificate" />
-                    </div>
-                )}
-            </div>
 
             {/* Header */}
             <div className="h-14 border-b bg-background flex items-center justify-between px-4">

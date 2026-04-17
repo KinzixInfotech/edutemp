@@ -41,6 +41,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ReceiptPreview from '@/components/receipts/ReceiptPreview';
 import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
+import { getReceiptPaperOptions } from '@/lib/receipts/receipt-format';
 
 import SessionManagementTab from '@/components/fee-settings/SessionManagementTab';
 import ServicesTab from '@/components/fee-settings/ServicesTab';
@@ -122,6 +123,7 @@ export default function FeeSettings() {
     const [earlyPaymentDaysYearly, setEarlyPaymentDaysYearly] = useState(60);
 
     const [previewType, setPreviewType] = useState('receipt'); // 'receipt' or 'statement'
+    const receiptPaperOptions = getReceiptPaperOptions();
     const [staffWardDiscountEnabled, setStaffWardDiscountEnabled] = useState(false);
     const [staffWardDiscountPercentage, setStaffWardDiscountPercentage] = useState('0');
 
@@ -749,7 +751,7 @@ export default function FeeSettings() {
                             </h4>
                             <p className="text-sm text-muted-foreground pl-8">
                                 Reach out to your ICICI Bank relationship manager or visit the nearest ICICI Bank branch.
-                                Request to enroll for <strong>"ICICI Eazypay Payment Gateway"</strong> service.
+                                Request to enroll for <strong>&quot;ICICI Eazypay Payment Gateway&quot;</strong> service.
                             </p>
                         </div>
 
@@ -1395,12 +1397,15 @@ export default function FeeSettings() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="a4">A4 / Letter (8.5&quot; × 11&quot;)</SelectItem>
-                                        <SelectItem value="thermal">Thermal 80mm</SelectItem>
+                                        {receiptPaperOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
-                                    A4 for standard printers. Thermal for POS/receipt printers.
+                                    Choose the real print format so preview, PDF download, and transaction receipts stay in sync.
                                 </p>
                             </div>
 

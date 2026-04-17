@@ -52,7 +52,7 @@ export default function AdmitCardTemplatePage() {
         queryKey: ['admitcard-templates', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates`);
+            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates?all=true`);
             if (!res.ok) throw new Error('Failed to fetch');
             return res.json();
         },

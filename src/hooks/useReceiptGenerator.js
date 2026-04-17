@@ -50,12 +50,13 @@ export function useReceiptGenerator() {
         paymentId,
         schoolId,
         filename,
+        paperSize = 'a4',
     }) => {
         try {
             setIsGenerating(true);
 
             // Generate PDF blob from the receipt HTML element
-            const pdfBlob = await generateReceiptPDF(receiptElement, filename);
+            const pdfBlob = await generateReceiptPDF(receiptElement, filename, paperSize);
 
             // Create File object from blob
             const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
@@ -119,6 +120,7 @@ export function useReceiptGenerator() {
                 paymentId: feePaymentId,
                 schoolId,
                 filename: suggestedFilename,
+                paperSize: receipt?.receiptData?.paperSize || 'a4',
             });
 
             return {

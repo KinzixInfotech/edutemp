@@ -2,6 +2,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { getReceiptPaperConfig, normalizeReceiptPaperSize } from "@/lib/receipts/receipt-format";
 
 // Number to Words (Indian Rupees)
 function numberToWords(num) {
@@ -48,12 +49,19 @@ export async function generateReceiptPdf(data) {
         paymentMethod,
         academicYear,
         installments = [],
+        receiptSettings = {},
     } = data;
+    const normalizedPaperSize = normalizeReceiptPaperSize(receiptSettings.receiptPaperSize);
+    const paperConfig = getReceiptPaperConfig(normalizedPaperSize);
+    const showSchoolLogo = receiptSettings.showSchoolLogo ?? true;
+    const showPaymentMode = receiptSettings.showPaymentMode ?? true;
+    const showSignatureLine = receiptSettings.showSignatureLine ?? true;
+    const receiptFooterText = receiptSettings.receiptFooterText || "Thank you for your payment!";
 
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: "a5",
+        format: [paperConfig.widthMm, paperConfig.heightMm],
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -78,7 +86,7 @@ export async function generateReceiptPdf(data) {
 
     // ============ LOGOS SECTION ============
     // School Logo (Left) - Larger and better positioned
-    if (school.logo) {
+    if (showSchoolLogo && school.logo) {
         try {
             doc.addImage(school.logo, "PNG", 10, 8, 25, 25);
         } catch (e) {
@@ -181,7 +189,7 @@ export async function generateReceiptPdf(data) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(17, 24, 39);
     doc.setFontSize(10);
-    doc.text(paymentMethod, col2X, infoStartY + 5);
+    doc.text(showPaymentMode ? paymentMethod : "Hidden by settings", col2X, infoStartY + 5);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -317,16 +325,18 @@ export async function generateReceiptPdf(data) {
     doc.setFontSize(8);
     doc.setTextColor(107, 114, 128);
     doc.setFont("helvetica", "italic");
-    doc.text("Thank you for your payment!", 10, currentY + 5);
+    doc.text(receiptFooterText, 10, currentY + 5);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.text("This is a computer-generated receipt.", 10, currentY + 9);
 
     // Signature
-    doc.setTextColor(75, 85, 99);
-    doc.text("Authorized Signature", pageWidth - 10, currentY + 5, { align: "right" });
-    doc.line(pageWidth - 45, currentY + 7, pageWidth - 10, currentY + 7);
+    if (showSignatureLine) {
+        doc.setTextColor(75, 85, 99);
+        doc.text("Authorized Signature", pageWidth - 10, currentY + 5, { align: "right" });
+        doc.line(pageWidth - 45, currentY + 7, pageWidth - 10, currentY + 7);
+    }
 
     // ============ POWERED BY FOOTER ============
     const footerY = pageHeight - 12;

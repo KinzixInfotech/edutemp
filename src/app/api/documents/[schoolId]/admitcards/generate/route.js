@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
+import {
+    applyMappingsToTemplateElements,
+    buildDocumentMappingContext,
+    buildResolvedMappings,
+    extractTemplatePlaceholders,
+} from '@/lib/certificate-template-mapping';
+import { serializeSignatureAsset } from '@/lib/document-signature-library';
 
 export async function POST(request, props) {
     const params = await props.params;
@@ -53,6 +60,20 @@ export async function POST(request, props) {
             where: { id: examId },
             include: {
                 school: true,
+                subjects: {
+                    include: {
+                        subject: {
+                            select: {
+                                id: true,
+                                subjectName: true,
+                                subjectCode: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        date: 'asc',
+                    },
+                },
             },
         });
 
@@ -92,6 +113,35 @@ export async function POST(request, props) {
                 { status: 400 }
             );
         }
+
+        const signatures = await prisma.signature.findMany({
+            where: {
+                schoolId,
+                isActive: true,
+            },
+            include: {
+                teacher: {
+                    select: {
+                        userId: true,
+                        name: true,
+                        employeeId: true,
+                    },
+                },
+                class: {
+                    select: {
+                        id: true,
+                        className: true,
+                    },
+                },
+                section: {
+                    select: {
+                        id: true,
+                        name: true,
+                        classId: true,
+                    },
+                },
+            },
+        });
 
         // 5. Convert logo to base64 if needed
         let layoutConfig = { ...template.layoutConfig };
@@ -139,17 +189,63 @@ export async function POST(request, props) {
             }
         }
 
+        const placeholderKeys = extractTemplatePlaceholders(layoutConfig?.elements || []);
+        const resolvedMappings = buildResolvedMappings(
+            placeholderKeys,
+            {
+                ...buildDocumentMappingContext({
+                    student,
+                    exam,
+                    formValues: {
+                        seatNumber,
+                        center,
+                        examDate,
+                        examTime,
+                        venue,
+                    },
+                    fullUser: {
+                        school: student.school,
+                        schoolName: student.school?.name,
+                    },
+                    docSettings: {
+                        signatureUrl: student.school?.signatureUrl || '',
+                        stampUrl: student.school?.stampUrl || '',
+                        signatures: signatures.map(serializeSignatureAsset),
+                    },
+                    certificateMeta: {
+                        studentId,
+                        verificationUrl: body?.verificationUrl || '',
+                    },
+                }),
+                __examSubjects: exam?.subjects || [],
+            }
+        );
+
+        layoutConfig = {
+            ...layoutConfig,
+            elements: applyMappingsToTemplateElements(
+                JSON.parse(JSON.stringify(layoutConfig.elements || [])),
+                {
+                    ...resolvedMappings,
+                    __examSubjects: exam?.subjects || [],
+                }
+            ),
+        };
+
         // 8. Generate PDF and get URL
         console.log('📄 Generating PDF...');
         const pdfDataUrl = await generateAdmitCardPDF({
             template: { ...template, layoutConfig },
             student,
             exam,
-            seatNumber,
-            center,
-            examDate,
-            examTime,
-            venue,
+            customFields: {
+                ...resolvedMappings,
+                seatNumber,
+                center,
+                examDate,
+                examTime,
+                venue,
+            },
         });
 
         console.log('✅ PDF generated');

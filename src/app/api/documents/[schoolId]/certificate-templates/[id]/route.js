@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { invalidatePattern } from '@/lib/cache';
 
 export async function GET(request, props) {
     const params = await props.params;
@@ -87,6 +88,8 @@ export async function PUT(request, props) {
             },
         });
 
+        await invalidatePattern(`certificate-templates:*schoolId:${schoolId}*`);
+
         return NextResponse.json({
             id: template.id,
             name: template.name,
@@ -135,6 +138,8 @@ export async function DELETE(request, props) {
                 name: `${template.name}_deleted_${Date.now()}`
             },
         });
+
+        await invalidatePattern(`certificate-templates:*schoolId:${schoolId}*`);
 
         return NextResponse.json({ message: 'Template deleted successfully' });
     } catch (error) {

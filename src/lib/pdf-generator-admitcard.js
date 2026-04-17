@@ -11,7 +11,7 @@ function replaceVariables(text, data) {
     if (matches) {
         matches.forEach(match => {
             const key = match.replace(/[{}]/g, '');
-            const value = data[key] || match;
+            const value = data[key] ?? match;
             result = result.replace(match, value);
         });
     }
@@ -62,18 +62,25 @@ export async function generateAdmitCardPDF({ template, student, exam, customFiel
         // Prepare data object for variable replacement
         const data = {
             rollNumber: student.rollNumber,
-            admissionNo: student.admissionNo,
-            studentName: student.name,
+            admissionNo: student.admissionNo || student.admissionNumber,
+            studentName: student.name || student.user?.name,
             class: student.class?.className || 'N/A',
             dob: student.dob,
             gender: student.gender,
-            fatherName: student.FatherName,
-            motherName: student.MotherName,
-            address: student.Address,
-            schoolName: layoutConfig.headerText || 'School Name',
-            examCenter: exam?.center || 'Exam Center',
+            fatherName: student.FatherName || student.fatherName,
+            motherName: student.MotherName || student.motherName,
+            address: student.Address || student.address,
+            schoolName: customFields.schoolName || layoutConfig.headerText || exam?.school?.name || 'School Name',
+            schoolAddress: customFields.schoolAddress || exam?.school?.address || exam?.school?.location || '',
+            examName: customFields.examName || exam?.title || exam?.name || '',
+            examDate: customFields.examDate || exam?.startDate || '',
+            examTime: customFields.examTime || '',
+            seatNumber: customFields.seatNumber || '',
+            center: customFields.center || exam?.center || '',
+            venue: customFields.venue || '',
+            examCenter: customFields.center || exam?.center || 'Exam Center',
             year: new Date().getFullYear(),
-            studentPhoto: student.profilePicture,
+            studentPhoto: customFields.studentPhoto || student.user?.profilePicture || student.profilePicture,
             ...customFields,
             // Add exam schedule data if provided
             examDate1: exam?.schedule?.[0]?.date || '',

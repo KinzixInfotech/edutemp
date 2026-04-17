@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getReceiptPaperConfig, normalizeReceiptPaperSize } from '@/lib/receipts/receipt-format';
 
 /**
  * Generate PDF from Receipt Template
@@ -7,8 +8,10 @@ import html2canvas from 'html2canvas';
  * @param {string} filename - Suggested filename for the PDF
  * @returns {Promise<Blob>} - PDF blob
  */
-export async function generateReceiptPDF(receiptElement, filename = 'receipt.pdf') {
+export async function generateReceiptPDF(receiptElement, filename = 'receipt.pdf', paperSize = 'a4') {
     try {
+        const paperConfig = getReceiptPaperConfig(normalizeReceiptPaperSize(paperSize));
+
         // Convert the receipt HTML to canvas
         const canvas = await html2canvas(receiptElement, {
             scale: 2, // Higher quality
@@ -18,12 +21,18 @@ export async function generateReceiptPDF(receiptElement, filename = 'receipt.pdf
         });
 
         // Get canvas dimensions
-        const imgWidth = 210; // A4 width in mm
-        const pageHeight = 297; // A4 height in mm
+        const imgWidth = paperConfig.widthMm;
+        const pageHeight = paperConfig.heightMm;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         // Create PDF
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: paperConfig.value === 'thermal'
+                ? [paperConfig.widthMm, Math.max(paperConfig.heightMm, imgHeight)]
+                : [paperConfig.widthMm, paperConfig.heightMm],
+        });
 
         // Calculate if content fits on one page
         let heightLeft = imgHeight;
@@ -70,9 +79,9 @@ export async function generateReceiptPDF(receiptElement, filename = 'receipt.pdf
  * @param {HTMLElement} receiptElement 
  * @param {string} filename 
  */
-export async function downloadReceiptPDF(receiptElement, filename = 'receipt.pdf') {
+export async function downloadReceiptPDF(receiptElement, filename = 'receipt.pdf', paperSize = 'a4') {
     try {
-        const blob = await generateReceiptPDF(receiptElement, filename);
+        const blob = await generateReceiptPDF(receiptElement, filename, paperSize);
 
         // Create download link
         const url = URL.createObjectURL(blob);

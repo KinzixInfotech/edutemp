@@ -36,8 +36,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
-import * as htmlToImage from 'html-to-image';
-import jsPDF from 'jspdf';
+import {
+    applyMappingsToTemplateElements,
+    buildResolvedTemplateConfig,
+    buildDocumentMappingContext,
+} from '@/lib/certificate-template-mapping';
+import { createPdfBlobFromLayout, downloadPdfFromLayout } from '@/lib/client-document-pdf';
 
 const formSchema = z.object({
     studentId: z.string().min(1, 'Student is required'),
@@ -106,6 +110,7 @@ export default function GenerateAdmitCardPage() {
             if (!schoolId) throw new Error('No school ID');
             const params = new URLSearchParams({ schoolId });
             if (academicYearId) params.append('academicYearId', academicYearId);
+            params.append('all', 'true');
             const res = await fetch(`/api/students?${params}`);
             if (!res.ok) throw new Error('Failed to fetch students');
             return res.json();
@@ -131,7 +136,9 @@ export default function GenerateAdmitCardPage() {
         queryKey: ['exams', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/schools/${schoolId}/examination/exams`);
+            const params = new URLSearchParams({ all: 'true' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/examination/exams?${params}`);
             if (!res.ok) throw new Error('Failed to fetch exams');
             return res.json();
         },
@@ -180,7 +187,7 @@ export default function GenerateAdmitCardPage() {
         queryKey: ['admitcard-templates', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('Invalid configuration');
-            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates`);
+            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates?all=true`);
             if (!res.ok) throw new Error('Failed to fetch templates');
             return res.json();
         },
@@ -197,157 +204,48 @@ export default function GenerateAdmitCardPage() {
 
         const student = students.find(s => s.userId === studentId) || {};
         const exam = exams?.find(e => e.id?.toString() === examId) || {};
-
-        // Create a deep copy of elements to avoid mutating original
-        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
-
-        // Get student's section name
-        const studentSection = student.class?.sections?.find(s => s.id === student.sectionId);
-        const sectionName = studentSection?.name || student.section?.name || 'Section';
-
-        // Format exam schedule as a table
-        let examScheduleText = '';
-        if (examId && exam.subjects && exam.subjects.length > 0) {
-            // Create table rows - each subject on a new line
-            exam.subjects.forEach((examSubject, index) => {
-                const date = examSubject.date
-                    ? new Date(examSubject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                    : 'TBA';
-                const subjectName = examSubject.subject?.subjectName || 'Subject';
-                const time = examSubject.startTime && examSubject.endTime
-                    ? `${examSubject.startTime} - ${examSubject.endTime}`
-                    : examTime || 'TBA';
-                const marks = examSubject.maxMarks || '100';
-
-                // Add line break between rows
-                if (index > 0) examScheduleText += '\n';
-                examScheduleText += `${date}  |  ${subjectName}  |  ${time}  |  ${marks}`;
-            });
-        } else if (examId) {
-            examScheduleText = `${exam.title || exam.name}\nNo subject schedule available yet`;
-        } else {
-            examScheduleText = '(Exam schedule will be populated during generation)';
-        }
-
-        // Replace placeholders
-        const replacements = {
-            '{{studentName}}': student.user?.name || student.name || 'Student Name',
-            '{{rollNumber}}': student.rollNumber || 'Roll No',
-            '{{admissionNo}}': student.admissionNumber || 'Adm No',
-            '{{class}}': student.class?.className || 'Class',
-            '{{section}}': sectionName,
-            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : 'DOB',
-            '{{fatherName}}': student.FatherName || 'Father Name',
-            '{{motherName}}': student.motherName || 'Mother Name',
-            '{{address}}': student.address || 'Address',
-            '{{schoolName}}': fullUser?.schoolName || fullUser?.school?.name || 'School Name',
-            '{{examName}}': exam.title || exam.name || 'Exam Name',
-            '{{schoolAddress}}': fullUser?.school.location || 'Location not added',
-            '{{examDate}}': examDate ? new Date(examDate).toLocaleDateString() : exam.startDate ? new Date(exam.startDate).toLocaleDateString() : 'Exam Date',
-            '{{examTime}}': examTime || 'Exam Time',
-            '{{seatNumber}}': seatNumber || 'Seat No',
-            '{{center}}': center || 'Exam Center',
-            '{{venue}}': venue || 'Venue',
-            '{{examSchedule}}': examScheduleText,
-            '{{verificationUrl}}': `${window.location.origin}/verify/admitcard?studentId=${studentId}&examId=${examId}&seat=${seatNumber}`,
-        };
-
-        // Add individual exam subject rows (for table-like display)
-        if (exam.subjects && exam.subjects.length > 0) {
-            for (let i = 0; i < 10; i++) {
-                const subject = exam.subjects[i];
-                if (subject) {
-                    const date = subject.date
-                        ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                        : '';
-                    const name = subject.subject?.subjectName || '';
-                    const time = subject.startTime && subject.endTime
-                        ? `${subject.startTime} - ${subject.endTime}`
-                        : '';
-                    const marks = subject.maxMarks || '';
-
-                    // Full row with all info
-                    replacements[`{{exam_subject_${i + 1}}}`] = `${date}  |  ${name}  |  ${time}  |  ${marks}`;
-                } else {
-                    // Empty if no subject at this index
-                    replacements[`{{exam_subject_${i + 1}}}`] = '';
-                }
-            }
-        } else {
-            // No subjects - empty all rows
-            for (let i = 0; i < 10; i++) {
-                replacements[`{{exam_subject_${i + 1}}}`] = '';
-            }
-        }
-
-        // Image replacements (URLs)
-        const imageReplacements = {
-            '{{studentPhoto}}': student?.user?.profilePicture || student.photoUrl || 'https://placehold.co/100x100?text=Photo',
-            '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
-            '{{principalSignature}}': docSettings?.signatureUrl || fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
-            '{{schoolStamp}}': docSettings?.stampUrl || fullUser?.school?.stampUrl || 'https://placehold.co/100x50?text=Stamp',
-        };
-
-        const processedElements = elements.map(el => {
-            if (el.type === 'text' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'qrcode' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'image') {
-                let url = el.url || '';
-                Object.entries(imageReplacements).forEach(([key, value]) => {
-                    if (url.includes(key) || url === key) {
-                        url = value;
-                    }
-                });
-                if (!url || url.startsWith('{{')) {
-                    url = 'https://placehold.co/100x100?text=Image';
-                }
-                return { ...el, url };
-            }
-            if (el.type === 'table' && el.dataSource === 'exam_subjects') {
-                // Populate table with exam subjects
-                const tableData = exam.subjects && exam.subjects.length > 0
-                    ? exam.subjects.map(subject => ({
-                        date: subject.date
-                            ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                            : '',
-                        subject: subject.subject?.subjectName || '',
-                        time: subject.startTime && subject.endTime
-                            ? `${subject.startTime} - ${subject.endTime}`
-                            : '',
-                        marks: subject.maxMarks || '',
-                    }))
-                    : [];
-
-                return { ...el, tableData };
-            }
-            return el;
+        const mappingContext = buildDocumentMappingContext({
+            student,
+            exam,
+            formValues: {
+                seatNumber,
+                center,
+                examDate,
+                examTime,
+                venue,
+            },
+            fullUser,
+            selectedYear,
+            docSettings,
+            certificateMeta: {
+                studentId,
+                verificationUrl: typeof window !== 'undefined'
+                    ? `${window.location.origin}/verify/admitcard?studentId=${studentId}&examId=${examId}&seat=${seatNumber}`
+                    : '',
+            },
+        });
+        const resolvedLayout = buildResolvedTemplateConfig({
+            layoutConfig: template.layoutConfig,
+            context: {
+                ...mappingContext,
+                __examSubjects: exam?.subjects || [],
+            },
         });
 
         const config = {
-            elements: processedElements,
-            canvasSize: template.layoutConfig.canvasSize || { width: 800, height: 600 },
-            backgroundImage: template.layoutConfig.backgroundImage || ''
+            ...resolvedLayout,
+            canvasSize: resolvedLayout.canvasSize || { width: 800, height: 600 },
+            backgroundImage: resolvedLayout.backgroundImage || '',
+            backgroundAsset: resolvedLayout.backgroundAsset || null,
+            backgroundColor: resolvedLayout.backgroundColor || '#ffffff',
+            customFonts: resolvedLayout.customFonts || [],
         };
         setPreviewConfig(config);
 
     }, [templateId, studentId, examId, seatNumber, center, examDate, examTime, venue, templates, students, exams, fullUser, docSettings]);
 
     const handleGeneratePDF = async (data) => {
-        const canvasElement = document.querySelector('#admitcard-preview-container [style*="background"]');
-
-        if (!canvasElement) {
+        if (!previewConfig) {
             toast.error('Preview not ready');
             return;
         }
@@ -355,37 +253,10 @@ export default function GenerateAdmitCardPage() {
         try {
             setGenerating(true);
 
-            // Use html-to-image with font options
-            const dataUrl = await htmlToImage.toPng(canvasElement, {
-                quality: 1.0,
-                pixelRatio: 2,
-                skipFonts: true, // Skip font parsing to avoid errors
-                preferCanvas: true, // Prefer canvas rendering for better compatibility
-            });
-
-            // Create image to get dimensions
-            const img = new Image();
-            img.src = dataUrl;
-
-            await new Promise((resolve) => {
-                img.onload = resolve;
-            });
-
-            const imgWidth = img.width / 2;
-            const imgHeight = img.height / 2;
-            const orientation = imgWidth > imgHeight ? 'l' : 'p';
-
-            const pdf = new jsPDF({
-                orientation,
-                unit: 'pt',
-                format: [imgWidth, imgHeight]
-            });
-
-            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-
             // Save locally
-            pdf.save(`AdmitCard_${seatNumber || 'preview'}.pdf`);
-            const pdfBlob = pdf.output('blob');
+            const fileName = `AdmitCard_${seatNumber || 'preview'}.pdf`;
+            await downloadPdfFromLayout(previewConfig, fileName);
+            const pdfBlob = await createPdfBlobFromLayout(previewConfig);
             const pdfUrl = URL.createObjectURL(pdfBlob);
             setPreviewUrl(pdfUrl);
 

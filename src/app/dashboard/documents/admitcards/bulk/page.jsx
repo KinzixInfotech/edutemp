@@ -9,8 +9,6 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 import {
     Save,
     Loader2,
@@ -46,6 +44,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import {
+    buildDocumentMappingContext,
+    buildResolvedTemplateConfig,
+} from '@/lib/certificate-template-mapping';
+import { createPdfBlobFromLayout } from '@/lib/client-document-pdf';
 
 const formSchema = z.object({
     examId: z.string().min(1, 'Exam is required'),
@@ -72,7 +75,6 @@ export default function BulkGenerateAdmitCardsPage() {
     const [progress, setProgress] = useState(0);
     const [statusMessage, setStatusMessage] = useState('');
     const [previewConfig, setPreviewConfig] = useState(null);
-    const [generationConfig, setGenerationConfig] = useState(null); // Separate state for hidden generation canvas
     const [studentCount, setStudentCount] = useState(0);
     const [loadingCount, setLoadingCount] = useState(false);
 
@@ -142,6 +144,7 @@ export default function BulkGenerateAdmitCardsPage() {
             if (!schoolId) throw new Error('No school ID');
             const params = new URLSearchParams();
             if (academicYearId) params.append('academicYearId', academicYearId);
+            params.append('all', 'true');
             const res = await fetch(`/api/schools/${schoolId}/examination/exams?${params}`);
             if (!res.ok) throw new Error('Failed to fetch exams');
             const data = await res.json();
@@ -155,7 +158,7 @@ export default function BulkGenerateAdmitCardsPage() {
         queryKey: ['admitcard-templates', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('Invalid configuration');
-            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates`);
+            const res = await fetch(`/api/documents/${schoolId}/admitcard-templates?all=true`);
             if (!res.ok) throw new Error('Failed to fetch templates');
             const data = await res.json();
             return data.data || data;
@@ -242,110 +245,50 @@ export default function BulkGenerateAdmitCardsPage() {
         const cls = classes?.find(c => c.id.toString() === watchedValues.classId) || {};
         const section = sections?.find(s => s.id.toString() === watchedValues.sectionId) || {};
 
-        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
-
-        // Format exam schedule as a table
-        let examScheduleText = '';
-        if (watchedValues.examId && exam.subjects && exam.subjects.length > 0) {
-            // Create table rows - each subject on a new line
-            exam.subjects.forEach((examSubject, index) => {
-                const date = examSubject.date
-                    ? new Date(examSubject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                    : 'TBA';
-                const subjectName = examSubject.subject?.subjectName || 'Subject';
-                const time = examSubject.startTime && examSubject.endTime
-                    ? `${examSubject.startTime} - ${examSubject.endTime}`
-                    : watchedValues.examTime || 'TBA';
-                const marks = examSubject.maxMarks || '100';
-
-                // Add line break between rows
-                if (index > 0) examScheduleText += '\n';
-                examScheduleText += `${date}  |  ${subjectName}  |  ${time}  |  ${marks}`;
-            });
-        } else if (watchedValues.examId) {
-            examScheduleText = `${exam.title || exam.name}\nNo subject schedule available yet`;
-        } else {
-            examScheduleText = '(Exam schedule will be populated during generation)';
-        }
-
-        const replacements = {
-            '{{studentName}}': 'John Doe (Sample)',
-            '{{rollNumber}}': '12345',
-            '{{admissionNo}}': 'ADM001',
-            '{{class}}': cls.className || 'Class X',
-            '{{section}}': section.name || 'A',
-            '{{dob}}': '2010-01-01',
-            '{{fatherName}}': 'Robert Doe',
-            '{{motherName}}': 'Jane Doe',
-            '{{address}}': '123 School Lane',
-            '{{schoolName}}': fullUser?.school?.name || fullUser?.schoolName || 'School Name',
-            '{{schoolAddress}}': fullUser?.school?.location || 'School Address',
-            '{{examName}}': exam.title || 'Mid Term Exam',
-            '{{examDate}}': watchedValues.examDate ? new Date(watchedValues.examDate).toLocaleDateString() : '2024-01-01',
-            '{{examTime}}': watchedValues.examTime || '09:00 AM',
-            '{{seatNumber}}': `${watchedValues.seatNumberPrefix}${watchedValues.startingSeatNumber}`,
-            '{{examSchedule}}': examScheduleText,
-            '{{center}}': watchedValues.center || 'Main Hall',
-            '{{venue}}': watchedValues.venue || 'Block A',
+        const sampleStudent = {
+            user: { name: 'John Doe (Sample)', profilePicture: 'https://placehold.co/100x100?text=Photo' },
+            rollNumber: '12345',
+            admissionNo: 'ADM001',
+            class: { className: cls.className || 'Class X' },
+            section: { name: section.name || 'A', sectionName: section.name || 'A' },
+            dob: '2010-01-01',
+            fatherName: 'Robert Doe',
+            motherName: 'Jane Doe',
+            address: '123 School Lane',
         };
+        const mappingContext = buildDocumentMappingContext({
+            student: sampleStudent,
+            exam,
+            formValues: {
+                examDate: watchedValues.examDate,
+                examTime: watchedValues.examTime,
+                center: watchedValues.center,
+                venue: watchedValues.venue,
+                seatNumber: `${watchedValues.seatNumberPrefix}${watchedValues.startingSeatNumber}`,
+            },
+            fullUser,
+            selectedYear,
+            docSettings: {},
+            certificateMeta: {
+                verificationUrl: 'https://example.com/verify/admit-card-sample',
+            },
+        });
 
-        const imageReplacements = {
-            '{{studentPhoto}}': 'https://placehold.co/100x100?text=Photo',
-            '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
-            '{{principalSignature}}': fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
-        };
-
-        const processedElements = elements.map(el => {
-            if (el.type === 'text' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'qrcode' && el.content) {
-                let content = el.content;
-                Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                });
-                return { ...el, content };
-            }
-            if (el.type === 'image') {
-                let url = el.url || '';
-                Object.entries(imageReplacements).forEach(([key, value]) => {
-                    if (url.includes(key) || url === key) {
-                        url = value;
-                    }
-                });
-                if (!url || url.startsWith('{{')) {
-                    url = 'https://placehold.co/100x100?text=Image';
-                }
-                return { ...el, url };
-            }
-            if (el.type === 'table' && el.dataSource === 'exam_subjects') {
-                // Populate table with exam subjects
-                const tableData = exam.subjects && exam.subjects.length > 0
-                    ? exam.subjects.map(subject => ({
-                        date: subject.date
-                            ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                            : '',
-                        subject: subject.subject?.subjectName || '',
-                        time: subject.startTime && subject.endTime
-                            ? `${subject.startTime} - ${subject.endTime}`
-                            : '',
-                        marks: subject.maxMarks || '',
-                    }))
-                    : [];
-
-                return { ...el, tableData };
-            }
-            return el;
+        const resolvedLayout = buildResolvedTemplateConfig({
+            layoutConfig: template.layoutConfig,
+            context: {
+                ...mappingContext,
+                __examSubjects: exam?.subjects || [],
+            },
         });
 
         setPreviewConfig({
-            elements: processedElements,
-            canvasSize: template.layoutConfig.canvasSize,
-            backgroundImage: template.layoutConfig.backgroundImage
+            ...resolvedLayout,
+            canvasSize: resolvedLayout.canvasSize,
+            backgroundImage: resolvedLayout.backgroundImage,
+            backgroundAsset: resolvedLayout.backgroundAsset || null,
+            backgroundColor: resolvedLayout.backgroundColor || '#ffffff',
+            customFonts: resolvedLayout.customFonts || [],
         });
 
     }, [JSON.stringify(watchedValues), templates, exams, classes, sections, fullUser]);
@@ -387,154 +330,60 @@ export default function BulkGenerateAdmitCardsPage() {
             let currentSeatNumber = data.startingSeatNumber;
             const total = students.length;
 
-            // Helper to process replacements
-            const processElements = (elements, student, seatNo) => {
-                // Format exam schedule
-                let examScheduleText = '';
-                if (exam.subjects && exam.subjects.length > 0) {
-                    exam.subjects.forEach((examSubject, index) => {
-                        const date = examSubject.date
-                            ? new Date(examSubject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                            : 'TBA';
-                        const subjectName = examSubject.subject?.subjectName || 'Subject';
-                        const time = examSubject.startTime && examSubject.endTime
-                            ? `${examSubject.startTime} - ${examSubject.endTime}`
-                            : data.examTime || 'TBA';
-                        const marks = examSubject.maxMarks || '100';
-
-                        if (index > 0) examScheduleText += '\n';
-                        examScheduleText += `${date}  |  ${subjectName}  |  ${time}  |  ${marks}`;
-                    });
-                } else {
-                    examScheduleText = `${exam.title}\nNo subject schedule available`;
-                }
-
-                const replacements = {
-                    '{{studentName}}': student.name,
-                    '{{rollNumber}}': student.rollNumber || '',
-                    '{{admissionNo}}': student.admissionNo || '',
-                    '{{class}}': student.className || '',
-                    '{{section}}': student.section || '',
-                    '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
-                    '{{fatherName}}': student.fatherName || '',
-                    '{{motherName}}': student.motherName || '',
-                    '{{address}}': student.address || '',
-                    '{{schoolName}}': fullUser?.school?.name || fullUser?.schoolName || '',
-                    '{{schoolAddress}}': fullUser?.school?.location || '',
-                    '{{examName}}': exam.title || '',
-                    '{{examDate}}': data.examDate ? new Date(data.examDate).toLocaleDateString() : '',
-                    '{{examTime}}': data.examTime || '',
-                    '{{seatNumber}}': seatNo,
-                    '{{examSchedule}}': examScheduleText,
-                    '{{center}}': data.center || '',
-                    '{{venue}}': data.venue || '',
-                };
-
-                const imageReplacements = {
-                    '{{studentPhoto}}': student.photo || 'https://placehold.co/100x100?text=No+Photo',
-                    '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
-                    '{{principalSignature}}': fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
-                };
-
-                return elements.map(el => {
-                    if (el.type === 'text' && el.content) {
-                        let content = el.content;
-                        Object.entries(replacements).forEach(([key, value]) => {
-                            content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                        });
-                        return { ...el, content };
-                    }
-                    if (el.type === 'qrcode' && el.content) {
-                        let content = el.content;
-                        Object.entries(replacements).forEach(([key, value]) => {
-                            content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
-                        });
-                        return { ...el, content };
-                    }
-                    if (el.type === 'image') {
-                        let url = el.url || '';
-                        Object.entries(imageReplacements).forEach(([key, value]) => {
-                            if (url.includes(key) || url === key) {
-                                url = value;
-                            }
-                        });
-                        if (!url || url.startsWith('{{')) {
-                            url = 'https://placehold.co/100x100?text=Image';
-                        }
-                        return { ...el, url };
-                    }
-                    if (el.type === 'table' && el.dataSource === 'exam_subjects') {
-                        const tableData = exam.subjects && exam.subjects.length > 0
-                            ? exam.subjects.map(subject => ({
-                                date: subject.date
-                                    ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                                    : '',
-                                subject: subject.subject?.subjectName || '',
-                                time: subject.startTime && subject.endTime
-                                    ? `${subject.startTime} - ${subject.endTime}`
-                                    : '',
-                                marks: subject.maxMarks || '',
-                            }))
-                            : [];
-                        return { ...el, tableData };
-                    }
-                    return el;
-                });
-            };
-
             for (let i = 0; i < students.length; i++) {
                 try {
                     const student = students[i];
                     const seatNo = `${data.seatNumberPrefix}${currentSeatNumber}`;
-
-                    const studentConfig = {
-                        elements: processElements(JSON.parse(JSON.stringify(template.layoutConfig.elements)), student, seatNo),
-                        canvasSize: template.layoutConfig.canvasSize,
-                        backgroundImage: template.layoutConfig.backgroundImage
-                    };
-
-                    // Use separate state for generation to avoid preview flicker
-                    setGenerationConfig(studentConfig);
-
-                    // Wait for render
-                    await new Promise(resolve => setTimeout(resolve, 300)); // Give React time to render
-
-                    // Capture
-                    const element = document.getElementById('admit-card-generation-canvas');
-                    if (element) {
-                        const dataUrl = await toPng(element, {
-                            quality: 0.95,
-                            skipFonts: true,
-                            preferCanvas: true
-                        });
-
-                        if (dataUrl.length < 100) {
-                            throw new Error('Generated image is invalid (too small)');
-                        }
-
-                        // Convert to PDF
-                        const width = template.layoutConfig.canvasSize.width;
-                        const height = template.layoutConfig.canvasSize.height;
-                        const pdf = new jsPDF({
-                            orientation: width > height ? 'landscape' : 'portrait',
-                            unit: 'px',
-                            format: [width, height]
-                        });
-
-                        pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
-                        const pdfBlob = pdf.output('blob');
-
-                        folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
-
-                        // Collect successful generation data
-                        generatedStudents.push({
-                            studentId: student.id,
+                    const mappingContext = buildDocumentMappingContext({
+                        student: {
+                            user: {
+                                name: student.name,
+                                profilePicture: student.photo || '',
+                            },
+                            rollNumber: student.rollNumber || '',
+                            admissionNo: student.admissionNo || '',
+                            class: { className: student.className || '' },
+                            section: { sectionName: student.section || '', name: student.section || '' },
+                            dob: student.dob,
+                            fatherName: student.fatherName || '',
+                            motherName: student.motherName || '',
+                            address: student.address || '',
+                        },
+                        exam,
+                        formValues: {
+                            examDate: data.examDate,
+                            examTime: data.examTime,
+                            center: data.center,
+                            venue: data.venue,
                             seatNumber: seatNo,
-                            center: data.center || '',
-                            layoutConfig: studentConfig,
-                            // We don't have individual fileUrl since we only upload ZIP for bulk
-                        });
-                    }
+                        },
+                        fullUser,
+                        selectedYear,
+                        docSettings: {},
+                        certificateMeta: {
+                            verificationUrl: typeof window !== 'undefined'
+                                ? `${window.location.origin}/verify/admitcard?studentId=${student.id}&examId=${data.examId}&seat=${seatNo}`
+                                : '',
+                        },
+                    });
+
+                    const studentConfig = buildResolvedTemplateConfig({
+                        layoutConfig: template.layoutConfig,
+                        context: {
+                            ...mappingContext,
+                            __examSubjects: exam?.subjects || [],
+                        },
+                    });
+
+                    const pdfBlob = await createPdfBlobFromLayout(studentConfig);
+                    folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
+
+                    generatedStudents.push({
+                        studentId: student.id,
+                        seatNumber: seatNo,
+                        center: data.center || '',
+                        layoutConfig: studentConfig,
+                    });
                 } catch (err) {
                     console.error(`Failed to generate admit card for student ${students[i].name}:`, err);
                     failures.push({
@@ -612,7 +461,6 @@ export default function BulkGenerateAdmitCardsPage() {
             toast.error('Failed to generate admit cards: ' + error.message);
         } finally {
             setGenerating(false);
-            setGenerationConfig(null); // Clear generation config
             setProgress(0);
             setStatusMessage('');
         }
@@ -695,26 +543,6 @@ export default function BulkGenerateAdmitCardsPage() {
                     </Card>
                 </div>
             )}
-
-            {/* Hidden Generation Canvas - Off-screen but rendered */}
-            <div className="absolute top-0 left-0 -z-50" style={{ position: 'fixed', left: '-10000px', top: 0 }}>
-                {generationConfig && (
-                    <div
-                        id="admit-card-generation-canvas"
-                        style={{
-                            width: generationConfig.canvasSize?.width || 800,
-                            height: generationConfig.canvasSize?.height || 600,
-                            overflow: 'hidden' // Ensure no scrollbars in capture
-                        }}
-                    >
-                        <CertificateDesignEditor
-                            initialConfig={generationConfig}
-                            readOnly={true}
-                            templateType="admitcard"
-                        />
-                    </div>
-                )}
-            </div>
 
             {/* Header Toolbar */}
             <div className="h-14 border-b bg-background flex items-center justify-between px-4 flex-shrink-0">

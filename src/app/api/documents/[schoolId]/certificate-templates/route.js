@@ -9,12 +9,13 @@ export async function GET(request, props) {
         const { schoolId } = params;
         const { searchParams } = new URL(request.url);
         const type = searchParams.get('type');
+        const fetchAll = searchParams.get('all') === 'true';
 
         const { page, limit, skip } = getPagination(request);
-        const cacheKey = generateKey('certificate-templates', { schoolId, page, limit, type });
+        const cacheKey = generateKey('certificate-templates', { schoolId, page, limit, type, fetchAll });
 
         const result = await remember(cacheKey, async () => {
-            const paged = await paginate(prisma.documentTemplate, {
+            const queryArgs = {
                 where: {
                     schoolId,
                     templateType: 'certificate',
@@ -31,7 +32,14 @@ export async function GET(request, props) {
                         },
                     },
                 },
-            }, page, limit);
+            };
+
+            const paged = fetchAll
+                ? {
+                    data: await prisma.documentTemplate.findMany(queryArgs),
+                    meta: null,
+                }
+                : await paginate(prisma.documentTemplate, queryArgs, page, limit);
 
             // Map data to match expected format
             const mappedData = paged.data.map(t => ({
@@ -128,7 +136,7 @@ export async function POST(request, props) {
         });
 
         // Invalidate cache
-        await invalidatePattern(`certificate-templates:${schoolId}*`);
+        await invalidatePattern(`certificate-templates:*schoolId:${schoolId}*`);
 
         return NextResponse.json({
             id: template.id,

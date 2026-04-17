@@ -41,6 +41,7 @@ import CertificateDesignEditor from '@/components/certificate-editor/Certificate
 import FileUploadButton from '@/components/fileupload';
 import CropImageDialog from '@/app/components/CropImageDialog';
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
+import { extractTemplatePlaceholders } from '@/lib/certificate-template-mapping';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -142,7 +143,10 @@ export default function EditTemplatePage() {
     const [editorConfig, setEditorConfig] = useState({
         elements: [],
         canvasSize: { width: 800, height: 600 },
-        backgroundImage: ''
+        backgroundImage: '',
+        backgroundAsset: null,
+        backgroundColor: '#ffffff',
+        customFonts: [],
     });
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -152,6 +156,7 @@ export default function EditTemplatePage() {
     const [isReady, setIsReady] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const initialSnapshotRef = useRef(null);
+    const [resetKeys, setResetKeys] = useState({ background: 0 });
 
     // Fetch template data
     const { data: template, isLoading } = useQuery({
@@ -198,7 +203,10 @@ export default function EditTemplatePage() {
                 setEditorConfig({
                     elements: template.layoutConfig.elements || [],
                     canvasSize: template.layoutConfig.canvasSize || { width: 800, height: 600 },
-                    backgroundImage: template.layoutConfig.backgroundImage || ''
+                    backgroundImage: template.layoutConfig.backgroundImage || '',
+                    backgroundAsset: template.layoutConfig.backgroundAsset || null,
+                    backgroundColor: template.layoutConfig.backgroundColor || '#ffffff',
+                    customFonts: template.layoutConfig.customFonts || [],
                 });
             }
             initialSnapshotRef.current = JSON.stringify({
@@ -212,6 +220,9 @@ export default function EditTemplatePage() {
                     elements: template.layoutConfig?.elements || [],
                     canvasSize: template.layoutConfig?.canvasSize || { width: 800, height: 600 },
                     backgroundImage: template.layoutConfig?.backgroundImage || '',
+                    backgroundAsset: template.layoutConfig?.backgroundAsset || null,
+                    backgroundColor: template.layoutConfig?.backgroundColor || '#ffffff',
+                    customFonts: template.layoutConfig?.customFonts || [],
                 },
             });
             setIsDirty(false);
@@ -232,6 +243,9 @@ export default function EditTemplatePage() {
                 elements: editorConfig.elements || [],
                 canvasSize: editorConfig.canvasSize || { width: 800, height: 600 },
                 backgroundImage: editorConfig.backgroundImage || '',
+                backgroundAsset: editorConfig.backgroundAsset || null,
+                backgroundColor: editorConfig.backgroundColor || '#ffffff',
+                customFonts: editorConfig.customFonts || [],
             },
         });
         setIsDirty(currentSnapshot !== initialSnapshotRef.current);
@@ -270,7 +284,11 @@ export default function EditTemplatePage() {
                 ...editorConfig,
                 elements: editorConfig.elements,
                 canvasSize: editorConfig.canvasSize,
-                backgroundImage: editorConfig.backgroundImage
+                backgroundImage: editorConfig.backgroundImage,
+                backgroundAsset: editorConfig.backgroundAsset || null,
+                backgroundColor: editorConfig.backgroundColor || '#ffffff',
+                customFonts: editorConfig.customFonts || [],
+                mappingPlaceholders: extractTemplatePlaceholders(editorConfig.elements || []),
             };
 
             const res = await fetch(`/api/documents/${schoolId}/${config.apiEndpoint}/${templateId}`, {
@@ -304,6 +322,9 @@ export default function EditTemplatePage() {
                     elements: editorConfig.elements || [],
                     canvasSize: editorConfig.canvasSize || { width: 800, height: 600 },
                     backgroundImage: editorConfig.backgroundImage || '',
+                    backgroundAsset: editorConfig.backgroundAsset || null,
+                    backgroundColor: editorConfig.backgroundColor || '#ffffff',
+                    customFonts: editorConfig.customFonts || [],
                 },
             });
             setIsDirty(false);
@@ -368,7 +389,7 @@ export default function EditTemplatePage() {
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Error</AlertTitle>
                             <AlertDescription>
-                                The template type "<strong>{params?.type || 'unknown'}</strong>" is not recognized.
+                                The template type <strong>&quot;{params?.type || 'unknown'}&quot;</strong> is not recognized.
                             </AlertDescription>
                         </Alert>
                         <Button onClick={() => router.push('/dashboard')} className="w-full">
@@ -400,7 +421,7 @@ export default function EditTemplatePage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                            The template you're looking for doesn't exist or has been deleted.
+                            The template you&apos;re looking for doesn&apos;t exist or has been deleted.
                         </p>
                         <Button onClick={() => router.push(config.backUrl)} className="w-full">
                             Back to Templates
@@ -588,7 +609,10 @@ export default function EditTemplatePage() {
                                                 variant="destructive"
                                                 size="icon"
                                                 className="absolute -top-2 -right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => setEditorConfig(prev => ({ ...prev, backgroundImage: '' }))}
+                                                onClick={() => {
+                                                    setEditorConfig(prev => ({ ...prev, backgroundImage: '' }));
+                                                    setResetKeys(prev => ({ ...prev, background: prev.background + 1 }));
+                                                }}
                                             >
                                                 <X className="h-4 w-4" />
                                             </Button>

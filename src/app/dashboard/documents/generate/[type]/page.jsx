@@ -52,9 +52,8 @@ import {
     buildResolvedMappings,
     extractTemplatePlaceholders,
 } from '@/lib/certificate-template-mapping';
-import * as htmlToImage from 'html-to-image';
-import jsPDF from 'jspdf';
 import { debounce } from '@/lib/utils';
+import { createPdfBlobFromLayout, downloadPdfFromLayout } from '@/lib/client-document-pdf';
 
 // Certificate type configurations
 const CERTIFICATE_CONFIGS = {
@@ -263,6 +262,7 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
             if (!schoolId) throw new Error('No school ID');
             const params = new URLSearchParams({ schoolId });
             if (academicYearId) params.append('academicYearId', academicYearId);
+            params.append('all', 'true');
             const res = await fetch(`/api/students?${params}`);
             if (!res.ok) throw new Error('Failed to fetch students');
             return res.json();
@@ -329,7 +329,11 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
         queryKey: ['certificate-templates', schoolId, config?.apiType],
         queryFn: async () => {
             if (!schoolId || !config) throw new Error('Invalid configuration');
-            const res = await fetch(`/api/documents/${schoolId}/certificate-templates?type=${config.apiType}`);
+            const params = new URLSearchParams({
+                type: config.apiType,
+                all: 'true',
+            });
+            const res = await fetch(`/api/documents/${schoolId}/certificate-templates?${params}`);
             if (!res.ok) throw new Error('Failed to fetch templates');
             return res.json();
         },
@@ -397,7 +401,10 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
     }), [certificateMeta, conductLabels, docSettings, fullUser, selectedStudent, selectedYear, watchedValues]);
 
     const resolvedMappings = useMemo(
-        () => buildResolvedMappings(placeholderKeys, mappingContext, fieldOverrides),
+        () => buildResolvedMappings(placeholderKeys, {
+            ...mappingContext,
+            __examSubjects: [],
+        }, fieldOverrides),
         [fieldOverrides, mappingContext, placeholderKeys]
     );
 
@@ -407,19 +414,7 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
     );
 
     const hasTemplateSelection = !!selectedTemplate;
-    const STUDENT_DEPENDENT_KEYS = [
-        'studentName', 'fatherName', 'motherName', 'class', 'section',
-        'dob', 'rollNumber', 'admissionNo', 'studentPhoto', 'gender',
-        'bloodGroup', 'address', 'category', 'nationality', 'religion'
-    ];
-
-    const missingNonStudentPlaceholders = useMemo(
-        () => placeholderKeys.filter(key =>
-            !resolvedMappings[key] && !STUDENT_DEPENDENT_KEYS.includes(key)
-        ),
-        [placeholderKeys, resolvedMappings]
-    );
-    const mappingReady = hasTemplateSelection && missingNonStudentPlaceholders.length === 0;
+    const mappingReady = hasTemplateSelection && missingPlaceholders.length === 0;
     const canGenerate = !!previewConfig && mappingReady && !!watchedValues.studentId && !generating;
     const selectedTemplateEditUrl = selectedTemplate
         ? `/dashboard/documents/templates/certificate/${selectedTemplate.id}?mode=edit`
@@ -487,9 +482,7 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
             toast.error('Choose a student after mapping is resolved.');
             return;
         }
-        // Target the specific content div
-        const element = document.getElementById('certificate-capture-target');
-        if (!element) {
+        if (!previewConfig) {
             toast.error('Preview not ready');
             return;
         }
@@ -497,39 +490,12 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
         try {
             setGenerating(true);
 
-            // Use html-to-image with font options
-            const dataUrl = await htmlToImage.toPng(element, {
-                quality: 1.0,
-                pixelRatio: 2,
-                skipFonts: true,
-                preferCanvas: true,
-                backgroundColor: '#ffffff',
-            });
-
-            // Create PDF
-            const img = new Image();
-            img.src = dataUrl;
-            await new Promise((resolve) => img.onload = resolve);
-
-            const imgWidth = img.width / 2;
-            const imgHeight = img.height / 2;
-            const orientation = imgWidth > imgHeight ? 'l' : 'p';
-
-            const pdf = new jsPDF({
-                orientation,
-                unit: 'pt',
-                format: [imgWidth, imgHeight]
-            });
-
-            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-
             // Generate Filename
             const filename = `${config.title}_${watchedValues.studentId || 'certificate'}.pdf`;
-            pdf.save(filename); // Client Download
+            await downloadPdfFromLayout(previewConfig, filename);
 
             // Upload and Save to History
-            const pdfBlob = pdf.output('blob');
-            // Fix: Filename for upload needs to be proper
+            const pdfBlob = await createPdfBlobFromLayout(previewConfig);
             const uploadFile = new File([pdfBlob], filename, { type: "application/pdf" });
 
             toast.message('Saving to history...');
@@ -782,7 +748,7 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
                                 </div>
                             )}
 
-                            {mappingReady ? (
+                            {hasTemplateSelection ? (
                                 <>
                                     <div className="h-px bg-border my-2" />
 
@@ -1036,7 +1002,7 @@ const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
                                 </>
                             ) : (
                                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                    Student selection and certificate details unlock only after the selected template mapping is fully resolved.
+                                    Choose a template to start resolving mappings and fill the generation details.
                                 </div>
                             )}
                         </div>

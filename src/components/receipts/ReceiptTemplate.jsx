@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef } from 'react';
+import { getReceiptPaperConfig, normalizeReceiptPaperSize } from '@/lib/receipts/receipt-format';
 
 /**
  * Professional Receipt Template
@@ -47,14 +48,16 @@ const ReceiptTemplate = forwardRef(({
     } = settings;
 
     const calculatedTotal = total || feeItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const normalizedPaperSize = normalizeReceiptPaperSize(paperSize);
+    const paperConfig = getReceiptPaperConfig(normalizedPaperSize);
 
     // ============ THERMAL 80mm LAYOUT ============
-    if (paperSize === 'thermal') {
+    if (normalizedPaperSize === 'thermal') {
         return (
             <div
                 ref={ref}
                 style={{
-                    width: '80mm',
+                    width: paperConfig.widthCss,
                     padding: '3mm',
                     fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                     fontSize: '11px',
@@ -77,7 +80,7 @@ const ReceiptTemplate = forwardRef(({
                     <p style={{ margin: '2px 0', fontSize: '9px' }}>Phone: {schoolContact}</p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
                         <span style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '11px' }}>FEE RECEIPT</span>
-                        <span style={{ fontSize: '9px' }}>Student's Copy</span>
+                        <span style={{ fontSize: '9px' }}>Student&apos;s Copy</span>
                     </div>
                 </div>
 
@@ -196,15 +199,15 @@ const ReceiptTemplate = forwardRef(({
         <div
             ref={ref}
             style={{
-                width: '8.5in',
-                minHeight: '5.5in', // Half page or so
-                padding: '0.5in',
+                width: paperConfig.widthCss,
+                minHeight: paperConfig.heightCss,
+                padding: normalizedPaperSize === 'a4' ? '12mm' : '0.45in',
                 fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                 fontSize: '12px',
                 color: '#000',
                 backgroundColor: '#fff',
                 boxSizing: 'border-box',
-                border: '1px solid #ccc', // Optional subtle border for preview isolation
+                border: '1px solid #ccc',
             }}
         >
             {/* Header */}
@@ -222,7 +225,7 @@ const ReceiptTemplate = forwardRef(({
                 <p style={{ margin: '4px 0', fontSize: '11px' }}>Phone: {schoolContact}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
                     <span style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '14px' }}>FEE RECEIPT</span>
-                    <span style={{ fontSize: '12px' }}>Student's Copy</span>
+                    <span style={{ fontSize: '12px' }}>Student&apos;s Copy</span>
                 </div>
             </div>
 

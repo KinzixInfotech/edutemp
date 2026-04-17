@@ -1,28 +1,45 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { remember, generateKey, invalidatePattern } from '@/lib/cache';
+import { paginate, getPagination } from '@/lib/api-utils';
 
 export async function GET(request, props) {
     const params = await props.params;
     try {
         const { schoolId } = params;
+        const { searchParams } = new URL(request.url);
+        const type = searchParams.get('type');
+        const fetchAll = searchParams.get('all') === 'true';
+        const { page, limit } = getPagination(request);
 
-        const templates = await prisma.documentTemplate.findMany({
-            where: {
-                schoolId,
-                templateType: 'admitcard',
-                isActive: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            include: {
-                createdBy: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
+        const cacheKey = generateKey('admitcard-templates', { schoolId, type, page, limit, fetchAll });
+        const templates = await remember(cacheKey, async () => {
+            const queryArgs = {
+                where: {
+                    schoolId,
+                    templateType: 'admitcard',
+                    isActive: true,
+                    ...(type ? { subType: type } : {}),
+                },
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    createdBy: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
                     },
                 },
-            },
-        });
+            };
+
+            if (fetchAll) {
+                return prisma.documentTemplate.findMany(queryArgs);
+            }
+
+            const result = await paginate(prisma.documentTemplate, queryArgs, page, limit);
+            return result.data;
+        }, 300);
 
         const mappedTemplates = templates.map(t => ({
             id: t.id,
@@ -85,6 +102,8 @@ export async function POST(request, props) {
                 },
             },
         });
+
+        await invalidatePattern(`admitcard-templates:*schoolId:${schoolId}*`);
 
         return NextResponse.json({
             id: template.id,

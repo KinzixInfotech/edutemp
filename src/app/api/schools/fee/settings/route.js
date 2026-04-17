@@ -214,8 +214,8 @@ export async function POST(req) {
                 break;
         }
 
-        // Invalidate cache for payment portal when payment gateway settings change
-        if (type === 'payment_gateway') {
+        // Invalidate payment portal caches when payment-facing settings change
+        if (['payment_gateway', 'receipts', 'bank_details'].includes(type)) {
             try {
                 // Clear all student fee caches for this school
                 const redis = (await import('@/lib/redis')).default;

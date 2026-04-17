@@ -5,6 +5,8 @@ export const PLACEHOLDER_REGEX = /\{\{([^}]+)\}\}/g;
 const PLACEHOLDER_ALIASES = {
     student_name: ['student.name', 'student.user.name'],
     studentname: ['student.name', 'student.user.name'],
+    student_id: ['student.studentId', 'student.userId', 'meta.studentId'],
+    studentid: ['student.studentId', 'student.userId', 'meta.studentId'],
     roll_number: ['student.rollNumber'],
     rollnumber: ['student.rollNumber'],
     admission_no: ['student.admissionNo'],
@@ -63,6 +65,22 @@ const PLACEHOLDER_ALIASES = {
     academicyear: ['form.academicYear', 'school.academicYearName'],
     eventname: ['form.eventName'],
     admissiondate: ['student.admissionDate'],
+    exam_name: ['exam.name', 'exam.title'],
+    examname: ['exam.name', 'exam.title'],
+    exam_date: ['exam.examDate', 'exam.startDate', 'form.examDate'],
+    examdate: ['exam.examDate', 'exam.startDate', 'form.examDate'],
+    exam_time: ['exam.examTime', 'form.examTime'],
+    examtime: ['exam.examTime', 'form.examTime'],
+    exam_center: ['exam.center', 'form.center'],
+    examcenter: ['exam.center', 'form.center'],
+    exam_schedule: ['exam.scheduleText'],
+    examschedule: ['exam.scheduleText'],
+    seat_number: ['form.seatNumber', 'exam.seatNumber'],
+    seatnumber: ['form.seatNumber', 'exam.seatNumber'],
+    center: ['form.center', 'exam.center'],
+    venue: ['form.venue', 'exam.venue'],
+    valid_until: ['form.validUntil', 'exam.validUntil'],
+    validuntil: ['form.validUntil', 'exam.validUntil'],
 };
 
 function getByPath(obj, path) {
@@ -109,13 +127,43 @@ function formatValue(value) {
     return String(value);
 }
 
-export function buildCertificateMappingContext({
+function formatDate(value) {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString();
+}
+
+function buildExamScheduleText(exam = {}, fallbackTime = '') {
+    if (Array.isArray(exam?.subjects) && exam.subjects.length > 0) {
+        return exam.subjects.map((examSubject) => {
+            const date = examSubject?.date
+                ? new Date(examSubject.date).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                })
+                : 'TBA';
+            const subjectName = examSubject?.subject?.subjectName || examSubject?.subjectName || 'Subject';
+            const time = examSubject?.startTime && examSubject?.endTime
+                ? `${examSubject.startTime} - ${examSubject.endTime}`
+                : fallbackTime || 'TBA';
+            const marks = examSubject?.maxMarks || '';
+            return [date, subjectName, time, marks].filter(Boolean).join('  |  ');
+        }).join('\n');
+    }
+
+    return exam?.title || exam?.name || '';
+}
+
+export function buildDocumentMappingContext({
     student = {},
     formValues = {},
     fullUser = {},
     selectedYear = null,
     docSettings = {},
     certificateMeta = {},
+    exam = {},
     assets = {},
 }) {
     const signatureLibrary = Array.isArray(docSettings?.signatures) ? docSettings.signatures : [];
@@ -130,52 +178,90 @@ export function buildCertificateMappingContext({
         sectionId: student?.sectionId ?? student?.section?.id ?? null,
     });
 
+    const normalizedStudent = {
+        ...student,
+        name: student?.user?.name || student?.name || '',
+        fatherName: student?.FatherName || student?.fatherName || '',
+        motherName: student?.MotherName || student?.motherName || '',
+        admissionNo: student?.admissionNo || student?.admissionNumber || '',
+        address: student?.Address || student?.address || '',
+        userId: student?.userId || student?.studentId || '',
+        section: student?.section ? {
+            ...student.section,
+            sectionName: student.section?.sectionName || student.section?.name || '',
+        } : null,
+    };
+
+    const school = fullUser?.school || {};
+    const normalizedExam = {
+        ...exam,
+        name: exam?.title || exam?.name || '',
+        title: exam?.title || exam?.name || '',
+        examDate: formatDate(formValues?.examDate || exam?.startDate || exam?.examDate),
+        examTime: formValues?.examTime || '',
+        center: formValues?.center || exam?.center || '',
+        venue: formValues?.venue || exam?.venue || '',
+        seatNumber: formValues?.seatNumber || '',
+        scheduleText: buildExamScheduleText(exam, formValues?.examTime || ''),
+        subjects: Array.isArray(exam?.subjects) ? exam.subjects : [],
+    };
+
     return {
-        student: {
-            ...student,
-            // these as PascalCase — normalize both
-            fatherName: student?.FatherName || student?.fatherName || '',
-            motherName: student?.MotherName || student?.motherName || '',
-            name: student?.user?.name || student?.name || '',
-        },
+        student: normalizedStudent,
         parent: {
-            fatherName: student?.fatherName || '',
-            motherName: student?.motherName || '',
-            phone: student?.parentContact || student?.fatherPhone || student?.motherPhone || '',
+            fatherName: normalizedStudent?.fatherName || '',
+            motherName: normalizedStudent?.motherName || '',
+            phone: normalizedStudent?.parentContact || normalizedStudent?.fatherPhone || normalizedStudent?.motherPhone || '',
         },
         teacher: {},
         school: {
-            name: fullUser?.schoolName || fullUser?.school?.name || '',
-            address: fullUser?.school?.address || fullUser?.schoolAddress || fullUser?.address || '',
+            ...school,
+            name: fullUser?.schoolName || school?.name || '',
+            address: school?.address || school?.location || fullUser?.schoolAddress || fullUser?.address || '',
             academicYearName: selectedYear?.name || selectedYear?.label || '',
         },
         form: {
             ...formValues,
             conductLabel: formValues?.conductLabel || '',
-            issueDate: formValues?.issueDate ? new Date(formValues.issueDate).toLocaleDateString() : new Date().toLocaleDateString(),
-            dateOfLeaving: formValues?.dateOfLeaving ? new Date(formValues.dateOfLeaving).toLocaleDateString() : '',
+            issueDate: formValues?.issueDate ? formatDate(formValues.issueDate) : formatDate(new Date()),
+            dateOfLeaving: formValues?.dateOfLeaving ? formatDate(formValues.dateOfLeaving) : '',
+            examDate: formValues?.examDate ? formatDate(formValues.examDate) : normalizedExam.examDate,
+            validUntil: formValues?.validUntil ? formatDate(formValues.validUntil) : '',
         },
+        exam: normalizedExam,
         meta: certificateMeta,
-        // assets: {
-        //     studentPhoto: student?.user?.profilePicture || student?.photoUrl || student?.photo || '',
-        //     schoolLogo: fullUser?.school?.profilePicture || '',
-        //     principalSignature: docSettings?.signatureUrl || bestPrincipalSignature?.imageUrl || fullUser?.school?.signatureUrl || '',
-        //     classTeacherSignature: bestClassTeacherSignature?.imageUrl || '',
-        //     schoolStamp: docSettings?.stampUrl || fullUser?.school?.stampUrl || '',
-        //     ...assets,
-        // },
         assets: {
-            studentPhoto: student?.user?.profilePicture || student?.photoUrl || '',
-            schoolLogo: fullUser?.school?.profilePicture || fullUser?.schoolLogo || fullUser?.profilePicture || '',
-            principalSignature: docSettings?.signatureUrl || bestPrincipalSignature?.imageUrl || fullUser?.school?.signatureUrl || '',
+            studentPhoto: normalizedStudent?.user?.profilePicture || normalizedStudent?.photoUrl || normalizedStudent?.photo || '',
+            schoolLogo: school?.profilePicture || fullUser?.schoolLogo || fullUser?.profilePicture || '',
+            principalSignature: docSettings?.signatureUrl || bestPrincipalSignature?.imageUrl || school?.signatureUrl || '',
             classTeacherSignature: bestClassTeacherSignature?.imageUrl || '',
-            schoolStamp: docSettings?.stampUrl || fullUser?.school?.stampUrl || fullUser?.stampUrl || '',
+            schoolStamp: docSettings?.stampUrl || school?.stampUrl || fullUser?.stampUrl || '',
             ...assets,
         },
     };
 }
 
-export function resolveCertificatePlaceholderValue(rawKey, context) {
+export function buildCertificateMappingContext({
+    student = {},
+    formValues = {},
+    fullUser = {},
+    selectedYear = null,
+    docSettings = {},
+    certificateMeta = {},
+    assets = {},
+}) {
+    return buildDocumentMappingContext({
+        student,
+        formValues,
+        fullUser,
+        selectedYear,
+        docSettings,
+        certificateMeta,
+        assets,
+    });
+}
+
+export function resolveDocumentPlaceholderValue(rawKey, context) {
     const normalized = normalizePlaceholderKey(rawKey);
     const candidatePaths = [
         ...(PLACEHOLDER_ALIASES[normalized] || []),
@@ -199,13 +285,40 @@ export function resolveCertificatePlaceholderValue(rawKey, context) {
     return '';
 }
 
+export function resolveCertificatePlaceholderValue(rawKey, context) {
+    return resolveDocumentPlaceholderValue(rawKey, context);
+}
+
 export function buildResolvedMappings(placeholderKeys = [], context = {}, fieldOverrides = {}) {
     return placeholderKeys.reduce((acc, key) => {
         acc[key] = fieldOverrides[key] !== undefined && fieldOverrides[key] !== ''
             ? fieldOverrides[key]
-            : resolveCertificatePlaceholderValue(key, context);
+            : resolveDocumentPlaceholderValue(key, context);
         return acc;
     }, {});
+}
+
+export function buildResolvedTemplateConfig({
+    layoutConfig = {},
+    context = {},
+    fieldOverrides = {},
+    imageFallbackUrl,
+}) {
+    const placeholderKeys = extractTemplatePlaceholders(layoutConfig?.elements || []);
+    const resolvedMappings = buildResolvedMappings(placeholderKeys, context, fieldOverrides);
+
+    return {
+        ...layoutConfig,
+        elements: applyMappingsToTemplateElements(
+            JSON.parse(JSON.stringify(layoutConfig?.elements || [])),
+            context?.__examSubjects
+                ? { ...resolvedMappings, __examSubjects: context.__examSubjects }
+                : resolvedMappings,
+            imageFallbackUrl,
+        ),
+        resolvedMappings,
+        placeholderKeys,
+    };
 }
 
 export function applyMappingsToTemplateElements(elements = [], resolvedMappings = {}, imageFallbackUrl = 'https://placehold.co/100x100?text=Image') {
@@ -227,6 +340,19 @@ export function applyMappingsToTemplateElements(elements = [], resolvedMappings 
                 ...el,
                 url: resolvedUrl || imageFallbackUrl,
             };
+        }
+        if (el.type === 'table' && el.dataSource === 'exam_subjects') {
+            const tableData = Array.isArray(resolvedMappings.__examSubjects)
+                ? resolvedMappings.__examSubjects.map((subject) => ({
+                    date: subject?.date
+                        ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                        : '',
+                    subject: subject?.subject?.subjectName || subject?.subjectName || '',
+                    time: subject?.startTime && subject?.endTime ? `${subject.startTime} - ${subject.endTime}` : '',
+                    marks: subject?.maxMarks || '',
+                }))
+                : [];
+            return { ...el, tableData };
         }
         return el;
     });

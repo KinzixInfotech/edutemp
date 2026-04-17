@@ -179,12 +179,22 @@ export async function POST(req) {
 
         // PDF Generation & Upload (outside transaction)
         const { payment, allocations, studentFee } = result;
+        const feeSettings = await prisma.feeSettings.findUnique({
+            where: { schoolId },
+            select: {
+                receiptPaperSize: true,
+                showSchoolLogo: true,
+                showPaymentMode: true,
+                showSignatureLine: true,
+                receiptFooterText: true,
+            },
+        });
 
         const pdfBuffer = await generateReceiptPdf({
             school: {
                 name: studentFee.school.name,
                 address: studentFee.school.address || "School Address",
-                logo: studentFee.school.logoUrl,
+                logo: studentFee.school.profilePicture || studentFee.school.logoUrl,
             },
             receiptNumber: payment.receiptNumber,
             studentName: studentFee.student.name,
@@ -198,6 +208,7 @@ export async function POST(req) {
                 number: a.installmentNumber,
                 amount: a.amount,
             })),
+            receiptSettings: feeSettings,
         });
         // Upload PDF to R2
         const pdfKey = generateFileKey(`${payment.receiptNumber}.pdf`, { folder: 'receipts', schoolId });

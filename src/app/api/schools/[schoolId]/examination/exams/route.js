@@ -11,9 +11,10 @@ export async function GET(req, props) {
         const { searchParams } = new URL(req.url);
         const academicYearId = searchParams.get('academicYearId');
         const status = searchParams.get('status');
+        const fetchAll = searchParams.get('all') === 'true';
         const { page, limit } = getPagination(req);
 
-        const cacheKey = generateKey('examination:exams', { schoolId, academicYearId, status, page, limit });
+        const cacheKey = generateKey('examination:exams', { schoolId, academicYearId, status, page, limit, fetchAll });
 
         const result = await remember(cacheKey, async () => {
             const where = {
@@ -22,7 +23,7 @@ export async function GET(req, props) {
                 ...(status && { status }),
             };
 
-            return await paginate(prisma.exam, {
+            const queryArgs = {
                 where,
                 include: {
                     academicYear: true,
@@ -56,7 +57,16 @@ export async function GET(req, props) {
                 orderBy: {
                     createdAt: 'desc',
                 },
-            }, page, limit);
+            };
+
+            if (fetchAll) {
+                return {
+                    data: await prisma.exam.findMany(queryArgs),
+                    meta: null,
+                };
+            }
+
+            return paginate(prisma.exam, queryArgs, page, limit);
         }, 300);
 
         // Return data array for backward compatibility

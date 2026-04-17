@@ -117,11 +117,11 @@ export default function CertificateTemplatePage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [deleteId, setDeleteId] = useState(null);
 
-  const { data: templates, isLoading } = useQuery({
-    queryKey: ['certificate-templates', schoolId],
-    queryFn: async () => {
-      if (!schoolId) throw new Error('No school ID');
-      const res = await fetch(`/api/documents/${schoolId}/certificate-templates`);
+    const { data: templates, isLoading } = useQuery({
+        queryKey: ['certificate-templates', schoolId],
+        queryFn: async () => {
+          if (!schoolId) throw new Error('No school ID');
+      const res = await fetch(`/api/documents/${schoolId}/certificate-templates?all=true`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
