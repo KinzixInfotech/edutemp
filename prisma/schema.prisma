@@ -518,11 +518,11 @@ model GlobalState {
 }
 
 model GlobalDistrict {
-  id        String @id @default(cuid())
-  lgdCode   String @unique // District LGD code (e.g. "77")
-  name      String // District name in English (e.g. "Central")
-  stateCode String // FK to GlobalState.stateCode
-  shortName String? // Short abbreviation (e.g. "CNT")
+  id         String  @id @default(cuid())
+  lgdCode    String  @unique // District LGD code (e.g. "77")
+  name       String // District name in English (e.g. "Central")
+  stateCode  String // FK to GlobalState.stateCode
+  shortName  String? // Short abbreviation (e.g. "CNT")
   censusCode String? // Census 2011 code
 
   state    GlobalState     @relation(fields: [stateCode], references: [stateCode])
@@ -536,8 +536,8 @@ model GlobalDistrict {
 }
 
 model GlobalPincode {
-  id           String         @id @default(cuid())
-  pincode      String         @unique
+  id           String @id @default(cuid())
+  pincode      String @unique
   districtCode String
   stateCode    String
 
@@ -1939,13 +1939,13 @@ model UserDevice {
   id         String   @id @default(uuid()) @db.Uuid
   userId     String   @db.Uuid
   fcmToken   String   @unique
-  platform   String?  // 'ios', 'android', 'web'
+  platform   String? // 'ios', 'android', 'web'
   isActive   Boolean  @default(true)
   lastActive DateTime @default(now())
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -2437,8 +2437,8 @@ model Class {
   chatConversations Conversation[]
 
   // StudentSession enrollments
-  studentSessions StudentSession[]
-  documentSignatures Signature[] @relation("ClassSignatures")
+  studentSessions    StudentSession[]
+  documentSignatures Signature[]      @relation("ClassSignatures")
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -2491,8 +2491,8 @@ model Section {
   chatConversations Conversation[]
 
   // StudentSession enrollments
-  studentSessions StudentSession[]
-  documentSignatures Signature[] @relation("SectionSignatures")
+  studentSessions    StudentSession[]
+  documentSignatures Signature[]      @relation("SectionSignatures")
 
   @@unique([classId, name])
   @@index([classId])
@@ -3032,19 +3032,19 @@ model Attendance {
   academicYearId String? @db.Uuid
 
   // Status & Timing
-  status       AttendanceStatus
-  checkInTime  DateTime?
-  checkOutTime DateTime?
-  workingHours Float?           @default(0) // Calculated hours
-  overtimeHours Float           @default(0)
-  overtimeStatus ApprovalStatus @default(NOT_REQUIRED)
-  overtimeApprovedBy String?    @db.Uuid
-  overtimeApprovedAt DateTime?
+  status                  AttendanceStatus
+  checkInTime             DateTime?
+  checkOutTime            DateTime?
+  workingHours            Float?           @default(0) // Calculated hours
+  overtimeHours           Float            @default(0)
+  overtimeStatus          ApprovalStatus   @default(NOT_REQUIRED)
+  overtimeApprovedBy      String?          @db.Uuid
+  overtimeApprovedAt      DateTime?
   overtimeApprovalRemarks String?
-  checkoutType CheckoutType     @default(MANUAL)
-  isExtended   Boolean          @default(false)
-  extendedTill DateTime?
-  extensionRequestedAt DateTime?
+  checkoutType            CheckoutType     @default(MANUAL)
+  isExtended              Boolean          @default(false)
+  extendedTill            DateTime?
+  extensionRequestedAt    DateTime?
 
   // Location & Device Info
   checkInLocation  Json? // {latitude, longitude, address}
@@ -3202,13 +3202,13 @@ model AttendanceConfig {
   schoolId String @unique @db.Uuid
 
   // Working Hours
-  defaultStartTime   String @default("09:00")
-  defaultEndTime     String @default("17:00")
-  gracePeriodMinutes Int    @default(15) // Late after this
-  halfDayHours       Float  @default(4)
-  fullDayHours       Float  @default(8)
-  autoCheckoutBufferMinutes Int @default(60)
-  maxExtensionHours Float @default(4)
+  defaultStartTime          String @default("09:00")
+  defaultEndTime            String @default("17:00")
+  gracePeriodMinutes        Int    @default(15) // Late after this
+  halfDayHours              Float  @default(4)
+  fullDayHours              Float  @default(8)
+  autoCheckoutBufferMinutes Int    @default(60)
+  maxExtensionHours         Float  @default(4)
 
   // Geo-fencing
   enableGeoFencing    Boolean @default(false)
@@ -3513,6 +3513,7 @@ enum NotificationType {
   EXAM
   ATTENDANCE
   NOTICE
+  SECURITY_LOGIN_ALERT
   LEAVE
   TRANSPORT
   LIBRARY
@@ -5532,8 +5533,8 @@ model PayrollConfig {
   leaveEncashmentRate   Float? // Per day rate
 
   // Overtime
-  enableOvertime Boolean @default(false)
-  overtimeRate   Float   @default(1.5) // Multiplier
+  enableOvertime           Boolean @default(false)
+  overtimeRate             Float   @default(1.5) // Multiplier
   includeOvertimeInPayroll Boolean @default(false)
   overtimeRequiresApproval Boolean @default(true)
 
