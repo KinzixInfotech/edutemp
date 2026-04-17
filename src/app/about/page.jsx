@@ -135,7 +135,7 @@ export default function AboutPage() {
 
             {/* Subtitle */}
             <motion.p variants={fadeInUp} className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
-              We're on a mission to simplify school management and empower educators with modern technology that just works.
+              We&apos;re on a mission to simplify school management and empower educators with modern technology that just works.
             </motion.p>
 
             {/* CTA Buttons */}

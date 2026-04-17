@@ -183,15 +183,15 @@ const MODULE_CONFIGS = {
 export async function GET(req, { params }) {
     try {
         const { searchParams } = new URL(req.url);
-        const module = searchParams.get('module');
+        const moduleKey = searchParams.get('module');
 
-        if (!module || !MODULE_CONFIGS[module]) {
+        if (!moduleKey || !MODULE_CONFIGS[moduleKey]) {
             return NextResponse.json({
                 error: 'Invalid module. Available modules: ' + Object.keys(MODULE_CONFIGS).join(', ')
             }, { status: 400 });
         }
 
-        const config = MODULE_CONFIGS[module];
+        const config = MODULE_CONFIGS[moduleKey];
 
         // Create workbook
         const wb = XLSX.utils.book_new();
@@ -255,4 +255,3 @@ export async function GET(req, { params }) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-

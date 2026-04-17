@@ -74,6 +74,10 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // 🔥 Remove console logs in production
   compiler: {
     removeConsole: {

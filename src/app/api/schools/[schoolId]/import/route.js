@@ -96,10 +96,10 @@ export async function POST(req, { params }) {
         const { schoolId } = await params;
         const formData = await req.formData();
         const file = formData.get('file');
-        const module = formData.get('module');
+        const moduleKey = formData.get('module');
         const retryIds = formData.get('retryIds'); // For retry functionality
 
-        if (!file || !module) {
+        if (!file || !moduleKey) {
             return NextResponse.json({ error: 'File and module are required' }, { status: 400 });
         }
 
@@ -118,9 +118,9 @@ export async function POST(req, { params }) {
         }
 
         // Get expected columns for this module
-        const expectedFields = FIELD_MAPPINGS[module];
+        const expectedFields = FIELD_MAPPINGS[moduleKey];
         if (!expectedFields) {
-            return NextResponse.json({ error: `Module '${module}' not supported` }, { status: 400 });
+            return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
         }
 
         // Helper function to normalize column names for flexible matching
@@ -171,7 +171,7 @@ export async function POST(req, { params }) {
                     message: 'The uploaded file appears to be for a different module or has incorrect format.',
                     expectedColumns: expectedColumns.slice(0, 5).map(c => c.replace(' *', '')),
                     uploadedColumns: uploadedColumns.slice(0, 5),
-                    suggestion: `Please use the correct ${module} template.`
+                    suggestion: `Please use the correct ${moduleKey} template.`
                 }
             }, { status: 400 });
         }
@@ -195,7 +195,7 @@ export async function POST(req, { params }) {
             accountsCreated: 0,
             accountsFailed: 0,
             accountErrors: [],
-            requiresAuth: AUTH_MODULES.includes(module),
+            requiresAuth: AUTH_MODULES.includes(moduleKey),
             totalRecords: data.length,
         };
 
@@ -211,11 +211,11 @@ export async function POST(req, { params }) {
             const rowNumber = row['S.No'] || (i + 2);
 
             try {
-                const importResult = await processRow(module, row, schoolId, FIELD_MAPPINGS[module] || {});
+                const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {});
                 results.success++;
 
                 // Track Supabase account creation for auth modules
-                if (AUTH_MODULES.includes(module) && importResult) {
+                if (AUTH_MODULES.includes(moduleKey) && importResult) {
                     if (importResult.authSuccess) {
                         results.accountsCreated++;
                         // Save for email sending
@@ -223,9 +223,9 @@ export async function POST(req, { params }) {
                             email: importResult.email,
                             name: importResult.name || row['Full Name *'],
                             password: importResult.defaultPassword,
-                            userType: module === 'students' ? 'student' :
-                                module === 'teachers' ? 'teacher' :
-                                    module === 'nonTeachingStaff' ? 'staff' : 'parent'
+                            userType: moduleKey === 'students' ? 'student' :
+                                moduleKey === 'teachers' ? 'teacher' :
+                                    moduleKey === 'nonTeachingStaff' ? 'staff' : 'parent'
                         });
                     } else if (importResult.authError) {
                         results.accountsFailed++;
@@ -255,7 +255,7 @@ export async function POST(req, { params }) {
                 await prisma.importHistory.create({
                     data: {
                         schoolId,
-                        module,
+                        module: moduleKey,
                         fileName: file.name,
                         totalRows: data.length,
                         success: results.success,

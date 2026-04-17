@@ -166,7 +166,7 @@ export default function BrochurePage() {
                                         <CheckCircle className="w-8 h-8 text-green-600" />
                                     </div>
                                     <h3 className="text-2xl font-bold text-slate-900 mb-2">Check Your Inbox</h3>
-                                    <p className="text-slate-500 mb-8">We've securely sent the brochure to your email.</p>
+                                    <p className="text-slate-500 mb-8">We&apos;ve securely sent the brochure to your email.</p>
                                     <button
                                         onClick={() => setIsSuccess(false)}
                                         className="text-[#004ffe] font-medium hover:underline inline-flex items-center gap-1.5 text-sm"

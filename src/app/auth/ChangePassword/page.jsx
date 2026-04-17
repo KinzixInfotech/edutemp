@@ -542,7 +542,7 @@ export default function ChangePasswordPage() {
                                 <li>Include uppercase and lowercase letters.</li>
                                 <li>Add numbers and special characters (e.g., !@#$%).</li>
                                 <li>Avoid common words or personal information.</li>
-                                <li>Don't reuse passwords from other sites.</li>
+                                <li>Don&apos;t reuse passwords from other sites.</li>
                                 <li>Consider using a password manager.</li>
                             </ul>
                         </CardContent>

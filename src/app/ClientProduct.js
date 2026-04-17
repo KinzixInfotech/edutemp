@@ -3,19 +3,12 @@
 import { usePathname } from "next/navigation";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import CalBtn from "./components/cal";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function ClientProduct({ children }) {
     const pathname = usePathname()
 
-    const [hostname, setHostname] = useState("")
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            setHostname(window.location.hostname)
-        }
-    }, [])
+    const [hostname] = useState(() => (typeof window !== "undefined" ? window.location.hostname : ""))
 
     const isAtlasDomain = hostname.startsWith("atlas.")
     const isPayDomain = hostname.startsWith("pay.")

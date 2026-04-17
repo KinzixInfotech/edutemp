@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect } from 'react';
-import { usePathname, useSearchParams, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 
@@ -19,40 +19,11 @@ NProgress.configure({
 export default function NavigationProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   // Stop progress bar when navigation completes
   useEffect(() => {
     NProgress.done();
   }, [pathname, searchParams]);
-
-  // Start progress bar on all router navigation calls
-  useEffect(() => {
-    const originalPush = router.push;
-    const originalReplace = router.replace;
-    const originalBack = router.back;
-
-    router.push = (...args) => {
-      NProgress.start();
-      return originalPush(...args);
-    };
-
-    router.replace = (...args) => {
-      NProgress.start();
-      return originalReplace(...args);
-    };
-
-    router.back = (...args) => {
-      NProgress.start();
-      return originalBack(...args);
-    };
-
-    return () => {
-      router.push = originalPush;
-      router.replace = originalReplace;
-      router.back = originalBack;
-    };
-  }, [router]);
 
   // Intercept link clicks
   useEffect(() => {

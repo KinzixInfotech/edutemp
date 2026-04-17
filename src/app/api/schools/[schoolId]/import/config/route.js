@@ -201,10 +201,10 @@ const MODULE_CONFIGS = {
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
-        const module = searchParams.get('module');
+        const moduleKey = searchParams.get('module');
 
-        if (module && MODULE_CONFIGS[module]) {
-            return NextResponse.json(MODULE_CONFIGS[module]);
+        if (moduleKey && MODULE_CONFIGS[moduleKey]) {
+            return NextResponse.json(MODULE_CONFIGS[moduleKey]);
         }
 
         // Return all modules summary

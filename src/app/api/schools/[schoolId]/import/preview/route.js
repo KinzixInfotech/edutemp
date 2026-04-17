@@ -87,9 +87,9 @@ export async function POST(req, { params }) {
         const { schoolId } = await params;
         const formData = await req.formData();
         const file = formData.get('file');
-        const module = formData.get('module');
+        const moduleKey = formData.get('module');
 
-        if (!file || !module) {
+        if (!file || !moduleKey) {
             return NextResponse.json({ error: 'File and module are required' }, { status: 400 });
         }
 
@@ -108,9 +108,9 @@ export async function POST(req, { params }) {
         }
 
         // Get expected columns for this module
-        const expectedFields = FIELD_MAPPINGS[module];
+        const expectedFields = FIELD_MAPPINGS[moduleKey];
         if (!expectedFields) {
-            return NextResponse.json({ error: `Module '${module}' not supported` }, { status: 400 });
+            return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
         }
 
         // Helper function to normalize column names for flexible matching
@@ -158,7 +158,7 @@ export async function POST(req, { params }) {
         }
 
         // Check for duplicates in database
-        const duplicateInfo = await checkForDuplicates(module, data, schoolId, expectedFields);
+        const duplicateInfo = await checkForDuplicates(moduleKey, data, schoolId, expectedFields);
 
         // Process each row for preview with validation
         const previewRows = data.map((row, index) => {
@@ -211,12 +211,12 @@ export async function POST(req, { params }) {
 
         return NextResponse.json({
             fileName: file.name,
-            module,
+            module: moduleKey,
             totalRows: previewRows.length,
             validRows: validCount,
             invalidRows: invalidCount,
             duplicateRows: duplicateCount,
-            requiresAuth: AUTH_MODULES.includes(module),
+            requiresAuth: AUTH_MODULES.includes(moduleKey),
             rows: previewRows,
             columns: Object.values(expectedFields)
         });

@@ -13,7 +13,7 @@ export async function POST(req, { params }) {
         const { schoolId } = await params;
         const body = await req.json();
         const {
-            name,
+            name: requestedName,
             startDate,
             endDate,
             carryForward = {},
@@ -26,6 +26,9 @@ export async function POST(req, { params }) {
 
         // ─── Validations ─────────────────────────────────────
         let newYear;
+        let sessionName = requestedName;
+        let start;
+        let end;
 
         if (existingYearId) {
             // Use an existing future year
@@ -67,20 +70,20 @@ export async function POST(req, { params }) {
             });
 
             // Set variables for downstream cloning
-            var start = new Date(existingYear.startDate);
-            var end = new Date(existingYear.endDate);
-            var name = existingYear.name;
+            start = new Date(existingYear.startDate);
+            end = new Date(existingYear.endDate);
+            sessionName = existingYear.name;
         } else {
             // Create a brand new year
-            if (!name || !startDate || !endDate) {
+            if (!requestedName || !startDate || !endDate) {
                 return NextResponse.json(
                     { error: "Name, startDate, and endDate are required" },
                     { status: 400 }
                 );
             }
 
-            var start = new Date(startDate);
-            var end = new Date(endDate);
+            start = new Date(startDate);
+            end = new Date(endDate);
 
             if (end <= start) {
                 return NextResponse.json(
@@ -121,9 +124,9 @@ export async function POST(req, { params }) {
                         });
                     });
 
-                    var start = new Date(overlapping.startDate);
-                    var end = new Date(overlapping.endDate);
-                    var name = overlapping.name;
+                    start = new Date(overlapping.startDate);
+                    end = new Date(overlapping.endDate);
+                    sessionName = overlapping.name;
                 } else {
                     return NextResponse.json(
                         { error: `Cannot create session — the active session "${overlapping.name}" (${new Date(overlapping.startDate).toLocaleDateString()} - ${new Date(overlapping.endDate).toLocaleDateString()}) overlaps with these dates. Use the "Start New Session" wizard to transition properly.` },
@@ -151,7 +154,7 @@ export async function POST(req, { params }) {
                     // Create new year
                     return tx.academicYear.create({
                         data: {
-                            name,
+                            name: sessionName,
                             startDate: start,
                             endDate: end,
                             schoolId,
