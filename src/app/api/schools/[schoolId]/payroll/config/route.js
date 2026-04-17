@@ -5,6 +5,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey, delCache } from "@/lib/cache";
+import { getPayrollConfigForSchool } from '@/lib/payroll/config';
 
 // GET - Get payroll configuration for school
 export async function GET(req, props) {
@@ -15,39 +16,7 @@ export async function GET(req, props) {
         const cacheKey = generateKey('payroll:config', { schoolId });
 
         const config = await remember(cacheKey, async () => {
-            let payrollConfig = await prisma.payrollConfig.findUnique({
-                where: { schoolId }
-            });
-
-            // Create default config if not exists
-            if (!payrollConfig) {
-                payrollConfig = await prisma.payrollConfig.create({
-                    data: {
-                        schoolId,
-                        payCycleDay: 1,
-                        paymentDay: 7,
-                        standardWorkingDays: 26,
-                        standardWorkingHours: 8,
-                        enablePF: true,
-                        pfEmployerPercent: 12,
-                        pfEmployeePercent: 12,
-                        pfWageLimit: 15000,
-                        enableESI: true,
-                        esiEmployerPercent: 3.25,
-                        esiEmployeePercent: 0.75,
-                        esiWageLimit: 21000,
-                        enableProfessionalTax: true,
-                        enableTDS: true,
-                        enableLeaveEncashment: false,
-                        enableOvertime: false,
-                        overtimeRate: 1.5,
-                        lateGraceMinutes: 15,
-                        halfDayThreshold: 4
-                    }
-                });
-            }
-
-            return payrollConfig;
+            return getPayrollConfigForSchool(schoolId);
         }, 3600); // Cache for 1 hour
 
         return NextResponse.json(config);
@@ -90,6 +59,8 @@ export async function PUT(req, props) {
                 leaveEncashmentRate: data.leaveEncashmentRate,
                 enableOvertime: data.enableOvertime,
                 overtimeRate: data.overtimeRate,
+                includeOvertimeInPayroll: data.includeOvertimeInPayroll,
+                overtimeRequiresApproval: data.overtimeRequiresApproval,
                 lateGraceMinutes: data.lateGraceMinutes,
                 halfDayThreshold: data.halfDayThreshold
             },

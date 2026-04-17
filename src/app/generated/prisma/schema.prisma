@@ -3032,10 +3032,19 @@ model Attendance {
   academicYearId String? @db.Uuid
 
   // Status & Timing
-  status       AttendanceStatus
-  checkInTime  DateTime?
-  checkOutTime DateTime?
-  workingHours Float?           @default(0) // Calculated hours
+  status                  AttendanceStatus
+  checkInTime             DateTime?
+  checkOutTime            DateTime?
+  workingHours            Float?           @default(0) // Calculated hours
+  overtimeHours           Float            @default(0)
+  overtimeStatus          ApprovalStatus   @default(NOT_REQUIRED)
+  overtimeApprovedBy      String?          @db.Uuid
+  overtimeApprovedAt      DateTime?
+  overtimeApprovalRemarks String?
+  checkoutType            CheckoutType     @default(MANUAL)
+  isExtended              Boolean          @default(false)
+  extendedTill            DateTime?
+  extensionRequestedAt    DateTime?
 
   // Location & Device Info
   checkInLocation  Json? // {latitude, longitude, address}
@@ -3193,11 +3202,13 @@ model AttendanceConfig {
   schoolId String @unique @db.Uuid
 
   // Working Hours
-  defaultStartTime   String @default("09:00")
-  defaultEndTime     String @default("17:00")
-  gracePeriodMinutes Int    @default(15) // Late after this
-  halfDayHours       Float  @default(4)
-  fullDayHours       Float  @default(8)
+  defaultStartTime          String @default("09:00")
+  defaultEndTime            String @default("17:00")
+  gracePeriodMinutes        Int    @default(15) // Late after this
+  halfDayHours              Float  @default(4)
+  fullDayHours              Float  @default(8)
+  autoCheckoutBufferMinutes Int    @default(60)
+  maxExtensionHours         Float  @default(4)
 
   // Geo-fencing
   enableGeoFencing    Boolean @default(false)
@@ -3461,6 +3472,12 @@ enum ApprovalStatus {
   APPROVED
   REJECTED
   NOT_REQUIRED
+}
+
+enum CheckoutType {
+  MANUAL
+  AUTO
+  EXTENDED_AUTO
 }
 
 enum LeaveType {
@@ -5515,8 +5532,10 @@ model PayrollConfig {
   leaveEncashmentRate   Float? // Per day rate
 
   // Overtime
-  enableOvertime Boolean @default(false)
-  overtimeRate   Float   @default(1.5) // Multiplier
+  enableOvertime           Boolean @default(false)
+  overtimeRate             Float   @default(1.5) // Multiplier
+  includeOvertimeInPayroll Boolean @default(false)
+  overtimeRequiresApproval Boolean @default(true)
 
   // Grace Period for Late
   lateGraceMinutes Int   @default(15)

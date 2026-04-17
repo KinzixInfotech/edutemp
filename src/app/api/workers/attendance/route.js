@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 import { createAttendanceAuditLog } from '@/lib/attendance/audit';
 import { processScheduledAttendanceNotifications } from '@/lib/attendance/reminder-notifications';
+import { processAttendanceLifecycleWorker } from '@/lib/attendance/auto-checkout-worker';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
@@ -22,7 +23,29 @@ async function handleWorker(req) {
   } = body;
 
   if (jobType === 'SCHEDULED_ATTENDANCE_NOTIFICATIONS') {
-    const stats = await processScheduledAttendanceNotifications({
+    const [notificationStats, lifecycleStats] = await Promise.all([
+      processScheduledAttendanceNotifications({
+        now: now || new Date(),
+        windowMinutes,
+      }),
+      processAttendanceLifecycleWorker({
+        now: now || new Date(),
+        windowMinutes,
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      jobType,
+      stats: {
+        notifications: notificationStats,
+        lifecycle: lifecycleStats,
+      },
+    });
+  }
+
+  if (jobType === 'SCHEDULED_ATTENDANCE_LIFECYCLE') {
+    const stats = await processAttendanceLifecycleWorker({
       now: now || new Date(),
       windowMinutes,
     });

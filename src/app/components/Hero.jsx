@@ -5,6 +5,7 @@ import { ArrowRight, Loader2, AlertCircle, CheckCircle, MapPin, Search, School, 
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import ImageMarquee from "./MarqueeImage";
 
 const SCHOOLS_PER_PAGE = 4;
 const LOCATION_CACHE_KEY = 'eb_nearby_schools';
@@ -434,7 +435,7 @@ const Hero = () => {
     return (
         <section className="relative min-h-screen mt-6 md:mt-18 border-b flex overflow-hidden bg-white">
             {/* LEFT SIDE */}
-            <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#f5f7fa]">
+            {/* <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#f5f7fa]">
                 <InteractiveGridPattern
                     className="absolute opacity-50 inset-0 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_20%,transparent_70%)]"
                     squares={[40, 40]}
@@ -452,8 +453,8 @@ const Hero = () => {
                         Access your school's complete management system with your unique school code
                     </p>
                 </div>
-            </div>
-
+            </div> */}
+            <ImageMarquee />
             {/* RIGHT SIDE */}
             <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-8 md:py-12 lg:py-0">
                 <div className="w-full max-w-md space-y-5">

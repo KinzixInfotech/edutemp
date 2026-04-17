@@ -3,28 +3,18 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey } from "@/lib/cache";
+import { getSchoolTimezone, zonedDateToDbDate } from '@/lib/attendance/timezone';
 
-// SIMPLE: Use the same ISTDate function from bulk attendance
-export const ISTDate = (input) => {
+function parseReportDate(input, timezone) {
     if (!input) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+        return zonedDateToDbDate(new Date(), timezone);
     }
 
-    // If input is YYYY-MM-DD, just append time
     if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
-        return new Date(`${input}T00:00:00.000Z`);
+        return zonedDateToDbDate(new Date(`${input}T12:00:00.000Z`), timezone);
     }
 
-    // Otherwise parse normally
-    const d = new Date(input);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    return zonedDateToDbDate(new Date(input), timezone);
 }
 
 export async function GET(req, props) {
@@ -34,12 +24,18 @@ export async function GET(req, props) {
 
     const reportType = searchParams.get('reportType') || 'MONTHLY';
 
-    // Parse dates using ISTDate
+    const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { websiteConfig: true }
+    });
+    const timezone = getSchoolTimezone(school);
+
+    // Parse dates using school timezone
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
 
-    const startDate = ISTDate(startDateParam);
-    const endDate = ISTDate(endDateParam);
+    const startDate = parseReportDate(startDateParam, timezone);
+    const endDate = parseReportDate(endDateParam, timezone);
 
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
@@ -88,6 +84,7 @@ export async function GET(req, props) {
                 metadata: {
                     generatedAt: new Date(),
                     schoolId,
+                    timezone,
                     period: { startDate, endDate },
                     generatedBy: userId || 'admin'
                 }

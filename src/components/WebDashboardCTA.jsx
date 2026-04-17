@@ -14,7 +14,7 @@ export default function WebDashboardCTA() {
                     <div className="flex-1 text-center lg:text-left">
                         {/* Heading */}
                         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
-                            Modern App For <br /> <span className="text-[#0469ff]">Modern Schools</span>
+                            Modern App For <br /> <span className="text-[#0469ff]">Modern Schools 🤩</span>
                         </h2>
 
                         {/* Description */}

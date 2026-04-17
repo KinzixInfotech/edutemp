@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from "@/lib/cache";
 import { sendNotification } from '@/lib/notifications/notificationHelper';
+import { calculateOvertimeEarnings, getPayrollConfigForSchool } from '@/lib/payroll/config';
 
 // POST - Process payroll for the period
 export async function POST(req, props) {
@@ -43,15 +44,7 @@ export async function POST(req, props) {
         }
 
         // Get payroll configuration
-        const config = await prisma.payrollConfig.findUnique({
-            where: { schoolId }
-        });
-
-        if (!config) {
-            return NextResponse.json({
-                error: 'Payroll configuration not found. Please configure payroll settings first.'
-            }, { status: 400 });
-        }
+        const config = await getPayrollConfigForSchool(schoolId);
 
         // Get ALL active employees (including those without salary structures for proper validation)
         const allEmployees = await prisma.employeePayrollProfile.findMany({
@@ -275,19 +268,31 @@ export async function POST(req, props) {
                 const taEarned = structure.taAmount * workFactor;
                 const medicalEarned = structure.medicalAllowance * workFactor;
                 const specialEarned = structure.specialAllowance * workFactor;
-                const grossEarnings = basicEarned + hraEarned + daEarned + taEarned + medicalEarned + specialEarned;
+                const payableOvertimeRecords = attendance.filter((record) => {
+                    if (!config.enableOvertime || !config.includeOvertimeInPayroll || !record.overtimeHours) {
+                        return false;
+                    }
+
+                    if (!config.overtimeRequiresApproval) {
+                        return true;
+                    }
+
+                    return record.overtimeStatus === 'APPROVED';
+                });
+                const overtimeHours = Number(payableOvertimeRecords.reduce((sum, record) => sum + (record.overtimeHours || 0), 0).toFixed(2));
+                const overtimeEarned = calculateOvertimeEarnings({
+                    overtimeHours,
+                    overtimeRate: config.overtimeRate,
+                    grossSalary: structure.grossSalary,
+                    standardWorkingDays: config.standardWorkingDays,
+                    standardWorkingHours: config.standardWorkingHours,
+                });
+                const grossEarnings = basicEarned + hraEarned + daEarned + taEarned + medicalEarned + specialEarned + overtimeEarned;
 
                 // Calculate Loss of Pay for unpaid leaves
                 // Per-day salary = gross / working days
                 const perDaySalary = structure.grossSalary / workingDays;
                 let lossOfPay = unpaidLeaveDays * perDaySalary;
-
-                // Also add LOP for late penalties if configured
-                if (config.latePenaltyEnabled && lateCount > config.allowedLateCount) {
-                    const excessLates = lateCount - config.allowedLateCount;
-                    const latePenaltyDays = Math.floor(excessLates / (config.latesPerLop || 3)); // Default: 3 lates = 1 day LOP
-                    lossOfPay += latePenaltyDays * perDaySalary;
-                }
 
                 // Calculate statutory deductions
                 let pfEmployee = 0;
@@ -377,7 +382,7 @@ export async function POST(req, props) {
                         }
                     },
                     update: {
-                        daysWorked: Math.floor(daysWorked),
+                        daysWorked: Number(daysWorked.toFixed(2)),
                         daysAbsent,
                         daysLeave,
                         daysHoliday: period.holidays,
@@ -389,6 +394,8 @@ export async function POST(req, props) {
                         taEarned,
                         medicalEarned,
                         specialEarned,
+                        overtimeHours,
+                        overtimeEarned,
                         grossEarnings,
                         pfEmployee,
                         pfEmployer,
@@ -408,7 +415,7 @@ export async function POST(req, props) {
                     create: {
                         periodId,
                         employeeId: employee.id,
-                        daysWorked: Math.floor(daysWorked),
+                        daysWorked: Number(daysWorked.toFixed(2)),
                         daysAbsent,
                         daysLeave,
                         daysHoliday: period.holidays,
@@ -420,6 +427,8 @@ export async function POST(req, props) {
                         taEarned,
                         medicalEarned,
                         specialEarned,
+                        overtimeHours,
+                        overtimeEarned,
                         grossEarnings,
                         pfEmployee,
                         pfEmployer,

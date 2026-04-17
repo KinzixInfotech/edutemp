@@ -79,6 +79,8 @@ export default function PayrollSettings() {
             leaveEncashmentRate: parseFloat(formData.get("leaveEncashmentRate")) || null,
             enableOvertime: formData.get("enableOvertime") === "on",
             overtimeRate: parseFloat(formData.get("overtimeRate")) || 1.5,
+            includeOvertimeInPayroll: formData.get("includeOvertimeInPayroll") === "on",
+            overtimeRequiresApproval: formData.get("overtimeRequiresApproval") === "on",
             lateGraceMinutes: parseInt(formData.get("lateGraceMinutes")) || 15,
             halfDayThreshold: parseFloat(formData.get("halfDayThreshold")) || 4,
             // Loan & Advance Settings
@@ -345,15 +347,31 @@ export default function PayrollSettings() {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div>
-                                        <Label>Overtime Rate (multiplier)</Label>
-                                        <Input
-                                            name="overtimeRate"
-                                            type="number"
-                                            step="0.1"
-                                            defaultValue={config?.overtimeRate || 1.5}
-                                        />
-                                        <p className="text-xs text-muted-foreground mt-1">e.g., 1.5 = 150% of regular rate</p>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <Label>Overtime Rate (multiplier)</Label>
+                                            <Input
+                                                name="overtimeRate"
+                                                type="number"
+                                                step="0.1"
+                                                defaultValue={config?.overtimeRate || 1.5}
+                                            />
+                                            <p className="text-xs text-muted-foreground mt-1">e.g., 1.5 = 150% of regular rate</p>
+                                        </div>
+                                        <div className="flex items-center justify-between rounded-lg border p-4">
+                                            <div>
+                                                <p className="font-medium">Include Overtime In Payroll</p>
+                                                <p className="text-sm text-muted-foreground">Only approved overtime will be paid when this is enabled.</p>
+                                            </div>
+                                            <Switch name="includeOvertimeInPayroll" defaultChecked={config?.includeOvertimeInPayroll} />
+                                        </div>
+                                        <div className="flex items-center justify-between rounded-lg border p-4">
+                                            <div>
+                                                <p className="font-medium">Overtime Requires Approval</p>
+                                                <p className="text-sm text-muted-foreground">Managers must approve overtime before payroll can include it.</p>
+                                            </div>
+                                            <Switch name="overtimeRequiresApproval" defaultChecked={config?.overtimeRequiresApproval ?? true} />
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

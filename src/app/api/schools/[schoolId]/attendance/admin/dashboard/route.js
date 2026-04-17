@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import dayjs from "dayjs";
 import { remember, generateKey } from '@/lib/cache';
+import { getDateKey, getSchoolTimezone, getZonedNow, zonedDateToDbDate } from '@/lib/attendance/timezone';
 
 export async function GET(req, props) {
   const params = await props.params;
@@ -34,12 +35,14 @@ export async function GET(req, props) {
       );
     }
 
-    const today = new Date(Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate()
-    ));
-    const todayStr = today.toISOString().split('T')[0];
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { websiteConfig: true },
+    });
+    const timezone = getSchoolTimezone(school);
+    const today = zonedDateToDbDate(date, timezone);
+    const todayStr = getDateKey(date, timezone);
+    const zonedToday = getZonedNow(timezone, date);
 
     // PARALLEL BATCH 1: Calendar, Academic Year, Today Stats, Config
     const [calendar, academicYear, todayStats, attendanceConfig] = await Promise.all([
@@ -71,7 +74,7 @@ export async function GET(req, props) {
     const attendanceThreshold = attendanceConfig.minAttendancePercent;
 
     // Day info
-    const dayOfWeek = today.getDay();
+    const dayOfWeek = zonedToday.day();
     const isWeekend = dayOfWeek === 0;
     const isWorkingDay = calendar ? calendar.dayType === 'WORKING_DAY' : !isWeekend;
     const dayInfo = {
@@ -93,8 +96,8 @@ export async function GET(req, props) {
     };
 
     // Monthly date range
-    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const monthStart = zonedToday.startOf('month').utc().toDate();
+    const monthEnd = zonedToday.endOf('month').startOf('day').utc().toDate();
 
     // Trend: compute range based on trendRange param
     const trendStart = new Date(date);

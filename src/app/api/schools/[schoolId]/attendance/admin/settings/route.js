@@ -45,6 +45,8 @@ export async function GET(req, props) {
         minFullDayHours: snapshot.minFullDayHours,
         halfDayHours: snapshot.minHalfDayHours,
         fullDayHours: snapshot.minFullDayHours,
+        autoCheckoutBufferMinutes: snapshot.autoCheckoutBufferMinutes,
+        maxExtensionHours: snapshot.maxExtensionHours,
 
         enableGeoFencing: snapshot.enableGeoFencing,
         schoolLatitude: snapshot.schoolLatitude,
@@ -106,6 +108,8 @@ export async function PUT(req, props) {
       gracePeriodMinutes: updates.lateGraceMinutes ?? updates.gracePeriodMinutes,
       halfDayHours: updates.minHalfDayHours ?? updates.halfDayHours,
       fullDayHours: updates.minFullDayHours ?? updates.fullDayHours,
+      autoCheckoutBufferMinutes: updates.autoCheckoutBufferMinutes,
+      maxExtensionHours: updates.maxExtensionHours,
       enableGeoFencing: updates.enableGeoFencing,
       schoolLatitude: updates.schoolLatitude === '' || updates.schoolLatitude == null ? null : Number(updates.schoolLatitude),
       schoolLongitude: updates.schoolLongitude === '' || updates.schoolLongitude == null ? null : Number(updates.schoolLongitude),
@@ -164,6 +168,16 @@ export async function PUT(req, props) {
     if (normalizedUpdates.fullDayHours !== undefined && (normalizedUpdates.fullDayHours < 0 || normalizedUpdates.fullDayHours > 24)) {
       return NextResponse.json({
         error: 'Full day hours must be between 0 and 24'
+      }, { status: 400 });
+    }
+    if (normalizedUpdates.autoCheckoutBufferMinutes !== undefined && (normalizedUpdates.autoCheckoutBufferMinutes < 0 || normalizedUpdates.autoCheckoutBufferMinutes > 720)) {
+      return NextResponse.json({
+        error: 'Auto checkout buffer must be between 0 and 720 minutes'
+      }, { status: 400 });
+    }
+    if (normalizedUpdates.maxExtensionHours !== undefined && (normalizedUpdates.maxExtensionHours < 0 || normalizedUpdates.maxExtensionHours > 12)) {
+      return NextResponse.json({
+        error: 'Max extension hours must be between 0 and 12'
       }, { status: 400 });
     }
 

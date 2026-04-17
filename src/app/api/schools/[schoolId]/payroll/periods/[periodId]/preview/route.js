@@ -4,6 +4,7 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { getPayrollConfigForSchool, calculateOvertimeEarnings } from '@/lib/payroll/config';
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -27,6 +28,8 @@ export async function GET(req, props) {
         if (period.schoolId !== schoolId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
+
+        const payrollConfig = await getPayrollConfigForSchool(schoolId);
 
         // Get ALL active employees
         const allEmployees = await prisma.employeePayrollProfile.findMany({
@@ -99,6 +102,8 @@ export async function GET(req, props) {
             let daysAbsent = 0;
             let daysLeave = 0;
             let halfDayCount = 0;
+            let overtimeHours = 0;
+            let pendingOvertimeHours = 0;
 
             for (const record of attendance) {
                 switch (record.status) {
@@ -116,6 +121,14 @@ export async function GET(req, props) {
                         halfDayCount++;
                         daysWorked += 0.5;
                         break;
+                }
+
+                if ((record.overtimeHours || 0) > 0) {
+                    if (!payrollConfig.overtimeRequiresApproval || record.overtimeStatus === 'APPROVED') {
+                        overtimeHours += record.overtimeHours || 0;
+                    } else if (record.overtimeStatus === 'PENDING') {
+                        pendingOvertimeHours += record.overtimeHours || 0;
+                    }
                 }
             }
 
@@ -177,9 +190,20 @@ export async function GET(req, props) {
             // Calculate expected salary (pro-rated)
             let expectedGross = 0;
             let expectedNet = 0;
+            let expectedOvertime = 0;
             if (emp.salaryStructure) {
                 const workFactor = daysWorked / (period.totalWorkingDays || 1);
                 expectedGross = Math.round(emp.salaryStructure.grossSalary * workFactor);
+                expectedOvertime = payrollConfig.enableOvertime && payrollConfig.includeOvertimeInPayroll
+                    ? calculateOvertimeEarnings({
+                        overtimeHours,
+                        overtimeRate: payrollConfig.overtimeRate,
+                        grossSalary: emp.salaryStructure.grossSalary,
+                        standardWorkingDays: payrollConfig.standardWorkingDays,
+                        standardWorkingHours: payrollConfig.standardWorkingHours,
+                    })
+                    : 0;
+                expectedGross += expectedOvertime;
                 expectedNet = expectedGross; // Simplified - actual deductions calculated during processing
             }
 
@@ -205,6 +229,9 @@ export async function GET(req, props) {
                 daysAbsent,
                 daysLeave,
                 halfDayCount,
+                overtimeHours: Number(overtimeHours.toFixed(2)),
+                pendingOvertimeHours: Number(pendingOvertimeHours.toFixed(2)),
+                expectedOvertime,
                 totalPeriodDays: period.totalWorkingDays,
 
                 // Bank details

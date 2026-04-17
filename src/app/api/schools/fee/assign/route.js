@@ -43,7 +43,6 @@ export async function POST(req) {
     if (!globalFeeStructureId || !schoolId || !academicYearId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-
     // ── 1. Resolve student list ────────────────────────────
     let targetIds = studentIds || [];
 

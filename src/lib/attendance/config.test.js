@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  calculateOvertimeHours,
+  canRequestExtension,
   computeAttendanceWindows,
   getCheckInStatus,
   getCheckoutAttendanceStatus,
+  getOvertimeState,
+  normalizeExtendedTill,
   requiresApprovalForDate,
+  resolveAttendanceCheckoutDeadline,
 } from './config.js';
 
 const sampleConfig = {
@@ -34,7 +39,9 @@ test('strict check-in window ends at grace cutoff when no window hours are confi
   assert.equal(windows.checkInEnd.getTime(), windows.lateAfter.getTime());
   assert.equal(windows.checkOutDeadline.getHours(), 14);
   assert.equal(windows.checkOutDeadline.getMinutes(), 0);
-  assert.equal(windows.checkOutEnd.getTime(), windows.checkOutDeadline.getTime());
+  assert.equal(windows.autoCheckoutCutoff.getHours(), 15);
+  assert.equal(windows.autoCheckoutCutoff.getMinutes(), 0);
+  assert.equal(windows.checkOutEnd.getTime(), windows.autoCheckoutCutoff.getTime());
 });
 
 test('on-time and late check-in statuses use grace cutoff', () => {
@@ -58,4 +65,54 @@ test('backdated approval respects configured threshold days', () => {
 
   assert.equal(requiresApprovalForDate(new Date('2026-04-12T00:00:00.000Z'), 3, today), false);
   assert.equal(requiresApprovalForDate(new Date('2026-04-10T00:00:00.000Z'), 3, today), true);
+});
+
+test('extension helpers enforce post-end and max-extension cutoff', () => {
+  const windows = computeAttendanceWindows(sampleConfig, new Date('2026-04-14T00:00:00.000Z'));
+  const beforeEnd = new Date(windows.checkOutDeadline.getTime() - 60 * 1000);
+  const afterEnd = new Date(windows.checkOutDeadline.getTime() + 5 * 60 * 1000);
+
+  assert.equal(canRequestExtension(beforeEnd, windows), false);
+  assert.equal(canRequestExtension(afterEnd, windows), true);
+
+  const validExtendedTill = normalizeExtendedTill(
+    new Date(windows.checkOutDeadline.getTime() + 3 * 60 * 60 * 1000).toISOString(),
+    windows,
+  );
+  const invalidExtendedTill = normalizeExtendedTill(
+    new Date(windows.checkOutDeadline.getTime() + 5 * 60 * 60 * 1000).toISOString(),
+    windows,
+  );
+
+  assert.ok(validExtendedTill instanceof Date);
+  assert.equal(invalidExtendedTill, null);
+
+  const effectiveDeadline = resolveAttendanceCheckoutDeadline({
+    isExtended: true,
+    extendedTill: new Date(windows.checkOutDeadline.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+  }, windows);
+
+  assert.equal(effectiveDeadline.toISOString(), new Date(windows.checkOutDeadline.getTime() + 2 * 60 * 60 * 1000).toISOString());
+});
+
+test('overtime state is derived from working hours and approval settings', () => {
+  assert.equal(calculateOvertimeHours(9.5, 8), 1.5);
+  assert.deepEqual(getOvertimeState({
+    workingHours: 9.5,
+    standardWorkingHours: 8,
+    overtimeEnabled: true,
+    overtimeRequiresApproval: true,
+  }), {
+    overtimeHours: 1.5,
+    overtimeStatus: 'PENDING',
+  });
+  assert.deepEqual(getOvertimeState({
+    workingHours: 9.5,
+    standardWorkingHours: 8,
+    overtimeEnabled: true,
+    overtimeRequiresApproval: false,
+  }), {
+    overtimeHours: 1.5,
+    overtimeStatus: 'APPROVED',
+  });
 });

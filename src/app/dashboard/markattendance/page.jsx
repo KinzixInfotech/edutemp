@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -25,6 +26,7 @@ export default function SelfAttendancePage() {
     const { fullUser } = useAuth();
     const queryClient = useQueryClient();
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [customExtensionTime, setCustomExtensionTime] = useState("");
 
     // Geofencing state
     const [userLocation, setUserLocation] = useState(null);
@@ -90,7 +92,7 @@ export default function SelfAttendancePage() {
 
     // Mark attendance mutation with optimistic UI
     const markMutation = useMutation({
-        mutationFn: async ({ type, location }) => {
+        mutationFn: async ({ type, location, extendedTill }) => {
             const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -98,6 +100,7 @@ export default function SelfAttendancePage() {
                     userId: fullUser.id,
                     type,
                     location,
+                    extendedTill,
                     deviceInfo: {
                         userAgent: navigator.userAgent,
                         platform: navigator.platform
@@ -142,6 +145,25 @@ export default function SelfAttendancePage() {
                             workingHours: parseFloat(hours),
                             liveWorkingHours: null,
                         },
+                    };
+                }
+                if (type === 'EXTEND') {
+                    return {
+                        ...old,
+                        attendance: {
+                            ...old.attendance,
+                            isExtended: true,
+                            extendedTill,
+                        },
+                        windows: old.windows ? {
+                            ...old.windows,
+                            checkOut: {
+                                ...old.windows.checkOut,
+                                effectiveCutoff: extendedTill,
+                                end: extendedTill,
+                                isOpen: true,
+                            },
+                        } : old.windows,
                     };
                 }
                 return old;
@@ -229,7 +251,7 @@ export default function SelfAttendancePage() {
         let location = null;
 
         // If geofencing is enabled, validate location first
-        if (data?.config?.enableGeoFencing) {
+        if (type !== "EXTEND" && data?.config?.enableGeoFencing) {
             if (locationError) {
                 toast.error("Location access is required to mark attendance.");
                 return;
@@ -247,7 +269,7 @@ export default function SelfAttendancePage() {
         }
 
         // If no location yet, try to get it
-        if (!location) {
+        if (type !== "EXTEND" && !location) {
             try {
                 const pos = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -273,6 +295,43 @@ export default function SelfAttendancePage() {
         markMutation.mutate({ type, location });
     };
 
+    const handleExtendAttendance = (mode) => {
+        const deadline = windows?.checkOut?.deadline ? new Date(windows.checkOut.deadline) : null;
+        const maxExtendedEnd = windows?.checkOut?.maxExtendedEnd ? new Date(windows.checkOut.maxExtendedEnd) : null;
+        if (!deadline) {
+            toast.error("Shift end time is not available.");
+            return;
+        }
+
+        let extendedTill = null;
+        if (mode === "CUSTOM") {
+            if (!customExtensionTime) {
+                toast.error("Pick a custom extension time first.");
+                return;
+            }
+            const candidate = new Date(deadline);
+            const [hours, minutes] = customExtensionTime.split(":").map(Number);
+            candidate.setHours(hours || 0, minutes || 0, 0, 0);
+            extendedTill = candidate.toISOString();
+        } else {
+            const hoursToAdd = Number(mode);
+            const candidate = new Date(deadline);
+            candidate.setHours(candidate.getHours() + hoursToAdd);
+            extendedTill = candidate.toISOString();
+        }
+
+        if (new Date(extendedTill) <= deadline) {
+            toast.error("Pick a time after school end.");
+            return;
+        }
+        if (maxExtendedEnd && new Date(extendedTill) > maxExtendedEnd) {
+            toast.error(`Extension cannot exceed ${config?.maxExtensionHours} hours after school end.`);
+            return;
+        }
+
+        markMutation.mutate({ type: "EXTEND", extendedTill });
+    };
+
     const { attendance, windows, monthlyStats, config, isWorkingDay, dayType, holidayName } = data || {};
     const isCheckedIn = !!attendance?.checkInTime;
     const isCheckedOut = !!attendance?.checkOutTime;
@@ -281,6 +340,10 @@ export default function SelfAttendancePage() {
     const geofenceBlocking = config?.enableGeoFencing && (!isWithinRadius || locationError);
     const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn && !geofenceBlocking;
     const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut && !geofenceBlocking;
+    const hasShiftEnded = windows?.checkOut?.deadline ? currentTime >= new Date(windows.checkOut.deadline) : false;
+    const isExtended = !!attendance?.isExtended && !isCheckedOut;
+    const effectiveCheckoutCutoff = windows?.checkOut?.effectiveCutoff || windows?.checkOut?.end;
+    const canRequestExtension = isCheckedIn && !isCheckedOut && hasShiftEnded && !isExtended;
 
     // Helper to calculate time status and progress
     const timeStatus = useMemo(() => {
@@ -724,6 +787,46 @@ export default function SelfAttendancePage() {
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {canRequestExtension && (
+                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-900 dark:bg-amber-950/30">
+                                                <p className="font-semibold text-amber-900 dark:text-amber-100">School time ended. Continue working?</p>
+                                                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                                                    You can check out now or extend once up to {config?.maxExtensionHours} hours. Auto checkout is currently set for {formatTime(effectiveCheckoutCutoff)}.
+                                                </p>
+                                                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                                    <Button variant="outline" onClick={() => handleExtendAttendance("1")} disabled={markMutation.isPending}>
+                                                        Continue +1 hr
+                                                    </Button>
+                                                    <Button variant="outline" onClick={() => handleExtendAttendance("2")} disabled={markMutation.isPending}>
+                                                        Continue +2 hr
+                                                    </Button>
+                                                    <Button variant="secondary" onClick={() => handleMarkAttendance("CHECK_OUT")} disabled={!canCheckOut || markMutation.isPending}>
+                                                        End Now
+                                                    </Button>
+                                                </div>
+                                                <div className="mt-3 flex gap-2">
+                                                    <Input
+                                                        type="time"
+                                                        value={customExtensionTime}
+                                                        onChange={(e) => setCustomExtensionTime(e.target.value)}
+                                                        className="max-w-[180px]"
+                                                    />
+                                                    <Button variant="outline" onClick={() => handleExtendAttendance("CUSTOM")} disabled={markMutation.isPending}>
+                                                        Use Custom Time
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {isExtended && (
+                                            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-left dark:border-blue-900 dark:bg-blue-950/30">
+                                                <p className="font-semibold text-blue-900 dark:text-blue-100">Extended workday active</p>
+                                                <p className="mt-1 text-sm text-blue-800 dark:text-blue-200">
+                                                    You extended this session until {formatTime(attendance?.extendedTill)}. If you forget to check out, the system will auto checkout at that time.
+                                                </p>
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
@@ -740,6 +843,16 @@ export default function SelfAttendancePage() {
                                             <Badge variant="outline" className="mt-3 bg-white/50 border-emerald-200 text-emerald-800">
                                                 Total Duration: {attendance.workingHours?.toFixed(2)} hrs
                                             </Badge>
+                                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                                                <Badge variant="outline" className="bg-white/50 border-emerald-200 text-emerald-800">
+                                                    {attendance.checkoutType || "MANUAL"} checkout
+                                                </Badge>
+                                                {(attendance.overtimeHours || 0) > 0 && (
+                                                    <Badge variant="outline" className="bg-white/50 border-emerald-200 text-emerald-800">
+                                                        Overtime: {attendance.overtimeHours?.toFixed(2)} hrs
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

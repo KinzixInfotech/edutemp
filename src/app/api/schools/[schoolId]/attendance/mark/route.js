@@ -3,18 +3,24 @@ import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
 import qstash from '@/lib/qstash';
 import {
+  calculateWorkingHours,
+  canRequestExtension,
   computeAttendanceWindows,
   getAttendanceConfigSnapshot,
   getCheckInStatus,
   getCheckoutAttendanceStatus,
+  getOvertimeState,
   getDateKeyForConfig,
   getDbDateForConfig,
+  normalizeExtendedTill,
   requiresApprovalForDate,
+  resolveAttendanceCheckoutDeadline,
 } from '@/lib/attendance/config';
 import { getSchoolTimezone, getZonedNow } from '@/lib/attendance/timezone';
 import { getTeacherShiftAttendanceWindow } from '@/lib/attendance/shifts';
 import { getLocationSecuritySignals } from '@/lib/attendance/security';
 import { createAttendanceAuditLog } from '@/lib/attendance/audit';
+import { getPayrollConfigForSchool } from '@/lib/payroll/config';
 
 function logAttendanceDebug(stage, payload) {
   console.log(`[attendance/mark] ${stage}`, payload);
@@ -87,15 +93,15 @@ export async function POST(req, props) {
     queueId: queueId || null,
   };
 
-  if (!userId || !type || !['CHECK_IN', 'CHECK_OUT'].includes(type)) {
+  if (!userId || !type || !['CHECK_IN', 'CHECK_OUT', 'EXTEND'].includes(type)) {
     return NextResponse.json({
-      error: 'userId and valid type (CHECK_IN/CHECK_OUT) required',
+      error: 'userId and valid type (CHECK_IN/CHECK_OUT/EXTEND) required',
     }, { status: 400 });
   }
 
   try {
     const serverNow = new Date();
-    const [config, school, activeAcademicYear, recentAttendance] = await Promise.all([
+    const [config, school, activeAcademicYear, recentAttendance, payrollConfig] = await Promise.all([
       prisma.attendanceConfig.findUnique({ where: { schoolId } }),
       prisma.school.findUnique({
         where: { id: schoolId },
@@ -116,6 +122,7 @@ export async function POST(req, props) {
           checkOutLocation: true,
         },
       }),
+      getPayrollConfigForSchool(schoolId),
     ]);
 
     if (!config) {
@@ -175,6 +182,8 @@ export async function POST(req, props) {
       lateAfter: windows.lateAfter.toISOString(),
       checkOutDeadline: windows.checkOutDeadline.toISOString(),
       checkOutEnd: windows.checkOutEnd.toISOString(),
+      autoCheckoutCutoff: windows.autoCheckoutCutoff.toISOString(),
+      maxExtendedCheckoutEnd: windows.maxExtendedCheckoutEnd.toISOString(),
     });
 
     const effectiveDayType = calendar?.dayType || 'WORKING_DAY';
@@ -205,7 +214,7 @@ export async function POST(req, props) {
     }
 
     let distance = null;
-    if (configSnapshot.enableGeoFencing) {
+    if (type !== 'EXTEND' && configSnapshot.enableGeoFencing) {
       if (!location?.latitude || !location?.longitude) {
         await createAttendanceAuditLog({
           userId,
@@ -373,6 +382,15 @@ export async function POST(req, props) {
             isLateCheckIn: isLate,
             lateByMinutes,
             workingHours: 0,
+            overtimeHours: 0,
+            overtimeStatus: 'NOT_REQUIRED',
+            overtimeApprovedBy: null,
+            overtimeApprovedAt: null,
+            overtimeApprovalRemarks: null,
+            checkoutType: 'MANUAL',
+            isExtended: false,
+            extendedTill: null,
+            extensionRequestedAt: null,
           },
         })
         : await prisma.attendance.create({
@@ -388,6 +406,10 @@ export async function POST(req, props) {
             isLateCheckIn: isLate,
             lateByMinutes,
             workingHours: 0,
+            overtimeHours: 0,
+            overtimeStatus: 'NOT_REQUIRED',
+            checkoutType: 'MANUAL',
+            isExtended: false,
           },
         });
 
@@ -430,8 +452,10 @@ export async function POST(req, props) {
         shiftWindow,
         checkOutWindow: {
           start: windows.checkOutStart.toISOString(),
-          end: windows.checkOutEnd.toISOString(),
           deadline: windows.checkOutDeadline.toISOString(),
+          autoCutoff: windows.autoCheckoutCutoff.toISOString(),
+          end: windows.autoCheckoutCutoff.toISOString(),
+          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString(),
         },
       });
     }
@@ -440,7 +464,7 @@ export async function POST(req, props) {
       await createAttendanceAuditLog({
         userId,
         schoolId,
-        action: 'CHECK_OUT_WITHOUT_CHECK_IN',
+        action: type === 'EXTEND' ? 'EXTEND_WITHOUT_CHECK_IN' : 'CHECK_OUT_WITHOUT_CHECK_IN',
         payload: { date: dateKey, submissionMode },
         error: 'No check-in record found',
       });
@@ -455,7 +479,7 @@ export async function POST(req, props) {
         userId,
         schoolId,
         attendanceId: existing.id,
-        action: 'CHECK_OUT_DUPLICATE',
+        action: type === 'EXTEND' ? 'EXTEND_DUPLICATE' : 'CHECK_OUT_DUPLICATE',
         payload: { date: dateKey, submissionMode, existingCheckOutTime: existing.checkOutTime },
         error: 'Already checked out',
       });
@@ -466,6 +490,71 @@ export async function POST(req, props) {
       });
     }
 
+    if (type === 'EXTEND') {
+      if (existing.isExtended && existing.extendedTill) {
+        return NextResponse.json({
+          success: false,
+          message: 'Extension has already been recorded for today.',
+          attendance: existing,
+        }, { status: 400 });
+      }
+
+      if (!canRequestExtension(effectiveEventTime, windows)) {
+        return NextResponse.json({
+          success: false,
+          message: 'Extension can only be requested after school end time and before the maximum extension cutoff.',
+        }, { status: 400 });
+      }
+
+      const requestedExtendedTill = normalizeExtendedTill(body.extendedTill, windows);
+      if (!requestedExtendedTill) {
+        return NextResponse.json({
+          success: false,
+          message: `Extension time must be after ${configSnapshot.defaultEndTime} and within ${windows.maxExtensionHours} hours of school end.`,
+        }, { status: 400 });
+      }
+
+      const attendance = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          ...baseAttendanceData,
+          isExtended: true,
+          extendedTill: requestedExtendedTill,
+          extensionRequestedAt: serverNow,
+          remarks: remarks || existing.remarks,
+        },
+      });
+
+      await createAttendanceAuditLog({
+        userId,
+        schoolId,
+        attendanceId: attendance.id,
+        action: 'EXTEND_WORKDAY',
+        payload: {
+          date: dateKey,
+          submissionMode,
+          extendedTill: requestedExtendedTill.toISOString(),
+          maxExtendedCheckoutEnd: windows.maxExtendedCheckoutEnd.toISOString(),
+          shiftWindow,
+        },
+      });
+
+      await invalidatePattern(`attendance:${schoolId}*`);
+
+      return NextResponse.json({
+        success: true,
+        message: `Workday extended until ${requestedExtendedTill.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+        attendance,
+        timezone,
+        checkOutWindow: {
+          deadline: windows.checkOutDeadline.toISOString(),
+          autoCutoff: windows.autoCheckoutCutoff.toISOString(),
+          effectiveCutoff: requestedExtendedTill.toISOString(),
+          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString(),
+        },
+      });
+    }
+
     if (effectiveEventTime < new Date(existing.checkInTime)) {
       return NextResponse.json({
         success: false,
@@ -473,31 +562,51 @@ export async function POST(req, props) {
       }, { status: 400 });
     }
 
-    if (effectiveEventTime > windows.checkOutEnd) {
+    const effectiveCheckoutDeadline = resolveAttendanceCheckoutDeadline(existing, windows);
+    if (effectiveEventTime > effectiveCheckoutDeadline) {
       await createAttendanceAuditLog({
         userId,
         schoolId,
         attendanceId: existing.id,
         action: 'CHECK_OUT_WINDOW_BLOCK',
-        payload: { date: dateKey, submissionMode, eventTime: effectiveEventTime.toISOString() },
+        payload: {
+          date: dateKey,
+          submissionMode,
+          eventTime: effectiveEventTime.toISOString(),
+          effectiveCheckoutDeadline: effectiveCheckoutDeadline.toISOString(),
+        },
         error: 'Outside check-out window',
       });
       return NextResponse.json({
         success: false,
-        message: `Check-out window closed at ${windows.checkOutEnd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`,
+        message: `Check-out window closed at ${effectiveCheckoutDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`,
       });
     }
 
-    const workingHours = Number(((effectiveEventTime - new Date(existing.checkInTime)) / (1000 * 60 * 60)).toFixed(2));
-    const status = getCheckoutAttendanceStatus(workingHours, configWithTimezone);
+    const workingHours = calculateWorkingHours(existing.checkInTime, effectiveEventTime);
+    const rawStatus = getCheckoutAttendanceStatus(workingHours, configWithTimezone);
+    const normalizedStatus = existing.status === 'LATE' && rawStatus === 'PRESENT' ? 'LATE' : rawStatus;
+    const overtimeState = getOvertimeState({
+      workingHours,
+      standardWorkingHours: payrollConfig.standardWorkingHours,
+      overtimeEnabled: payrollConfig.enableOvertime,
+      overtimeRequiresApproval: payrollConfig.overtimeRequiresApproval,
+    });
+
     const attendance = await prisma.attendance.update({
       where: { id: existing.id },
       data: {
         ...baseAttendanceData,
-        status: existing.status === 'LATE' && status === 'PRESENT' ? 'LATE' : status,
+        status: normalizedStatus,
         checkOutTime: effectiveEventTime,
         checkOutLocation: location || null,
         workingHours,
+        overtimeHours: overtimeState.overtimeHours,
+        overtimeStatus: overtimeState.overtimeStatus,
+        overtimeApprovedBy: null,
+        overtimeApprovedAt: overtimeState.overtimeStatus === 'APPROVED' ? serverNow : null,
+        overtimeApprovalRemarks: null,
+        checkoutType: 'MANUAL',
         remarks: remarks || existing.remarks,
       },
     });
@@ -512,6 +621,8 @@ export async function POST(req, props) {
         submissionMode,
         status: attendance.status,
         workingHours,
+        overtimeHours: overtimeState.overtimeHours,
+        overtimeStatus: overtimeState.overtimeStatus,
         location,
         deviceInfo: enrichedDeviceInfo,
         securityAssessment,
@@ -534,6 +645,8 @@ export async function POST(req, props) {
       message: `Checked out successfully. Worked ${workingHours.toFixed(2)} hours`,
       attendance,
       workingHours,
+      overtimeHours: overtimeState.overtimeHours,
+      overtimeStatus: overtimeState.overtimeStatus,
       attendanceStatus: attendance.status,
       securityAssessment,
       timezone,
@@ -569,12 +682,13 @@ export async function GET(req, props) {
   }
 
   try {
-    const [config, school] = await Promise.all([
+    const [config, school, payrollConfig] = await Promise.all([
       prisma.attendanceConfig.findUnique({ where: { schoolId } }),
       prisma.school.findUnique({
         where: { id: schoolId },
         select: { id: true, websiteConfig: true },
       }),
+      getPayrollConfigForSchool(schoolId),
     ]);
 
     if (!config) {
@@ -613,8 +727,11 @@ export async function GET(req, props) {
 
     let liveWorkingHours = 0;
     if (attendance?.checkInTime && !attendance?.checkOutTime) {
-      liveWorkingHours = Number(((now - new Date(attendance.checkInTime)) / (1000 * 60 * 60)).toFixed(2));
+      liveWorkingHours = calculateWorkingHours(attendance.checkInTime, now);
     }
+    const effectiveCheckoutDeadline = attendance?.checkInTime && !attendance?.checkOutTime
+      ? resolveAttendanceCheckoutDeadline(attendance, computed)
+      : computed.autoCheckoutCutoff;
 
     const isWorkingDay = (calendar?.dayType || 'WORKING_DAY') === 'WORKING_DAY';
 
@@ -649,6 +766,8 @@ export async function GET(req, props) {
         minFullDayHours: configSnapshot.minFullDayHours,
         halfDayHours: configSnapshot.minHalfDayHours,
         fullDayHours: configSnapshot.minFullDayHours,
+        autoCheckoutBufferMinutes: configSnapshot.autoCheckoutBufferMinutes,
+        maxExtensionHours: configSnapshot.maxExtensionHours,
         checkInWindowHours: configSnapshot.checkInWindowHours,
         checkOutGraceHours: configSnapshot.checkOutGraceHours,
         approvalAfterDays: configSnapshot.approvalAfterDays,
@@ -656,6 +775,7 @@ export async function GET(req, props) {
         autoApproveLeaves: configSnapshot.autoApproveLeaves,
         attendanceThreshold: configSnapshot.attendanceThreshold,
         minAttendancePercent: configSnapshot.attendanceThreshold,
+        standardWorkingHours: payrollConfig.standardWorkingHours,
       },
       windows: {
         checkIn: {
@@ -666,9 +786,12 @@ export async function GET(req, props) {
         },
         checkOut: {
           start: computed.checkOutStart.toISOString(),
-          end: computed.checkOutEnd.toISOString(),
+          end: effectiveCheckoutDeadline.toISOString(),
           deadline: computed.checkOutDeadline.toISOString(),
-          isOpen: !!attendance?.checkInTime && !attendance?.checkOutTime && now <= computed.checkOutEnd,
+          autoCutoff: computed.autoCheckoutCutoff.toISOString(),
+          maxExtendedEnd: computed.maxExtendedCheckoutEnd.toISOString(),
+          effectiveCutoff: effectiveCheckoutDeadline.toISOString(),
+          isOpen: !!attendance?.checkInTime && !attendance?.checkOutTime && now <= effectiveCheckoutDeadline,
         },
       },
       monthlyStats,

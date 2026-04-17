@@ -1548,6 +1548,15 @@ exports.Prisma.AttendanceScalarFieldEnum = {
   checkInTime: 'checkInTime',
   checkOutTime: 'checkOutTime',
   workingHours: 'workingHours',
+  overtimeHours: 'overtimeHours',
+  overtimeStatus: 'overtimeStatus',
+  overtimeApprovedBy: 'overtimeApprovedBy',
+  overtimeApprovedAt: 'overtimeApprovedAt',
+  overtimeApprovalRemarks: 'overtimeApprovalRemarks',
+  checkoutType: 'checkoutType',
+  isExtended: 'isExtended',
+  extendedTill: 'extendedTill',
+  extensionRequestedAt: 'extensionRequestedAt',
   checkInLocation: 'checkInLocation',
   checkOutLocation: 'checkOutLocation',
   deviceInfo: 'deviceInfo',
@@ -1606,6 +1615,8 @@ exports.Prisma.AttendanceConfigScalarFieldEnum = {
   gracePeriodMinutes: 'gracePeriodMinutes',
   halfDayHours: 'halfDayHours',
   fullDayHours: 'fullDayHours',
+  autoCheckoutBufferMinutes: 'autoCheckoutBufferMinutes',
+  maxExtensionHours: 'maxExtensionHours',
   enableGeoFencing: 'enableGeoFencing',
   schoolLatitude: 'schoolLatitude',
   schoolLongitude: 'schoolLongitude',
@@ -2671,6 +2682,8 @@ exports.Prisma.PayrollConfigScalarFieldEnum = {
   leaveEncashmentRate: 'leaveEncashmentRate',
   enableOvertime: 'enableOvertime',
   overtimeRate: 'overtimeRate',
+  includeOvertimeInPayroll: 'includeOvertimeInPayroll',
+  overtimeRequiresApproval: 'overtimeRequiresApproval',
   lateGraceMinutes: 'lateGraceMinutes',
   halfDayThreshold: 'halfDayThreshold',
   enableLoanApplications: 'enableLoanApplications',
@@ -3811,6 +3824,12 @@ exports.ApprovalStatus = exports.$Enums.ApprovalStatus = {
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   NOT_REQUIRED: 'NOT_REQUIRED'
+};
+
+exports.CheckoutType = exports.$Enums.CheckoutType = {
+  MANUAL: 'MANUAL',
+  AUTO: 'AUTO',
+  EXTENDED_AUTO: 'EXTENDED_AUTO'
 };
 
 exports.DelegationStatus = exports.$Enums.DelegationStatus = {

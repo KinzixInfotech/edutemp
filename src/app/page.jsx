@@ -31,6 +31,7 @@ import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern
 import ProductGuideAI from '@/components/ProductGuideAI';
 import SectionHeading from '@/components/SectionHeading';
 import Image from 'next/image';
+import HorizontalImageMarquee from './components/HorizontalMarquee';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -84,6 +85,7 @@ export default function HomePage() {
             <HPCSection />
             <FeaturesSection />
             <IntegrationsSection />
+            <AppGlimpseSection />
 
             {/* AI Product Guide - Ask questions about EduBreezy */}
 
@@ -452,7 +454,7 @@ function AttendanceSection() {
 
                         {/* Heading */}
                         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-6 leading-tight tracking-tight">
-                            Smart Attendance <br /> <span className="text-[#0469ff]">Made Simple</span>
+                            Smart Attendance <br /> <span className="text-[#0469ff]">Made Simple 😌 </span>
                         </h2>
 
                         {/* Description */}
@@ -504,6 +506,36 @@ function AttendanceSection() {
         </section>
     )
 }
+// App Glimpse Section — Horizontal scrolling marquee of app screenshots
+function AppGlimpseSection() {
+    return (
+        <section className="pt-16 md:pt-24 bg-white relative overflow-hidden" id="app-glimpse">
+            {/* Background decorations */}
+            <div className="absolute top-0 left-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#8B5CF6]/5 rounded-full blur-3xl" />
+
+            <div className="relative z-10">
+                {/* Section Header */}
+                <div className="text-center mb-10 md:mb-14 px-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-4 md:mb-6">
+                        <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0469ff]" />
+                        <span className="text-xs md:text-sm font-semibold text-[#0469ff]">App Preview</span>
+                    </div>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
+                        A Glimpse of the <span className="text-[#0469ff]">App 😍</span>
+                    </h2>
+                    <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium max-w-[700px] mx-auto leading-relaxed">
+                        Explore the beautifully crafted screens that make EduBreezy a joy to use every day — for teachers, parents, and administrators alike.
+                    </p>
+                </div>
+
+                {/* Full-width Horizontal Marquee */}
+                <HorizontalImageMarquee />
+            </div>
+        </section>
+    );
+}
+
 // Marquee Banner Section
 function MarqueeBanner() {
     // JSON-based content for easy editing
@@ -836,7 +868,7 @@ function HPCSection() {
 
                         {/* Heading */}
                         <h2 className="text-4xl md:text-5xl lg:text-5xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
-                            New Education Policy 2020 Based <span className="text-[#0e66fe]"> HOLISTIC PROGRESS CARD</span>
+                            New Education Policy 2020 Based <span className="text-[#0e66fe]"> HOLISTIC PROGRESS CARD 👻</span>
                         </h2>
 
                         {/* Description */}
@@ -908,7 +940,7 @@ function CommunicatingSeamlesslySection() {
                     </span>
                     <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] leading-tight mb-4 md:mb-6 tracking-tight">
                         <Highlighter action="underline" color="black">Modern App</Highlighter> for
-                        <span className="text-[#0569ff]"> <Highlighter isView={true} action="underline" color="black">Modern Schools</Highlighter></span>
+                        <span className="text-[#0569ff]"> <Highlighter isView={true} action="underline" color="black">Modern Schools 😜</Highlighter></span>
                     </h2>
                     <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium max-w-2xl mx-auto leading-relaxed">
                         Beautifully designed, intuitive mobile app that bring schools, parents, director, principal, teachers, and students together on one powerful platform.
@@ -1163,15 +1195,15 @@ function FeaturesSection() {
                 <div className="flex items-end justify-between mb-10">
                     <div>
                         <h2 className="text-2xl md:text-[2.5rem] font-black leading-tight text-white tracking-tight">
-                            All-in-one modules for your school.
+                            All-in-one modules for your school 🤩
                         </h2>
                         <p className="text-sm md:text-base text-white/40 mt-2 font-medium">
-                            {modules.length}+ modules to automate every aspect of school management.
+                            modules to automate every aspect of school management.
                         </p>
                     </div>
-                    <Link href="/features" className="hidden md:inline-flex items-center gap-1 text-[#0469ff] text-sm font-semibold hover:underline whitespace-nowrap">
+                    {/* <Link href="/features" className="hidden md:inline-flex items-center gap-1 text-[#0469ff] text-sm font-semibold hover:underline whitespace-nowrap">
                         Explore all <ArrowRight size={14} />
-                    </Link>
+                    </Link> */}
                 </div>
 
                 {/* Scrollable Cards Strip */}
@@ -1309,7 +1341,7 @@ function IntegrationsSection() {
                     <h2 className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] mb-5 text-[#1a1a2e]">
                         Seamlessly Connects{' '}
                         <br className="hidden md:block" />
-                        With <span className="text-[#046bff]">Everything</span>
+                        With <span className="text-[#046bff]">Everything 🥰</span>
                     </h2>
                     <p className="text-base md:text-lg text-gray-500 font-medium max-w-3xl mx-auto leading-relaxed">
                         20+ integrations that enhance the capability and functionality of EduBreezy — from biometric devices to payment gateways.
@@ -1627,7 +1659,7 @@ function PricingSection() {
                     <SectionHeading
                         badge="SIMPLE PRICING"
                         title="Transparent Pricing for"
-                        highlightedText="Every School"
+                        highlightedText="Every School "
                         description="One simple plan. No hidden fees. Pay yearly and save 30%."
                     />
                 </div>

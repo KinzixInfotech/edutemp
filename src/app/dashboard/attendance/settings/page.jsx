@@ -323,6 +323,37 @@ export default function AttendanceSettings() {
                                         Minimum hours for half day attendance
                                     </p>
                                 </div>
+
+                                <div>
+                                    <Label>Auto Checkout Buffer (minutes)</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        max="720"
+                                        value={settings.autoCheckoutBufferMinutes ?? ''}
+                                        onChange={(e) => handleChange('autoCheckoutBufferMinutes', e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                        className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        If a user forgets to check out, the system auto-checks out after end time plus this buffer.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <Label>Max Extension Hours</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        max="12"
+                                        step="0.5"
+                                        value={settings.maxExtensionHours ?? ''}
+                                        onChange={(e) => handleChange('maxExtensionHours', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                        className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Users cannot extend their workday beyond end time plus this limit.
+                                    </p>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

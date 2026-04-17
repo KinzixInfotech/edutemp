@@ -97,6 +97,44 @@ export default function PayrollPeriodDetailPage({ params }) {
         enabled: !!schoolId && !!periodId,
     });
 
+    const { data: overtimeData, isLoading: overtimeLoading } = useQuery({
+        queryKey: ["payroll-overtime", schoolId, periodId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/overtime`);
+            if (!res.ok) throw new Error("Failed to fetch overtime records");
+            return res.json();
+        },
+        enabled: !!schoolId && !!periodId,
+    });
+
+    const overtimeApprovalMutation = useMutation({
+        mutationFn: async ({ attendanceId, action }) => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/overtime`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    attendanceId,
+                    action,
+                    approvedBy: fullUser?.id,
+                }),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to update overtime");
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success("Overtime status updated");
+            queryClient.invalidateQueries(["payroll-overtime", schoolId, periodId]);
+            queryClient.invalidateQueries(["payroll-preview", schoolId, periodId]);
+            queryClient.invalidateQueries(["payroll-period", schoolId, periodId]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
     // Process payroll mutation
     const processMutation = useMutation({
         mutationFn: async () => {
@@ -542,6 +580,90 @@ export default function PayrollPeriodDetailPage({ params }) {
                                 ℹ️ {period.summary.missingCount} active employee(s) were not included when this payroll was processed.
                                 {period.status === 'DRAFT' ? ' Re-process the payroll to include them.' : ''}
                             </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {overtimeData?.settings?.enableOvertime && (
+                <Card className="border bg-white dark:bg-muted">
+                    <CardHeader>
+                        <CardTitle>Overtime Review</CardTitle>
+                        <CardDescription>
+                            Attendance records with extra worked hours. Payroll only includes them when the payroll settings allow it and the approval rule is satisfied.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-wrap gap-3 mb-4">
+                            <Badge variant="outline">Include in payroll: {overtimeData.settings.includeOvertimeInPayroll ? "Yes" : "No"}</Badge>
+                            <Badge variant="outline">Approval required: {overtimeData.settings.overtimeRequiresApproval ? "Yes" : "No"}</Badge>
+                            <Badge variant="outline">Rate: {overtimeData.settings.overtimeRate}x</Badge>
+                            <Badge variant="outline">Standard hours: {overtimeData.settings.standardWorkingHours}</Badge>
+                        </div>
+
+                        {overtimeLoading ? (
+                            <Skeleton className="h-40 w-full" />
+                        ) : overtimeData.records?.length ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Employee</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Worked</TableHead>
+                                        <TableHead>Overtime</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {overtimeData.records.map((record) => (
+                                        <TableRow key={record.id}>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-10 w-10">
+                                                        <AvatarImage src={record.profilePicture} />
+                                                        <AvatarFallback>{record.name?.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <p className="font-medium">{record.name}</p>
+                                                        <p className="text-sm text-muted-foreground">{record.employeeType || 'Staff'}</p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{formatDate(record.date)}</TableCell>
+                                            <TableCell>{record.workingHours?.toFixed?.(2) || record.workingHours} hrs</TableCell>
+                                            <TableCell>{record.overtimeHours?.toFixed?.(2) || record.overtimeHours} hrs</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">{record.overtimeStatus}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={record.overtimeStatus === "APPROVED" || overtimeApprovalMutation.isPending}
+                                                        onClick={() => overtimeApprovalMutation.mutate({ attendanceId: record.id, action: "APPROVE" })}
+                                                    >
+                                                        Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        disabled={record.overtimeStatus === "REJECTED" || overtimeApprovalMutation.isPending}
+                                                        onClick={() => overtimeApprovalMutation.mutate({ attendanceId: record.id, action: "REJECT" })}
+                                                    >
+                                                        Reject
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                No overtime attendance records found for this period.
+                            </div>
                         )}
                     </CardContent>
                 </Card>
