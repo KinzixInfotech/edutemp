@@ -21,7 +21,7 @@ function shuffle(arr) {
 // Build a flat list, then split into 4 columns (round-robin)
 const ALL_IMAGES = Array.from({ length: 15 }, (_, i) => ({
     id: `img-${i + 1}`,
-    src: `./images_screenshot/${i + 1}.png`,
+    src: `https://cdn.edubreezy.com/images_screenshot/${i + 1}.png`,
 }));
 const NUM_COLS = 4;
 const COLUMNS = Array.from({ length: NUM_COLS }, (_, col) =>

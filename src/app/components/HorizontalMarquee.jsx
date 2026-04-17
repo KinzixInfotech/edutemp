@@ -21,7 +21,7 @@ function shuffle(arr) {
 // All available images
 const ALL_IMAGES = Array.from({ length: 15 }, (_, i) => ({
     id: `img-${i + 1}`,
-    src: `./images_screenshot/${i + 1}.png`,
+    src: `https://cdn.edubreezy.com/images_screenshot/${i + 1}.png`,
 }));
 
 function MarqueeRow({ images, direction, speed, rowIndex }) {
