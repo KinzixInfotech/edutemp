@@ -3878,6 +3878,7 @@ exports.NotificationType = exports.$Enums.NotificationType = {
   EXAM: 'EXAM',
   ATTENDANCE: 'ATTENDANCE',
   NOTICE: 'NOTICE',
+  SECURITY_LOGIN_ALERT: 'SECURITY_LOGIN_ALERT',
   LEAVE: 'LEAVE',
   TRANSPORT: 'TRANSPORT',
   LIBRARY: 'LIBRARY',

@@ -19,9 +19,12 @@ export async function GET(req, { params }) {
         const classId = searchParams.get('classId');
         const sectionId = searchParams.get('sectionId');
         const status = searchParams.get('status') || 'ACTIVE';
+        const page = Math.max(parseInt(searchParams.get('page') || '1', 10), 1);
+        const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '25', 10), 1), 100);
+        const skip = (page - 1) * limit;
 
         // Redis cache key
-        const cacheKey = generateKey('director:students', { schoolId, search, classId, sectionId, status });
+        const cacheKey = generateKey('director:students', { schoolId, search, classId, sectionId, status, page, limit });
 
         const data = await remember(cacheKey, async () => {
             const where = {
@@ -40,7 +43,59 @@ export async function GET(req, { params }) {
                 ...(sectionId && { sectionId: parseInt(sectionId) })
             };
 
-            const [students, totalCount, activeCount, classes, sections] = await Promise.all([
+            // const [students, totalCount, activeCount, classes, sections] = await Promise.all([
+            //     prisma.student.findMany({
+            //         where,
+            //         include: {
+            //             user: {
+            //                 select: {
+            //                     id: true,
+            //                     name: true,
+            //                     email: true,
+            //                     profilePicture: true,
+            //                     status: true
+            //                 }
+            //             },
+            //             class: {
+            //                 select: {
+            //                     id: true,
+            //                     className: true
+            //                 }
+            //             },
+            //             section: {
+            //                 select: {
+            //                     id: true,
+            //                     name: true
+            //                 }
+            //             }
+            //         },
+            //         orderBy: [
+            //             { admissionNo: 'asc' },
+            //             { userId: 'asc' },
+            //         ],
+            //         skip,
+            //         take: limit
+            //     }),
+            //     prisma.student.count({ where }),
+            //     prisma.student.count({ where: { schoolId, user: { deletedAt: null } } }),
+            //     prisma.student.count({ where: { schoolId, user: { deletedAt: null, status: 'ACTIVE' } } }),
+            //     // Get all classes for filter dropdown
+            //     prisma.class.findMany({
+            //         where: { schoolId },
+            //         select: { id: true, className: true },
+            //         orderBy: { className: 'asc' }
+            //     }),
+            //     // Get all sections for filter dropdown (optionally filtered by classId)
+            //     prisma.section.findMany({
+            //         where: {
+            //             class: { schoolId },
+            //             ...(classId && { classId: parseInt(classId) })
+            //         },
+            //         select: { id: true, name: true, classId: true },
+            //         orderBy: { name: 'asc' }
+            //     })
+            // ]);
+            const [students, totalCount, totalNonDeleted, activeCount, classes, sections] = await Promise.all([
                 prisma.student.findMany({
                     where,
                     include: {
@@ -66,18 +121,21 @@ export async function GET(req, { params }) {
                             }
                         }
                     },
-                    orderBy: { admissionNo: 'asc' },
-                    take: 100
+                    orderBy: [
+                        { admissionNo: 'asc' },
+                        { userId: 'asc' },
+                    ],
+                    skip,
+                    take: limit
                 }),
+                prisma.student.count({ where }),
                 prisma.student.count({ where: { schoolId, user: { deletedAt: null } } }),
                 prisma.student.count({ where: { schoolId, user: { deletedAt: null, status: 'ACTIVE' } } }),
-                // Get all classes for filter dropdown
                 prisma.class.findMany({
                     where: { schoolId },
                     select: { id: true, className: true },
                     orderBy: { className: 'asc' }
                 }),
-                // Get all sections for filter dropdown (optionally filtered by classId)
                 prisma.section.findMany({
                     where: {
                         class: { schoolId },
@@ -87,12 +145,18 @@ export async function GET(req, { params }) {
                     orderBy: { name: 'asc' }
                 })
             ]);
-
             return {
                 summary: {
                     total: totalCount,
                     active: activeCount,
-                    inactive: totalCount - activeCount
+                    inactive: totalNonDeleted - activeCount
+                },
+                pagination: {
+                    page,
+                    limit,
+                    total: totalCount,
+                    hasMore: skip + students.length < totalCount,
+                    nextPage: skip + students.length < totalCount ? page + 1 : null,
                 },
                 classes: classes.map(c => ({ id: c.id, name: c.className })),
                 sections: sections.map(s => ({ id: s.id, name: s.name, classId: s.classId })),

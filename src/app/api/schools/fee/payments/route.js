@@ -205,7 +205,7 @@ export async function POST(req) {
                 where: { id: studentFeeId },
                 data: {
                     paidAmount: newPaidAmount,
-                    balanceAmount: newBalanceAmount, 
+                    balanceAmount: newBalanceAmount,
                     status: newStatus,
                     lastPaymentDate: new Date(),
                 },
@@ -228,6 +228,172 @@ export async function POST(req) {
         return NextResponse.json(
             { error: error.message || "Failed to process payment" },
             { status: 400 }
+        );
+    }
+}
+
+export async function GET(req) {
+    try {
+        const { searchParams } = new URL(req.url);
+        const schoolId = searchParams.get("schoolId");
+        const academicYearId = searchParams.get("academicYearId");
+        const studentId = searchParams.get("studentId");
+        const search = searchParams.get("search") || "";
+        const className = searchParams.get("className");
+        const sectionName = searchParams.get("sectionName");
+        const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
+        const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10), 1), 50);
+        const skip = (page - 1) * limit;
+
+        if (!schoolId) {
+            return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
+        }
+
+        // Build where clause carefully — Student fields use direct columns, not user relation
+        const where = {
+            schoolId,
+            status: "SUCCESS",
+            ...(academicYearId && { academicYearId }),
+            ...(studentId && { studentId }),
+        };
+
+        // Search filters go on the student relation
+        if (search || className || sectionName) {
+            where.student = {
+                ...(search && {
+                    OR: [
+                        { name: { contains: search, mode: "insensitive" } },
+                        { admissionNo: { contains: search, mode: "insensitive" } },
+                    ],
+                }),
+                ...(className && { class: { className } }),
+                ...(sectionName && { section: { name: sectionName } }),
+            };
+        }
+
+        // Single query with all includes — no N+1
+        const [payments, totalCount] = await Promise.all([
+            prisma.feePayment.findMany({
+                where,
+                include: {
+                    student: {
+                        select: {
+                            name: true,
+                            admissionNo: true,
+                            admissionDate: true,
+                            FatherName: true,
+                            MotherName: true,
+                            GuardianName: true,
+                            GuardianRelation: true,
+                            user: {
+                                select: {
+                                    profilePicture: true,
+                                },
+                            },
+                            class: {
+                                select: {
+                                    className: true,
+                                },
+                            },
+                            section: {
+                                select: {
+                                    name: true,
+                                },
+                            },
+                        },
+                    },
+                    studentFee: {
+                        select: {
+                            finalAmount: true,
+                            paidAmount: true,
+                            balanceAmount: true,
+                        },
+                    },
+                    // FeePayment → installmentPayments (FeePaymentInstallment[])
+                    // Each FeePaymentInstallment has installment → StudentFeeInstallment
+                    installmentPayments: {
+                        select: {
+                            amount: true,
+                            installment: {
+                                select: {
+                                    id: true,
+                                    installmentNumber: true,
+                                    dueDate: true,
+                                    amount: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    paymentDate: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+            prisma.feePayment.count({ where }),
+        ]);
+
+        return NextResponse.json({
+            items: payments.map((payment) => ({
+                id: payment.id,
+                amount: Number(payment.amount || 0),
+                paymentDate: payment.paymentDate,
+                paymentMethod: payment.paymentMethod,
+                paymentMode: payment.paymentMode,
+                receiptNumber: payment.receiptNumber,
+                receiptUrl: payment.receiptUrl || null,
+                referenceNumber: payment.referenceNumber || null,
+                remarks: payment.remarks || null,
+                status: payment.status,
+                studentId: payment.studentId,
+                // Student fields — from Student model directly (not User)
+                studentName: payment.student?.name || "Unknown Student",
+                admissionNo: payment.student?.admissionNo || "",
+                className: payment.student?.class?.className || "",
+                sectionName: payment.student?.section?.name || "",
+                profilePicture: payment.student?.user?.profilePicture || null,
+                // Student model has admissionDate as String, not DateTime
+                admissionDate: payment.student?.admissionDate || null,
+                fatherName: payment.student?.FatherName || "",
+                motherName: payment.student?.MotherName || "",
+                guardianName: payment.student?.GuardianName || "",
+                guardianRelation: payment.student?.GuardianRelation || "",
+                studentFee: payment.studentFee
+                    ? {
+                        finalAmount: Number(payment.studentFee.finalAmount || 0),
+                        paidAmount: Number(payment.studentFee.paidAmount || 0),
+                        balanceAmount: Number(payment.studentFee.balanceAmount || 0),
+                    }
+                    : null,
+                // installmentPayments is the correct relation name on FeePayment
+                installmentSummary: (payment.installmentPayments || []).map((pi) => ({
+                    id: pi.installment?.id || null,
+                    installmentNumber: pi.installment?.installmentNumber || null,
+                    monthLabel: pi.installment?.dueDate
+                        ? new Date(pi.installment.dueDate).toLocaleDateString("en-IN", {
+                            month: "long",
+                            year: "numeric",
+                        })
+                        : null,
+                    dueDate: pi.installment?.dueDate || null,
+                    installmentAmount: Number(pi.installment?.amount || 0),
+                    allocatedAmount: Number(pi.amount || 0),
+                })),
+            })),
+            pagination: {
+                page,
+                limit,
+                total: totalCount,
+                hasMore: skip + payments.length < totalCount,
+                nextPage: skip + payments.length < totalCount ? page + 1 : null,
+            },
+        });
+    } catch (error) {
+        console.error("Fetch Payments Error:", error);
+        return NextResponse.json(
+            { error: error.message || "Failed to fetch payments" },
+            { status: 500 }
         );
     }
 }

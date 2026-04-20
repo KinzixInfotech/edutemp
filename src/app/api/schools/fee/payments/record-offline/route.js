@@ -184,6 +184,7 @@ export async function POST(req) {
             select: {
                 receiptPaperSize: true,
                 showSchoolLogo: true,
+                showBalanceDue: true,
                 showPaymentMode: true,
                 showSignatureLine: true,
                 receiptFooterText: true,
@@ -198,6 +199,7 @@ export async function POST(req) {
             },
             receiptNumber: payment.receiptNumber,
             studentName: studentFee.student.name,
+            fatherName: studentFee.student.FatherName || studentFee.student.GuardianName || '',
             admissionNo: studentFee.student.admissionNo,
             className: studentFee.student.class.className,
             paymentDate: payment.paymentDate,
@@ -206,8 +208,18 @@ export async function POST(req) {
             academicYear: studentFee.academicYear.name,
             installments: allocations.map(a => ({
                 number: a.installmentNumber,
+                label: studentFee.installments.find((inst) => inst.installmentNumber === a.installmentNumber)?.dueDate
+                    ? new Date(studentFee.installments.find((inst) => inst.installmentNumber === a.installmentNumber).dueDate)
+                        .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+                    : `Installment ${a.installmentNumber}`,
                 amount: a.amount,
             })),
+            remarks: allocations.map(a => {
+                const installment = studentFee.installments.find((inst) => inst.installmentNumber === a.installmentNumber);
+                return installment?.dueDate
+                    ? new Date(installment.dueDate).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+                    : `Installment ${a.installmentNumber}`;
+            }).join(', '),
             receiptSettings: feeSettings,
         });
         // Upload PDF to R2

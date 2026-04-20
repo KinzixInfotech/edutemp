@@ -34,12 +34,16 @@ export async function GET(request) {
             recentPayments,
             noticesData,
             eventsData,
+            collectionTrend,
+            classProgress,
         ] = await Promise.all([
             fetchFeeSummary(schoolId, academicYear?.id),
             fetchTodaysCollections(schoolId),
             fetchRecentPayments(schoolId, 10),
             fetchNotices(schoolId, userId, 5),
             fetchUpcomingEvents(schoolId, 5),
+            fetchCollectionTrend(schoolId),
+            fetchClassProgress(schoolId, academicYear?.id),
         ]);
 
         return NextResponse.json({
@@ -49,6 +53,8 @@ export async function GET(request) {
                 fees: feeSummary,
                 todaysCollections,
                 recentPayments,
+                collectionTrend,
+                classProgress,
                 notices: noticesData,
                 events: eventsData,
             }
@@ -72,7 +78,8 @@ async function fetchFeeSummary(schoolId, academicYearId) {
             _sum: {
                 originalAmount: true,
                 paidAmount: true,
-                balanceAmount: true
+                balanceAmount: true,
+                discountAmount: true,
             }
         });
 
@@ -85,11 +92,129 @@ async function fetchFeeSummary(schoolId, academicYearId) {
             totalFees,
             collected,
             pending,
-            collectionRate
+            collectionRate,
+            expectedCollection: totalFees,
+            discountGiven: fees._sum.discountAmount || 0,
         };
     } catch (error) {
         console.error('fetchFeeSummary error:', error);
         return null;
+    }
+}
+
+async function fetchCollectionTrend(schoolId) {
+    try {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+        sixMonthsAgo.setDate(1);
+        sixMonthsAgo.setHours(0, 0, 0, 0);
+
+        const payments = await prisma.feePayment.findMany({
+            where: {
+                schoolId,
+                status: 'SUCCESS',
+                paymentDate: { gte: sixMonthsAgo },
+            },
+            select: {
+                amount: true,
+                paymentDate: true,
+            },
+            orderBy: { paymentDate: 'asc' },
+        });
+
+        const buckets = new Map();
+        for (let i = 0; i < 6; i += 1) {
+            const date = new Date(sixMonthsAgo);
+            date.setMonth(sixMonthsAgo.getMonth() + i);
+            const key = `${date.getFullYear()}-${date.getMonth()}`;
+            buckets.set(key, {
+                label: date.toLocaleDateString('en-IN', { month: 'short' }),
+                amount: 0,
+            });
+        }
+
+        payments.forEach((payment) => {
+            const date = new Date(payment.paymentDate);
+            const key = `${date.getFullYear()}-${date.getMonth()}`;
+            const bucket = buckets.get(key);
+            if (bucket) {
+                bucket.amount += payment.amount || 0;
+            }
+        });
+
+        return Array.from(buckets.values()).map((item) => ({
+            ...item,
+            amount: Number(item.amount.toFixed(2)),
+        }));
+    } catch (error) {
+        console.error('fetchCollectionTrend error:', error);
+        return [];
+    }
+}
+
+async function fetchClassProgress(schoolId, academicYearId) {
+    try {
+        if (!academicYearId) return [];
+
+        const fees = await prisma.studentFee.findMany({
+            where: {
+                academicYearId,
+                student: { schoolId },
+            },
+            select: {
+                originalAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                student: {
+                    select: {
+                        class: {
+                            select: {
+                                className: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const classMap = new Map();
+
+        fees.forEach((fee) => {
+            const className = fee.student?.class?.className || 'Unassigned';
+            if (!classMap.has(className)) {
+                classMap.set(className, {
+                    className,
+                    total: 0,
+                    collected: 0,
+                    pending: 0,
+                    students: 0,
+                });
+            }
+
+            const item = classMap.get(className);
+            item.total += fee.originalAmount || 0;
+            item.collected += fee.paidAmount || 0;
+            item.pending += fee.balanceAmount || 0;
+            item.students += 1;
+        });
+
+        return Array.from(classMap.values())
+            .sort((a, b) => {
+                const numA = parseInt(a.className, 10);
+                const numB = parseInt(b.className, 10);
+                if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+                return a.className.localeCompare(b.className);
+            })
+            .map((item) => ({
+                ...item,
+                total: Number(item.total.toFixed(2)),
+                collected: Number(item.collected.toFixed(2)),
+                pending: Number(item.pending.toFixed(2)),
+                progress: item.total > 0 ? Math.round((item.collected / item.total) * 100) : 0,
+            }));
+    } catch (error) {
+        console.error('fetchClassProgress error:', error);
+        return [];
     }
 }
 
@@ -136,14 +261,22 @@ async function fetchRecentPayments(schoolId, limit) {
                 paymentMethod: true,
                 paymentDate: true,
                 receiptNumber: true,
+                receiptUrl: true,
                 studentFee: {
                     select: {
                         student: {
                             select: {
+                                userId: true,
                                 name: true,
                                 admissionNo: true,
+                                admissionDate: true,
+                                FatherName: true,
+                                MotherName: true,
+                                GuardianName: true,
+                                GuardianRelation: true,
                                 class: { select: { className: true } },
                                 section: { select: { name: true } },
+                                user: { select: { profilePicture: true } },
                             }
                         }
                     }
@@ -157,10 +290,18 @@ async function fetchRecentPayments(schoolId, limit) {
             method: p.paymentMethod,
             date: p.paymentDate,
             receiptNumber: p.receiptNumber,
+            receiptUrl: p.receiptUrl,
+            studentId: p.studentFee?.student?.userId || null,
             studentName: p.studentFee?.student?.name || 'Unknown',
             admissionNo: p.studentFee?.student?.admissionNo || '',
+            admissionDate: p.studentFee?.student?.admissionDate || null,
             className: p.studentFee?.student?.class?.className || '',
             sectionName: p.studentFee?.student?.section?.name || '',
+            profilePicture: p.studentFee?.student?.user?.profilePicture || null,
+            fatherName: p.studentFee?.student?.FatherName || null,
+            motherName: p.studentFee?.student?.MotherName || null,
+            guardianName: p.studentFee?.student?.GuardianName || null,
+            guardianRelation: p.studentFee?.student?.GuardianRelation || null,
         }));
     } catch (error) {
         console.error('fetchRecentPayments error:', error);

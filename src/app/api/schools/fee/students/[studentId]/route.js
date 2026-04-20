@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { calculateLateFees } from "@/lib/fee/late-fee-engine";
-import { generateStudentLedger, regenerateStudentLedger } from "@/lib/fee/ledger-engine";
+import { generateStudentLedger } from "@/lib/fee/ledger-engine";
 
 // Map GlobalFeeParticular enums → FeeComponent enums (same as ledger route)
 const TYPE_MAP = { MONTHLY: 'MONTHLY', ONE_TIME: 'ONE_TIME', ANNUAL: 'ANNUAL', TERM: 'TERM' };
@@ -25,6 +25,194 @@ async function syncFeeComponents(feeStructureId, session) {
         skipDuplicates: true,
     });
     return particulars.length;
+}
+
+function formatCurrencyNumber(value) {
+    return Number(Number(value || 0).toFixed(2));
+}
+
+function formatMonthKey(dateInput) {
+    const date = new Date(dateInput);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(dateInput) {
+    const date = new Date(dateInput);
+    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+function getLedgerStatusMeta(entry) {
+    const isPaid = entry.status === 'LEDGER_PAID';
+    const isWaived = entry.status === 'LEDGER_WAIVED';
+    const isPartial = entry.status === 'LEDGER_PARTIAL';
+    const isOverdue = !isPaid && !isWaived && new Date(entry.dueDate) < new Date();
+
+    if (isWaived) {
+        return { badge: 'Waived', tone: 'waived' };
+    }
+    if (isPaid) {
+        return { badge: 'Paid', tone: 'paid' };
+    }
+    if (isOverdue) {
+        return { badge: 'Overdue', tone: 'overdue' };
+    }
+    if (isPartial) {
+        return { badge: 'Partially Paid', tone: 'partial' };
+    }
+    return { badge: 'Unpaid', tone: 'pending' };
+}
+
+function getCategoryHeading(type) {
+    switch (type) {
+        case 'ONE_TIME':
+            return 'One-time Fees';
+        case 'ANNUAL':
+            return 'Annual Fees';
+        case 'TERM':
+            return 'Term Fees';
+        default:
+            return 'Monthly Fees';
+    }
+}
+
+function buildLedgerMonths(ledgerEntries) {
+    const monthMap = new Map();
+
+    for (const entry of ledgerEntries) {
+        const monthKey = formatMonthKey(entry.month);
+        if (!monthMap.has(monthKey)) {
+            monthMap.set(monthKey, {
+                monthKey,
+                monthLabel: entry.monthLabel || formatMonthLabel(entry.month),
+                monthDate: entry.month,
+                totalOriginal: 0,
+                totalDiscount: 0,
+                totalLateFee: 0,
+                totalNet: 0,
+                totalPaid: 0,
+                totalBalance: 0,
+                overdueAmount: 0,
+                groups: new Map(),
+            });
+        }
+
+        const month = monthMap.get(monthKey);
+        month.totalOriginal += entry.originalAmount || 0;
+        month.totalDiscount += entry.discountAmount || 0;
+        month.totalLateFee += entry.lateFeeAmount || 0;
+        month.totalNet += entry.netAmount || 0;
+        month.totalPaid += entry.paidAmount || 0;
+        month.totalBalance += entry.balanceAmount || 0;
+
+        const statusMeta = getLedgerStatusMeta(entry);
+        if (statusMeta.tone === 'overdue') {
+            month.overdueAmount += entry.balanceAmount || 0;
+        }
+
+        const groupKey = entry.feeComponent?.type || 'MONTHLY';
+        if (!month.groups.has(groupKey)) {
+            month.groups.set(groupKey, {
+                key: groupKey,
+                title: getCategoryHeading(groupKey),
+                items: [],
+            });
+        }
+
+        month.groups.get(groupKey).items.push({
+            id: entry.id,
+            title: entry.feeComponent?.name || 'Fee Item',
+            dueDate: entry.dueDate,
+            dueDateLabel: new Date(entry.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            originalAmount: formatCurrencyNumber(entry.originalAmount),
+            discountAmount: formatCurrencyNumber(entry.discountAmount),
+            lateFeeAmount: formatCurrencyNumber(entry.lateFeeAmount),
+            netAmount: formatCurrencyNumber(entry.netAmount),
+            paidAmount: formatCurrencyNumber(entry.paidAmount),
+            balanceAmount: formatCurrencyNumber(entry.balanceAmount),
+            status: entry.status,
+            statusMeta,
+            canAdjust: !entry.isFrozen && entry.status !== 'LEDGER_PAID',
+            isOptional: !!entry.feeComponent?.isOptional,
+        });
+    }
+
+    return Array.from(monthMap.values())
+        .sort((a, b) => new Date(a.monthDate) - new Date(b.monthDate))
+        .map((month) => {
+            const paidInMonth = month.totalPaid;
+            const progress = month.totalNet > 0 ? Math.min(100, Math.round((paidInMonth / month.totalNet) * 100)) : 0;
+            const monthStatus = month.totalBalance <= 0
+                ? 'No Dues'
+                : month.overdueAmount > 0
+                    ? 'Overdue'
+                    : paidInMonth > 0
+                        ? 'Partially Paid'
+                        : 'Upcoming';
+
+            return {
+                monthKey: month.monthKey,
+                monthLabel: month.monthLabel,
+                monthStatus,
+                totalOriginal: formatCurrencyNumber(month.totalOriginal),
+                totalDiscount: formatCurrencyNumber(month.totalDiscount),
+                totalLateFee: formatCurrencyNumber(month.totalLateFee),
+                totalNet: formatCurrencyNumber(month.totalNet),
+                totalPaid: formatCurrencyNumber(month.totalPaid),
+                totalBalance: formatCurrencyNumber(month.totalBalance),
+                overdueAmount: formatCurrencyNumber(month.overdueAmount),
+                progress,
+                groups: Array.from(month.groups.values()),
+                isEmpty: Array.from(month.groups.values()).every((group) => group.items.length === 0),
+            };
+        });
+}
+
+function buildStudentProfile(studentFee, studentDetails) {
+    const student = studentDetails || studentFee?.student;
+    if (!student) return null;
+
+    const parentLinks = student.studentParentLinks || [];
+    const fatherLink = parentLinks.find((link) => link.relation === 'FATHER');
+    const motherLink = parentLinks.find((link) => link.relation === 'MOTHER');
+    const guardianLink = parentLinks.find((link) =>
+        ['GUARDIAN', 'GRANDFATHER', 'GRANDMOTHER', 'UNCLE', 'AUNT', 'OTHER'].includes(link.relation)
+    );
+
+    return {
+        id: student.userId,
+        name: student.name,
+        admissionNo: student.admissionNo,
+        rollNumber: student.rollNumber,
+        profilePicture: student.user?.profilePicture || null,
+        admissionDate: student.admissionDate,
+        joinedOnLabel: student.admissionDate
+            ? new Date(student.admissionDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : null,
+        className: student.class?.className || null,
+        sectionName: student.section?.name || null,
+        fatherName: fatherLink?.parent?.name || fatherLink?.parent?.user?.name || student.FatherName || null,
+        motherName: motherLink?.parent?.name || motherLink?.parent?.user?.name || student.MotherName || null,
+        guardianName: guardianLink?.parent?.name || guardianLink?.parent?.user?.name || student.GuardianName || null,
+        guardianRelation: guardianLink?.relation || student.GuardianRelation || null,
+    };
+}
+
+function buildInstallmentSummary(installments) {
+    return (installments || []).map((installment) => {
+        const paidAmount = formatCurrencyNumber(installment.paidAmount);
+        const totalAmount = formatCurrencyNumber(installment.amount);
+        const balanceAmount = formatCurrencyNumber(totalAmount - paidAmount);
+        const monthDate = installment.dueDate || new Date();
+        return {
+            ...installment,
+            monthLabel: formatMonthLabel(monthDate),
+            dueDateLabel: installment.dueDate
+                ? new Date(installment.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                : null,
+            balanceAmount,
+            progress: totalAmount > 0 ? Math.min(100, Math.round((paidAmount / totalAmount) * 100)) : 0,
+        };
+    });
 }
 
 export async function GET(req, props) {
@@ -67,10 +255,28 @@ export async function GET(req, props) {
                 include: {
                     student: {
                         select: {
+                            user: {
+                                select: { profilePicture: true, name: true, email: true },
+                            },
                             userId: true, name: true, admissionNo: true, rollNumber: true, admissionDate: true,
                             class: { select: { className: true } },
                             section: { select: { name: true } },
                             schoolId: true,
+                            studentParentLinks: {
+                                where: { isActive: true },
+                                include: {
+                                    parent: {
+                                        select: {
+                                            name: true,
+                                            user: { select: { name: true } },
+                                        },
+                                    },
+                                },
+                            },
+                            FatherName: true,
+                            MotherName: true,
+                            GuardianName: true,
+                            GuardianRelation: true,
                         },
                     },
                     globalFeeStructure: {
@@ -114,7 +320,7 @@ export async function GET(req, props) {
             });
         }
 
-        // 🟢 V2: Always regenerate ledger on every load to stay fresh
+        // Only generate missing ledger once. Do not regenerate on every read.
         let ledgerEntries = [];
         let walletBalance = 0;
 
@@ -122,22 +328,31 @@ export async function GET(req, props) {
             try {
                 // Sync FeeComponents from GlobalFeeParticular (no-op if already synced)
                 await syncFeeComponents(studentFee.globalFeeStructureId, resolvedSession);
-
-                // Always regenerate: deletes unfrozen entries & recreates from current data
-                // Frozen entries (with payments) are NEVER touched
-                await regenerateStudentLedger({
-                    studentId,
-                    feeSessionId: resolvedSession.id,
-                    feeStructureId: studentFee.globalFeeStructureId,
-                    userId: 'SYSTEM',
-                });
             } catch (regenErr) {
-                console.error('[Ledger Auto-Regen] Non-fatal error:', regenErr.message);
-                // Continue — we'll still fetch whatever entries exist
+                console.error('[Ledger Component Sync] Non-fatal error:', regenErr.message);
             }
 
-            // Calculate late fees
-            await calculateLateFees(studentId, feeSessionId);
+            const existingLedgerCount = await prisma.studentFeeLedger.count({
+                where: { studentId, feeSessionId }
+            });
+
+            if (existingLedgerCount === 0) {
+                try {
+                    await generateStudentLedger({
+                        studentId,
+                        schoolId: resolvedSession.schoolId,
+                        academicYearId: resolvedSession.academicYearId,
+                        feeSessionId: resolvedSession.id,
+                        feeStructureId: studentFee.globalFeeStructureId,
+                        joinDate: studentFee.student?.admissionDate || new Date(),
+                        userId: 'SYSTEM',
+                    });
+                } catch (generateErr) {
+                    console.error('[Ledger Initial Generate] Non-fatal error:', generateErr.message);
+                }
+            }
+
+            await calculateLateFees(studentId, feeSessionId, false);
 
             // Fetch fresh ledger entries
             ledgerEntries = await prisma.studentFeeLedger.findMany({
@@ -188,7 +403,7 @@ export async function GET(req, props) {
             walletBalance = wallet?.balance || 0;
         } else if (feeSessionId) {
             // No fee structure assigned — just fetch existing entries
-            await calculateLateFees(studentId, feeSessionId);
+            await calculateLateFees(studentId, feeSessionId, false);
             ledgerEntries = await prisma.studentFeeLedger.findMany({
                 where: { studentId, feeSessionId },
                 include: {
@@ -206,28 +421,69 @@ export async function GET(req, props) {
             walletBalance = wallet?.balance || 0;
         }
 
+        const studentProfile = buildStudentProfile(studentFee, studentFee?.student || null);
+        const ledgerMonths = buildLedgerMonths(ledgerEntries);
+        const totalExpectedCollection = ledgerEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+        const totalCollected = ledgerEntries.reduce((sum, entry) => sum + (entry.paidAmount || 0), 0);
+        const totalPending = ledgerEntries.reduce((sum, entry) => sum + (entry.balanceAmount || 0), 0);
+        const totalDiscountGiven = ledgerEntries.reduce((sum, entry) => sum + (entry.discountAmount || 0), 0);
+        const totalLateFee = ledgerEntries.reduce((sum, entry) => sum + (entry.lateFeeAmount || 0), 0);
+        const collectionProgress = totalExpectedCollection > 0
+            ? Math.min(100, Math.round((totalCollected / totalExpectedCollection) * 100))
+            : 0;
+
         if (!studentFee) {
             // Fetch student details so the frontend can at least display the header
             const studentDetails = await prisma.student.findUnique({
                 where: { userId: studentId },
                 select: {
-                    userId: true, name: true, admissionNo: true, rollNumber: true, admissionDate: true,
+                    userId: true,
+                    name: true,
+                    admissionNo: true,
+                    rollNumber: true,
+                    admissionDate: true,
+                    schoolId: true,
+                    FatherName: true,
+                    MotherName: true,
+                    GuardianName: true,
+                    GuardianRelation: true,
+                    user: { select: { profilePicture: true, name: true, email: true } },
                     class: { select: { className: true } },
                     section: { select: { name: true } },
-                    schoolId: true,
-                }
+                    studentParentLinks: {
+                        where: { isActive: true },
+                        include: {
+                            parent: {
+                                select: {
+                                    name: true,
+                                    user: { select: { name: true } },
+                                },
+                            },
+                        },
+                    },
+                },
             });
 
             return NextResponse.json({
                 isUnassigned: !feeSessionId || ledgerEntries.length === 0, // V1 flag compatibility
                 student: studentDetails,
+                studentProfile: buildStudentProfile(null, studentDetails),
                 session: sessionData,  // 🟢 Inject Session Data
                 originalAmount: 0,
                 paidAmount: 0,
                 balanceAmount: 0,
                 installments: [],
                 ledger: ledgerEntries, // 🟢 Inject Ledger Data
+                ledgerMonths,
                 walletBalance,         // 🟢 Inject Wallet Data
+                summary: {
+                    totalFeesCollected: 0,
+                    feesPendingAcrossYear: formatCurrencyNumber(totalPending),
+                    expectedCollection: formatCurrencyNumber(totalExpectedCollection),
+                    discountGiven: formatCurrencyNumber(totalDiscountGiven),
+                    lateFeeAccrued: formatCurrencyNumber(totalLateFee),
+                    collectionProgress,
+                },
                 overdueCount: 0,
                 nextDueInstallment: null,
                 paymentOptions: {
@@ -248,7 +504,7 @@ export async function GET(req, props) {
         }
 
         // Calculate installment breakdowns (V1 Legacy logic)
-        const enrichedInstallments = studentFee.installments.map(installment => {
+        const enrichedInstallments = buildInstallmentSummary(studentFee.installments.map(installment => {
             const rule = studentFee.globalFeeStructure?.installmentRules?.find(
                 r => r.installmentNumber === installment.installmentNumber
             );
@@ -265,7 +521,7 @@ export async function GET(req, props) {
                 })),
                 canPayNow: installment.status !== 'PAID' && installment.amount > installment.paidAmount,
             };
-        });
+        }));
 
         // Update overdue status
         const now = new Date();
@@ -282,10 +538,20 @@ export async function GET(req, props) {
 
         return NextResponse.json({
             ...studentFee,
+            studentProfile,
             session: sessionData,       // 🟢 Inject Session Data
             installments: enrichedInstallments,
             ledger: ledgerEntries,      // 🟢 Inject Ledger Data
+            ledgerMonths,
             walletBalance,              // 🟢 Inject Wallet Data
+            summary: {
+                totalFeesCollected: formatCurrencyNumber(totalCollected),
+                feesPendingAcrossYear: formatCurrencyNumber(totalPending),
+                expectedCollection: formatCurrencyNumber(totalExpectedCollection),
+                discountGiven: formatCurrencyNumber(totalDiscountGiven),
+                lateFeeAccrued: formatCurrencyNumber(totalLateFee),
+                collectionProgress,
+            },
             overdueCount: overdueInstallments.length,
             nextDueInstallment: enrichedInstallments.find(inst => inst.status === "PENDING" && !inst.isOverdue),
             // Payment options for mobile app
