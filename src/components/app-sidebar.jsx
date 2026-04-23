@@ -637,6 +637,7 @@ export const SidebarData = [
         items: [
             { label: "Edubreezy Atlas", url: "/dashboard/edubreezyatlas", icon: Globe, roles: ['SUPER_ADMIN'] },
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+            { label: "Contact Submissions", url: "/dashboard/super-admin/contact-submissions", icon: Inbox, roles: ['SUPER_ADMIN'] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
             { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },

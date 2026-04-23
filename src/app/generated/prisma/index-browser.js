@@ -24,12 +24,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 7.4.2
- * Query Engine version: 94a226be1cf2967af2541cca5529f0f7ba866919
+ * Prisma Client JS version: 7.7.0
+ * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
  */
 Prisma.prismaVersion = {
-  client: "7.4.2",
-  engine: "94a226be1cf2967af2541cca5529f0f7ba866919"
+  client: "7.7.0",
+  engine: "75cbdc1eb7150937890ad5465d861175c6624711"
 }
 
 Prisma.PrismaClientKnownRequestError = () => {
@@ -202,6 +202,33 @@ exports.Prisma.ImportHistoryScalarFieldEnum = {
   errors: 'errors',
   accountsCreated: 'accountsCreated',
   accountsFailed: 'accountsFailed'
+};
+
+exports.Prisma.ContactSubmissionScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  schoolName: 'schoolName',
+  role: 'role',
+  studentCount: 'studentCount',
+  message: 'message',
+  demoPreferred: 'demoPreferred',
+  source: 'source',
+  status: 'status',
+  emailStatus: 'emailStatus',
+  emailSentAt: 'emailSentAt',
+  adminNotifiedAt: 'adminNotifiedAt',
+  emailProviderId: 'emailProviderId',
+  adminEmailProviderId: 'adminEmailProviderId',
+  emailError: 'emailError',
+  adminNotes: 'adminNotes',
+  ipAddress: 'ipAddress',
+  userAgent: 'userAgent',
+  dedupeKey: 'dedupeKey',
+  submittedAt: 'submittedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SchoolPublicProfileScalarFieldEnum = {
@@ -3631,6 +3658,21 @@ exports.SubscriptionAction = exports.$Enums.SubscriptionAction = {
   HANDOVER_COMPLETED: 'HANDOVER_COMPLETED'
 };
 
+exports.ContactSubmissionStatus = exports.$Enums.ContactSubmissionStatus = {
+  NEW: 'NEW',
+  IN_PROGRESS: 'IN_PROGRESS',
+  CONTACTED: 'CONTACTED',
+  RESOLVED: 'RESOLVED',
+  SPAM: 'SPAM'
+};
+
+exports.ContactEmailStatus = exports.$Enums.ContactEmailStatus = {
+  PENDING: 'PENDING',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED'
+};
+
 exports.PartnerRole = exports.$Enums.PartnerRole = {
   AFFILIATE: 'AFFILIATE',
   RESELLER: 'RESELLER',
@@ -4343,6 +4385,7 @@ exports.Prisma.ModelName = {
   SchoolSubscription: 'SchoolSubscription',
   SubscriptionAuditLog: 'SubscriptionAuditLog',
   ImportHistory: 'ImportHistory',
+  ContactSubmission: 'ContactSubmission',
   SchoolPublicProfile: 'SchoolPublicProfile',
   SchoolAchievement: 'SchoolAchievement',
   SchoolFacility: 'SchoolFacility',

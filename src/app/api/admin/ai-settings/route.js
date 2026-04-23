@@ -1,10 +1,10 @@
 /**
- * AI Settings API
- * CRUD for per-school AI settings
- * 
- * GET /api/admin/ai-settings?schoolId=xxx - Get settings
- * PUT /api/admin/ai-settings - Update settings
- */
+* AI Settings API
+* CRUD for per-school AI settings
+* 
+* GET /api/admin/ai-settings?schoolId=xxx - Get settings
+* PUT /api/admin/ai-settings - Update settings
+*/
 
 import { NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/api-auth';

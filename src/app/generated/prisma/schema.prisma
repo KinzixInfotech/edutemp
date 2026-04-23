@@ -288,6 +288,55 @@ model ImportHistory {
   @@index([createdAt])
 }
 
+model ContactSubmission {
+  id                   String                  @id @default(cuid())
+  name                 String
+  email                String
+  phone                String
+  schoolName           String
+  role                 String?
+  studentCount         String?
+  message              String?                 @db.Text
+  demoPreferred        String?
+  source               String                  @default("CONTACT_PAGE")
+  status               ContactSubmissionStatus @default(NEW)
+  emailStatus          ContactEmailStatus      @default(PENDING)
+  emailSentAt          DateTime?
+  adminNotifiedAt      DateTime?
+  emailProviderId      String?
+  adminEmailProviderId String?
+  emailError           String?                 @db.Text
+  adminNotes           String?                 @db.Text
+  ipAddress            String?
+  userAgent            String?
+  dedupeKey            String
+  submittedAt          DateTime                @default(now())
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([emailStatus])
+  @@index([submittedAt])
+  @@index([dedupeKey, submittedAt])
+}
+
+enum ContactSubmissionStatus {
+  NEW
+  IN_PROGRESS
+  CONTACTED
+  RESOLVED
+  SPAM
+}
+
+enum ContactEmailStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 // ============================================
 // SCHOOL EXPLORER - PUBLIC DISCOVERY PLATFORM
 // ============================================

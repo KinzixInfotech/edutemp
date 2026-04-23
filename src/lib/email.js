@@ -49,7 +49,7 @@ export async function sendEmail(options) {
         html,
         text,
         attachments = [],
-        from = process.env.EMAIL_FROM || 'noreply@yourdomain.com',
+        from = process.env.EMAIL_FROM || 'noreply@',
         cc = [],
         bcc = [],
     } = options;
