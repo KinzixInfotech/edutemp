@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, memo } from 'react';
 import { AnimatePresence, motion, useScroll, useTransform, useSpring } from 'motion/react';
 import Script from 'next/script';
-
+import { Backlight } from "@/components/ui/backlight"
 import {
     CheckCircle, Star, Users, BookOpen, BarChart3,
     Clock, GraduationCap, CreditCard, ArrowRight,
@@ -76,7 +76,6 @@ export default function HomePage() {
 
             <HeroSection />
             <MarqueeBanner />
-
             {/* <AboutBriefSection />s */}
             <WebDashboardCTA />
 
@@ -327,12 +326,14 @@ const HeroSection = memo(function HeroSection() {
                                 </div>
                             ) : (
                                 <div className="relative aspect-video">
-                                    <iframe
-                                        src={`${videoSrc}&autoplay=1`}
-                                        className="w-full h-full"
-                                        allowFullScreen
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    />
+                                    <Backlight blur={40}>
+                                        <iframe
+                                            src={`${videoSrc}&autoplay=1`}
+                                            className="w-full h-full"
+                                            allowFullScreen
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        />
+                                    </Backlight>
                                     <button
                                         onClick={() => setIsVideoOpen(false)}
                                         className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 sm:p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
@@ -755,12 +756,13 @@ function BusTrackingSection() {
                     {/* Phone Image - Left Side */}
                     <div className="flex-1 flex justify-center lg:justify-center relative">
                         <div className="absolute inset-0 lg:block hidden border-2 border-[#0469ff]/10 rounded-full  animate-pulse" />
-
-                        <img
-                            src="./mockups/bus.png"
-                            alt="EduBreezy Bus Tracking"
-                            className="w-[300px] md:w-[350px] lg:w-[400px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
-                        />
+                        <Backlight>
+                            <img
+                                src="./mockups/bus.png"
+                                alt="EduBreezy Bus Tracking"
+                                className="w-[300px] md:w-[350px] lg:w-[400px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                            />
+                        </Backlight>
                     </div>
 
                     {/* Content - Right Side */}

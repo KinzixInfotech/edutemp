@@ -7,10 +7,12 @@ import { Toaster } from "@/components/ui/sonner"
 import LoaderPage from "@/components/loader-page";
 import Provider from "./Provider";
 import NavigationProgress from "./components/NavigationProgress";
+import Script from "next/script";
 import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next"
 import FloatingDemoButton from "@/components/FloatingDemoButton";
+import BookDemoPopup from "@/components/BookDemoPopup";
 import AOSProvider from "@/components/AosProvider";
 
 export const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
@@ -159,11 +161,32 @@ export default function RootLayout({ children }) {
           <Analytics />
           <AOSProvider />
           <ClientProduct>{children}</ClientProduct>
+
+          <Script
+            id="1jmv56ekm"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+      var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+      (function(){
+        var s1=document.createElement("script"),
+        s0=document.getElementsByTagName("script")[0];
+        s1.async=true;
+        s1.src='https://embed.tawk.to/69eb1759f851631c32b88cec/1jmv56ekm';
+        s1.charset='UTF-8';
+        s1.setAttribute('crossorigin','*');
+        s0.parentNode.insertBefore(s1,s0);
+      })();
+    `,
+            }}
+          />
+
           <Suspense fallback={<div />}>
             <NavigationProgress />
             <PageTransitionLoader />
           </Suspense>
           <FloatingDemoButton />
+          <BookDemoPopup />
           <Toaster
             theme="system"
             toastOptions={{
