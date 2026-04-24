@@ -185,7 +185,7 @@ export default function RootLayout({ children }) {
             <NavigationProgress />
             <PageTransitionLoader />
           </Suspense>
-          <FloatingDemoButton />
+          {/* <FloatingDemoButton /> */}
           <BookDemoPopup />
           <Toaster
             theme="system"
