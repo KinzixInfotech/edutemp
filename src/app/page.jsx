@@ -75,6 +75,7 @@ export default function HomePage() {
             />
 
             <HeroSection />
+            <MacbookMockupSection />
             <MarqueeBanner />
             {/* <AboutBriefSection />s */}
             <WebDashboardCTA />
@@ -1896,6 +1897,127 @@ function TestimonialsSection() {
 
     );
 
+}
+
+// Macbook Mockup Section
+function MacbookMockupSection() {
+    return (
+        <section className="py-20 md:py-32 bg-[#f8fafc] relative overflow-hidden">
+            {/* Background Decorations */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#0469ff]/5 rounded-full blur-[100px] pointer-events-none" />
+
+            <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+                <div className="text-center mb-16 md:mb-24">
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-4 md:mb-6">
+                        <Laptop className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0469ff]" />
+                        <span className="text-xs md:text-sm font-semibold text-[#0469ff]">Web Dashboard</span>
+                    </span>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] tracking-tight mb-6">
+                        Complete Control from <span className="text-[#0469ff]">Anywhere</span>
+                    </h2>
+                    <p className="text-lg md:text-xl text-gray-600 font-medium max-w-2xl mx-auto">
+                        A powerful, beautifully designed admin dashboard that puts every aspect of your school at your fingertips.
+                    </p>
+                </div>
+
+                {/* Center Mockup with surrounding text */}
+                <div className="relative w-full max-w-[1400px] mx-auto flex flex-col items-center justify-center">
+
+                    {/* Top Row Text (Above) */}
+                    <div className="hidden lg:flex w-full justify-center gap-48 mb-[-80px] relative z-0">
+                        <motion.div
+                            animate={{ y: [0, -15, 0] }}
+                            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                            className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                        >
+                            <PieChart className="w-5 h-5 text-[#0469ff]" />
+                            <span className="font-bold text-gray-800">Advanced Analytics</span>
+                        </motion.div>
+                        <motion.div
+                            animate={{ y: [0, -10, 0] }}
+                            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                            className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                        >
+                            <Users className="w-5 h-5 text-[#10B981]" />
+                            <span className="font-bold text-gray-800">Staff Management</span>
+                        </motion.div>
+                    </div>
+
+                    {/* Middle Section: Left - Image - Right */}
+                    <div className="w-full flex flex-col lg:flex-row items-center justify-center relative">
+
+                        {/* Left Text (Left) */}
+                        <div className="hidden lg:flex flex-col gap-52 xl:gap-60 absolute -left-4 xl:left-4 2xl:left-10 z-10">
+                            <motion.div
+                                animate={{ y: [0, -12, 0] }}
+                                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                                className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                            >
+                                <CreditCard className="w-5 h-5 text-[#F59E0B]" />
+                                <span className="font-bold text-gray-800">Fee Collection</span>
+                            </motion.div>
+                            <motion.div
+                                animate={{ y: [0, -14, 0] }}
+                                transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                                className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                            >
+                                <ClipboardCheck className="w-5 h-5 text-[#8B5CF6]" />
+                                <span className="font-bold text-gray-800">Smart Attendance</span>
+                            </motion.div>
+                        </div>
+
+                        {/* Central Image */}
+                        <div className="w-full max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-[1200px] relative z-0 px-4 mt-8 lg:mt-0">
+                            <img
+                                src="/mockups/macbook_pro_web.png"
+                                alt="EduBreezy Web Dashboard on Macbook Pro"
+                                className="w-full h-auto drop-shadow-2xl hover:scale-[1.01] transition-transform duration-700"
+                            />
+                        </div>
+
+                        {/* Right Text (Right) */}
+                        <div className="hidden lg:flex flex-col gap-52 xl:gap-60 absolute -right-4 xl:right-4 2xl:right-10 z-10">
+                            <motion.div
+                                animate={{ y: [0, -15, 0] }}
+                                transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+                                className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                            >
+                                <Calendar className="w-5 h-5 text-[#EC4899]" />
+                                <span className="font-bold text-gray-800">Timetable Setup</span>
+                            </motion.div>
+                            <motion.div
+                                animate={{ y: [0, -10, 0] }}
+                                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+                                className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-center gap-3"
+                            >
+                                <FileText className="w-5 h-5 text-[#0469ff]" />
+                                <span className="font-bold text-gray-800">Examinations</span>
+                            </motion.div>
+                        </div>
+
+                    </div>
+                    {/* Mobile & Tablet fallback: Flex-wrap container */}
+                    <div className="lg:hidden w-full flex flex-wrap justify-center gap-3 sm:gap-4 px-4 mt-8 md:mt-12">
+                        {[
+                            { icon: PieChart, text: "Advanced Analytics", color: "text-[#0469ff]" },
+                            { icon: Users, text: "Staff Management", color: "text-[#10B981]" },
+                            { icon: CreditCard, text: "Fee Collection", color: "text-[#F59E0B]" },
+                            { icon: ClipboardCheck, text: "Smart Attendance", color: "text-[#8B5CF6]" },
+                            { icon: Calendar, text: "Timetable Setup", color: "text-[#EC4899]" },
+                            { icon: FileText, text: "Examinations", color: "text-[#0469ff]" },
+                            { icon: Bus, text: "Transport Tracking", color: "text-[#F97316]" },
+                            { icon: Library, text: "Library Records", color: "text-[#10B981]" },
+                        ].map((feat, idx) => (
+                            <div key={idx} className="bg-white/90 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-3 rounded-full shadow-md border border-gray-100 flex items-center gap-2 sm:gap-3">
+                                <feat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${feat.color}`} />
+                                <span className="font-bold text-gray-800 text-xs sm:text-sm">{feat.text}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
 }
 
 // Footer
