@@ -14,7 +14,7 @@ const STATS = [
   { value: '10K+', label: 'Admin hours saved every month', org: 'EduBreezy Platform' },
   { value: '98%', label: 'reduction in manual admin work reported' },
   { value: '3x', label: 'faster fee collection with digital workflows', org: 'RC Mission Schools' },
-]
+];
 
 export default function ContactPage() {
   const [formData, setFormData] = useState(initialFormData);

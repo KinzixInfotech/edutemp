@@ -1,0 +1,12 @@
+node_modules/
+.next/
+public/
+dist/
+prisma/migrations/
+.codex/
+graphify-out/
+biometric-agent/
+scripts/
+*.lock
+*.log
+*.generated.*

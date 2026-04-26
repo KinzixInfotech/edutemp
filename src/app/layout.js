@@ -14,10 +14,14 @@ import { Analytics } from "@vercel/analytics/next"
 import FloatingDemoButton from "@/components/FloatingDemoButton";
 import BookDemoPopup from "@/components/BookDemoPopup";
 import AOSProvider from "@/components/AosProvider";
-
+import { usePathname } from "next/navigation";
 export const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
 export { metadata } from './metadata';
 export default function RootLayout({ children }) {
+  const pathname = usePathname();
+
+  const hideTawk = pathname.startsWith("/dashboard");
+
   // JSON-LD structured data for Google site name
   const websiteSchema = {
     "@context": "https://schema.org",
@@ -73,7 +77,6 @@ export default function RootLayout({ children }) {
       }
     ]
   };
-
   return (
     <Provider>
 
@@ -91,6 +94,7 @@ export default function RootLayout({ children }) {
               })(window,document,'script','dataLayer','GTM-PN2FHJNH');`
             }}
           />
+
           {/* End Google Tag Manager */}
           {/* Google Analytics (gtag.js) */}
           <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMMQE5ELMX" />
@@ -162,25 +166,27 @@ export default function RootLayout({ children }) {
           <AOSProvider />
           <ClientProduct>{children}</ClientProduct>
 
-          <Script
-            id="1jmv56ekm"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-      var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-      (function(){
-        var s1=document.createElement("script"),
-        s0=document.getElementsByTagName("script")[0];
-        s1.async=true;
-        s1.src='https://embed.tawk.to/69eb1759f851631c32b88cec/1jmv56ekm';
-        s1.charset='UTF-8';
-        s1.setAttribute('crossorigin','*');
-        s0.parentNode.insertBefore(s1,s0);
-      })();
-    `,
-            }}
-          />
 
+          {!hideTawk && (
+            <Script
+              id="1jmv56ekm"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+                (function(){
+                  var s1=document.createElement("script"),
+                  s0=document.getElementsByTagName("script")[0];
+                  s1.async=true;
+                  s1.src='https://embed.tawk.to/69eb1759f851631c32b88cec/1jmv56ekm';
+                  s1.charset='UTF-8';
+                  s1.setAttribute('crossorigin','*');
+                  s0.parentNode.insertBefore(s1,s0);
+                })();
+              `,
+              }}
+            />
+          )}
           <Suspense fallback={<div />}>
             <NavigationProgress />
             <PageTransitionLoader />
