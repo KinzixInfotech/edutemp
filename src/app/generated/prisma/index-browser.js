@@ -1146,6 +1146,7 @@ exports.Prisma.StudentScalarFieldEnum = {
   email: 'email',
   dob: 'dob',
   gender: 'gender',
+  religion: 'religion',
   admissionDate: 'admissionDate',
   sectionId: 'sectionId',
   bloodGroup: 'bloodGroup',
@@ -3782,6 +3783,19 @@ exports.UserStatus = exports.$Enums.UserStatus = {
   LEFT: 'LEFT',
   DISABLED: 'DISABLED',
   BANNED: 'BANNED'
+};
+
+exports.StudentReligion = exports.$Enums.StudentReligion = {
+  HINDU: 'HINDU',
+  MUSLIM: 'MUSLIM',
+  CHRISTIAN: 'CHRISTIAN',
+  SIKH: 'SIKH',
+  BUDDHIST: 'BUDDHIST',
+  JAIN: 'JAIN',
+  PARSI: 'PARSI',
+  JEWISH: 'JEWISH',
+  OTHER: 'OTHER',
+  PREFER_NOT_TO_SAY: 'PREFER_NOT_TO_SAY'
 };
 
 exports.SessionStatus = exports.$Enums.SessionStatus = {

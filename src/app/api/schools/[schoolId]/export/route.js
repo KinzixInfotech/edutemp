@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import prisma from '@/lib/prisma';
 
 // Export configurations for each module
-const EXPORT_CONFIGS = {
+export const EXPORT_CONFIGS = {
     students: {
         name: 'Students',
         fields: [
@@ -11,6 +11,7 @@ const EXPORT_CONFIGS = {
             { key: 'name', label: 'Full Name' },
             { key: 'email', label: 'Email' },
             { key: 'gender', label: 'Gender' },
+            { key: 'religion', label: 'Religion' },
             { key: 'dob', label: 'Date of Birth' },
             { key: 'rollNumber', label: 'Roll Number' },
             { key: 'className', label: 'Class' },

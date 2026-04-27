@@ -81,7 +81,7 @@ const ROLE_CONFIG = {
 
 const EMPTY_FORM = {
     studentName: "", name: "", email: "", password: "", dob: null, gender: "",
-    admissionNo: "", admissionDate: null, rollNumber: "", bloodGroup: "", adhaarNo: "",
+    admissionNo: "", admissionDate: null, rollNumber: "", bloodGroup: "", religion: "", adhaarNo: "",
     empployeeId: "", address: "", city: "", state: "", country: "", postalCode: "",
     classId: "", sectionId: "", userId: "", schoolId: "", parentId: "",
     fatherName: "", fatherMobileNumber: "", motherName: "", motherMobileNumber: "",
@@ -573,6 +573,23 @@ export default function NewProfilePage() {
                                     <Select value={form.bloodGroup} onValueChange={v => updateForm("bloodGroup", v)}>
                                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                                         <SelectContent>{["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field label="Religion">
+                                    <Select value={form.religion} onValueChange={v => updateForm("religion", v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="HINDU">Hindu</SelectItem>
+                                            <SelectItem value="MUSLIM">Muslim</SelectItem>
+                                            <SelectItem value="CHRISTIAN">Christian</SelectItem>
+                                            <SelectItem value="SIKH">Sikh</SelectItem>
+                                            <SelectItem value="BUDDHIST">Buddhist</SelectItem>
+                                            <SelectItem value="JAIN">Jain</SelectItem>
+                                            <SelectItem value="PARSI">Parsi</SelectItem>
+                                            <SelectItem value="JEWISH">Jewish</SelectItem>
+                                            <SelectItem value="OTHER">Other</SelectItem>
+                                            <SelectItem value="PREFER_NOT_TO_SAY">Prefer not to say</SelectItem>
+                                        </SelectContent>
                                     </Select>
                                 </Field>
 

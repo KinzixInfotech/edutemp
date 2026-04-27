@@ -483,6 +483,25 @@ export default function StudentProfilePage() {
                                     } 
                                 />
                                 <EditableField label="Blood Group" value={student.bloodGroup} field="bloodGroup" {...ep} icon={Heart} placeholder="e.g. O+" />
+                                <EditableField label="Religion" value={student.religion ? student.religion.replaceAll('_', ' ') : ''} field="religion" {...ep} icon={BookOpen}
+                                    customInput={
+                                        <Select value={editValues.religion ?? student.religion ?? ""} onValueChange={(v) => handleChange('religion', v)}>
+                                            <SelectTrigger className="h-8 text-sm flex-1"><SelectValue placeholder="Select Religion" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="HINDU">Hindu</SelectItem>
+                                                <SelectItem value="MUSLIM">Muslim</SelectItem>
+                                                <SelectItem value="CHRISTIAN">Christian</SelectItem>
+                                                <SelectItem value="SIKH">Sikh</SelectItem>
+                                                <SelectItem value="BUDDHIST">Buddhist</SelectItem>
+                                                <SelectItem value="JAIN">Jain</SelectItem>
+                                                <SelectItem value="PARSI">Parsi</SelectItem>
+                                                <SelectItem value="JEWISH">Jewish</SelectItem>
+                                                <SelectItem value="OTHER">Other</SelectItem>
+                                                <SelectItem value="PREFER_NOT_TO_SAY">Prefer not to say</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    }
+                                />
                                 <EditableField label="Contact Phone" value={student.contactNumber} field="contactNumber" type="tel" {...ep} icon={Phone} placeholder="Phone number" />
                             </div>
                         </SectionCard>
@@ -681,7 +700,7 @@ export default function StudentProfilePage() {
                                             </div>
                                             {result.remarks && (
                                                 <p className="text-xs text-muted-foreground italic max-w-[120px] line-clamp-2 text-right">
-                                                    "{result.remarks}"
+                                                    &quot;{result.remarks}&quot;
                                                 </p>
                                             )}
                                         </div>
@@ -714,4 +733,3 @@ export default function StudentProfilePage() {
         </div>
     );
 }
-

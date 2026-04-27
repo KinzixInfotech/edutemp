@@ -14,6 +14,7 @@ const MODULE_CONFIGS = {
             { name: 'sectionName', label: 'Section', type: 'text', required: true, example: 'A' },
             { name: 'gender', label: 'Gender', type: 'select', required: true, example: 'Male', options: ['Male', 'Female', 'Other'] },
             { name: 'dob', label: 'Date of Birth', type: 'date', required: true, example: '2010-05-15' },
+            { name: 'religion', label: 'Religion', type: 'select', required: false, example: 'Hindu', options: ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Buddhist', 'Jain', 'Parsi', 'Jewish', 'Other', 'Prefer not to say'] },
             { name: 'rollNumber', label: 'Roll Number', type: 'text', required: false, example: '01' },
             { name: 'contactNumber', label: 'Contact Number', type: 'text', required: false, example: '9876543210' },
             { name: 'address', label: 'Address', type: 'text', required: false, example: '123 Main Street' },

@@ -110,6 +110,8 @@ export default function ImportDataPage() {
     const [selectedExportModules, setSelectedExportModules] = useState([]);
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState("");
+    const [activeImportJobId, setActiveImportJobId] = useState(null);
+    const [activeExportJobId, setActiveExportJobId] = useState(null);
 
     // Export credentials state (auto-export after import)
     const [exportCredentials, setExportCredentials] = useState(true);
@@ -125,6 +127,17 @@ export default function ImportDataPage() {
         refetchOnWindowFocus: false,
     });
 
+    const { data: importJobsData } = useQuery({
+        queryKey: ['importJobs', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/import/jobs`);
+            return res.json();
+        },
+        enabled: !!schoolId && (activeTab === "import" || activeTab === "history"),
+        refetchInterval: 5000,
+        refetchOnWindowFocus: false,
+    });
+
     // Fetch export modules
     const { data: exportModulesData } = useQuery({
         queryKey: ['exportModules', schoolId],
@@ -135,6 +148,63 @@ export default function ImportDataPage() {
         enabled: !!schoolId && activeTab === "export",
         refetchOnWindowFocus: false,
     });
+
+    const { data: exportJobsData } = useQuery({
+        queryKey: ['exportJobs', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/export/jobs`);
+            return res.json();
+        },
+        enabled: !!schoolId && activeTab === "export",
+        refetchInterval: 5000,
+        refetchOnWindowFocus: false,
+    });
+
+    const { data: activeImportJob } = useQuery({
+        queryKey: ['importJob', schoolId, activeImportJobId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/import/jobs/${activeImportJobId}`);
+            return res.json();
+        },
+        enabled: !!schoolId && !!activeImportJobId,
+        refetchInterval: 3000,
+        refetchOnWindowFocus: false,
+    });
+
+    const { data: activeExportJob } = useQuery({
+        queryKey: ['exportJob', schoolId, activeExportJobId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/export/jobs/${activeExportJobId}`);
+            return res.json();
+        },
+        enabled: !!schoolId && !!activeExportJobId,
+        refetchInterval: 3000,
+        refetchOnWindowFocus: false,
+    });
+
+    const currentUploadProgress = activeImportJob?.id
+        ? (activeImportJob.totalRows ? Math.round((activeImportJob.processedRows / activeImportJob.totalRows) * 100) : 0)
+        : uploadProgress;
+
+    const currentImportStatus = activeImportJob?.id
+        ? (
+            activeImportJob.status === "completed"
+                ? "Import complete"
+                : activeImportJob.status === "failed"
+                    ? "Import failed"
+                    : `Processing ${activeImportJob.processedRows || 0}/${activeImportJob.totalRows || 0} rows`
+        )
+        : importStatus;
+
+    const currentExportProgress = activeExportJob?.id
+        ? (
+            activeExportJob.status === "completed"
+                ? "Export ready"
+                : activeExportJob.status === "failed"
+                    ? "Export failed"
+                    : `Processing ${activeExportJob.processedModules || 0}/${activeExportJob.totalModules || 0} modules`
+        )
+        : exportProgress;
 
     // Handle retry for failed Supabase accounts
     const handleRetryAccounts = async (failedAccounts) => {
@@ -176,6 +246,21 @@ export default function ImportDataPage() {
             toast.error("Retry failed: " + error.message);
         } finally {
             setIsRetrying(false);
+        }
+    };
+
+    const handleRetryImportJob = async (jobId) => {
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/import/jobs/${jobId}`, {
+                method: "POST",
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Retry failed");
+            setActiveImportJobId(jobId);
+            toast.success("Import retry queued");
+            queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
+        } catch (error) {
+            toast.error(error.message || "Retry failed");
         }
     };
 
@@ -273,14 +358,10 @@ export default function ImportDataPage() {
         if (!uploadedFile || !previewData) return;
 
         setIsUploading(true);
-        setUploadProgress(5);
-        setImportStatus("📂 Starting import...");
+        setUploadProgress(0);
+        setImportStatus("Queueing import job...");
 
         try {
-            setUploadProgress(15);
-            setImportStatus("📦 Preparing data...");
-            await new Promise(r => setTimeout(r, 200));
-
             const formData = new FormData();
             formData.append("file", uploadedFile);
             formData.append("module", selectedModule);
@@ -290,21 +371,10 @@ export default function ImportDataPage() {
             formData.append("sendEmails", sendEmails.toString());
             formData.append("skipDuplicates", skipDuplicates.toString());
 
-            setUploadProgress(25);
-            setImportStatus("⬆️ Uploading to server...");
-
-            const res = await fetch(`/api/schools/${schoolId}/import`, {
+            const res = await fetch(`/api/schools/${schoolId}/import/jobs`, {
                 method: "POST",
                 body: formData,
             });
-
-            setUploadProgress(60);
-            setImportStatus("🔍 Validating template columns...");
-            await new Promise(r => setTimeout(r, 300));
-
-            setUploadProgress(70);
-            setImportStatus("📝 Processing records...");
-            await new Promise(r => setTimeout(r, 200));
 
             const data = await res.json();
 
@@ -312,44 +382,17 @@ export default function ImportDataPage() {
                 throw { message: data.error, details: data.details };
             }
 
-            setUploadProgress(85);
-            setImportStatus("👤 Creating user accounts...");
-            await new Promise(r => setTimeout(r, 300));
-
-            setUploadProgress(95);
-            setImportStatus("✅ Finalizing import...");
-            await new Promise(r => setTimeout(r, 200));
-
-            setUploadProgress(100);
-            setImportStatus("🎉 Import complete!");
-            setImportResults(data);
-            setPreviewData(null);
-            setUploadedFile(null);
-
-            if (data.success > 0) {
-                toast.success(`Successfully imported ${data.success} records`);
-                queryClient.invalidateQueries();
-            }
-
-            if (data.failed > 0) {
-                toast.warning(`${data.failed} records failed to import`);
-            }
-
-            if (data.emailsSent > 0) {
-                toast.info(`Sending ${data.emailsSent} credential emails...`);
-            }
-
-            // Automatically export credentials if enabled and accounts were created
-            if (exportCredentials && data.credentials && data.credentials.length > 0) {
-                handleExportCredentials(data.credentials, selectedModule);
-            }
+            setActiveImportJobId(data.jobId);
+            setImportStatus(`Import job created. ${data.totalRows} rows queued.`);
+            setIsUploading(false);
+            toast.success(`Import job created for ${data.totalRows} rows`);
 
         } catch (error) {
             toast.error(error.message || "Import failed");
             setImportResults({ error: error.message, details: error.details });
-            setImportStatus("❌ Import failed");
-        } finally {
+            setImportStatus("Import failed");
             setIsUploading(false);
+        } finally {
         }
     };
 
@@ -412,12 +455,10 @@ export default function ImportDataPage() {
         }
 
         setIsExporting(true);
-        setExportProgress("Preparing export...");
+        setExportProgress("Queueing export job...");
 
         try {
-            setExportProgress("Fetching data...");
-
-            const res = await fetch(`/api/schools/${schoolId}/export`, {
+            const res = await fetch(`/api/schools/${schoolId}/export/jobs`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modules: selectedExportModules })
@@ -429,37 +470,14 @@ export default function ImportDataPage() {
                 throw new Error(data.error);
             }
 
-            setExportProgress("Generating file...");
-
-            // Convert base64 to blob and download
-            const byteCharacters = atob(data.fileData);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: data.mimeType });
-
-            // Create download link
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = data.fileName;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            // Show stats
-            const totalRecords = data.stats.reduce((sum, s) => sum + s.recordCount, 0);
-            toast.success(`Exported ${totalRecords} records from ${data.stats.length} modules`);
-
-            setExportProgress("");
+            setActiveExportJobId(data.jobId);
+            setExportProgress(`Export job created for ${data.totalModules} modules`);
+            setIsExporting(false);
+            toast.success("Export job queued");
         } catch (error) {
             toast.error(error.message || "Export failed");
             setExportProgress("");
         } finally {
-            setIsExporting(false);
         }
     };
 
@@ -524,6 +542,84 @@ export default function ImportDataPage() {
                 </div>
             </div>
 
+            {activeTab === "import" && importJobsData?.jobs?.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Import Jobs</CardTitle>
+                        <CardDescription>Live progress, retries, and failed-row reports</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {importJobsData.jobs.slice(0, 4).map((job) => {
+                            const percent = job.totalRows ? Math.round((job.processedRows / job.totalRows) * 100) : 0;
+                            return (
+                                <div key={job.id} className="rounded-lg border p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="font-medium">{job.fileName}</div>
+                                            <div className="text-sm text-muted-foreground">{job.moduleKey} · {job.processedRows || 0}/{job.totalRows || 0} rows</div>
+                                        </div>
+                                        <Badge variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
+                                            {job.status}
+                                        </Badge>
+                                    </div>
+                                    <Progress value={percent} className="h-2" />
+                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        <span>Success: {job.success || 0}</span>
+                                        <span>Failed: {job.failed || 0}</span>
+                                        <span>Accounts: {job.accountsCreated || 0}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {job.errorReportUrl && (
+                                            <Button variant="outline" size="sm" onClick={() => window.open(job.errorReportUrl, "_blank", "noopener,noreferrer")}>
+                                                Download Error CSV
+                                            </Button>
+                                        )}
+                                        {job.status === "failed" && (
+                                            <Button variant="outline" size="sm" onClick={() => handleRetryImportJob(job.id)}>
+                                                Retry Job
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
+
+            {activeTab === "export" && exportJobsData?.jobs?.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Export Jobs</CardTitle>
+                        <CardDescription>Background exports with ready-to-download files</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {exportJobsData.jobs.slice(0, 4).map((job) => {
+                            const percent = job.totalModules ? Math.round((job.processedModules / job.totalModules) * 100) : 0;
+                            return (
+                                <div key={job.id} className="rounded-lg border p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="font-medium">{job.modules?.join(", ")}</div>
+                                            <div className="text-sm text-muted-foreground">{job.processedModules || 0}/{job.totalModules || 0} modules</div>
+                                        </div>
+                                        <Badge variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
+                                            {job.status}
+                                        </Badge>
+                                    </div>
+                                    <Progress value={percent} className="h-2" />
+                                    {job.fileUrl && (
+                                        <Button variant="outline" size="sm" onClick={() => window.open(job.fileUrl, "_blank", "noopener,noreferrer")}>
+                                            Download Export
+                                        </Button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Trust Banner */}
             {activeTab === "import" && !selectedModule && (
                 <Alert className="border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800">
@@ -578,7 +674,7 @@ export default function ImportDataPage() {
                             <AlertTriangle className="h-4 w-4 text-amber-600" />
                             <AlertTitle className="text-amber-800 dark:text-amber-300">Before Exporting</AlertTitle>
                             <AlertDescription className="text-amber-700 dark:text-amber-400">
-                                Exports will include data from the current academic year. Make sure you've selected the correct year in settings.
+                                Exports will include data from the current academic year. Make sure you&apos;ve selected the correct year in settings.
                             </AlertDescription>
                         </Alert>
 
@@ -651,7 +747,7 @@ export default function ImportDataPage() {
                                 {isExporting ? (
                                     <>
                                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        {exportProgress || "Exporting..."}
+                                        {currentExportProgress || "Exporting..."}
                                     </>
                                 ) : (
                                     <>
@@ -852,7 +948,7 @@ export default function ImportDataPage() {
                                             <AlertDescription>
                                                 <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                                                     <li>Download the template first</li>
-                                                    <li>Fill in data in the "Data" sheet</li>
+                                                    <li>Fill in data in the &quot;Data&quot; sheet</li>
                                                     <li>Fields marked with * are required</li>
                                                     <li>Date format: YYYY-MM-DD</li>
                                                     <li>Do not modify column headers</li>
@@ -944,12 +1040,12 @@ export default function ImportDataPage() {
                                                             </div>
                                                             <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
                                                         </div>
-                                                        <p className="font-semibold text-lg">{importStatus || "Processing..."}</p>
+                                                        <p className="font-semibold text-lg">{currentImportStatus || "Processing..."}</p>
                                                         <div className="max-w-xs mx-auto">
-                                                            <Progress value={uploadProgress} className="h-2" />
+                                                            <Progress value={currentUploadProgress} className="h-2" />
                                                         </div>
                                                         <div className="flex justify-between text-xs text-muted-foreground max-w-xs mx-auto">
-                                                            <span className="font-medium">{uploadProgress}% complete</span>
+                                                            <span className="font-medium">{currentUploadProgress}% complete</span>
                                                             <span className="text-primary animate-pulse">Please don&apos;t refresh</span>
                                                         </div>
                                                     </div>

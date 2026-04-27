@@ -2098,13 +2098,14 @@ model Accountant {
 }
 
 model Student {
-  userId             String  @id @db.Uuid
+  userId             String           @id @db.Uuid
   classId            Int
-  parentId           String? @db.Uuid
+  parentId           String?          @db.Uuid
   name               String
   email              String
   dob                String
   gender             String
+  religion           StudentReligion?
   admissionDate      String
   sectionId          Int
   bloodGroup         String
@@ -2184,6 +2185,19 @@ model Student {
   @@index([sectionId])
   @@index([parentId])
   @@index([currentSessionId])
+}
+
+enum StudentReligion {
+  HINDU
+  MUSLIM
+  CHRISTIAN
+  SIKH
+  BUDDHIST
+  JAIN
+  PARSI
+  JEWISH
+  OTHER
+  PREFER_NOT_TO_SAY
 }
 
 // ============================================

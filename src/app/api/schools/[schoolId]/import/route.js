@@ -12,10 +12,37 @@ const supabaseAdmin = createClient(
 );
 
 // Modules that require Supabase account creation
-const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff', 'parents'];
+export const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff', 'parents'];
+
+function normalizeStudentReligion(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    const map = {
+        hindu: 'HINDU',
+        hinduism: 'HINDU',
+        muslim: 'MUSLIM',
+        islam: 'MUSLIM',
+        christian: 'CHRISTIAN',
+        christianity: 'CHRISTIAN',
+        sikh: 'SIKH',
+        sikhism: 'SIKH',
+        buddhist: 'BUDDHIST',
+        buddhism: 'BUDDHIST',
+        jain: 'JAIN',
+        jainism: 'JAIN',
+        parsi: 'PARSI',
+        zoroastrian: 'PARSI',
+        jewish: 'JEWISH',
+        judaism: 'JEWISH',
+        other: 'OTHER',
+        'prefer not to say': 'PREFER_NOT_TO_SAY',
+        'prefer_not_to_say': 'PREFER_NOT_TO_SAY',
+    };
+
+    return map[normalized] || null;
+}
 
 // Field name mapping from template to database
-const FIELD_MAPPINGS = {
+export const FIELD_MAPPINGS = {
     students: {
         'Full Name *': 'name',
         'Email *': 'email',
@@ -24,6 +51,7 @@ const FIELD_MAPPINGS = {
         'Section *': 'sectionName',
         'Gender *': 'gender',
         'Date of Birth (YYYY-MM-DD) *': 'dob',
+        'Religion': 'religion',
         'Roll Number': 'rollNumber',
         'Contact Number': 'contactNumber',
         'Address': 'address',
@@ -138,6 +166,7 @@ export async function POST(req, { params }) {
         const uploadedColumns = Object.keys(rawData[0]).filter(col => col !== 'S.No');
         const expectedColumns = Object.keys(expectedFields);
         const requiredColumns = expectedColumns.filter(col => col.includes('*'));
+        const unexpectedColumns = uploadedColumns.filter(col => !expectedColumns.some(exp => normalizeColumnName(exp) === normalizeColumnName(col)));
 
         // Check for missing required columns using flexible matching
         const missingRequired = requiredColumns.filter(reqCol => {
@@ -145,15 +174,16 @@ export async function POST(req, { params }) {
             return !uploadedColumns.some(upCol => normalizeColumnName(upCol) === normalizedReq);
         });
 
-        if (missingRequired.length > 0) {
+        if (missingRequired.length > 0 || unexpectedColumns.length > 0) {
             return NextResponse.json({
                 error: 'Template mapping not matched',
                 details: {
                     message: 'The uploaded file does not match the expected template format.',
                     missingColumns: missingRequired.map(c => c.replace(' *', '')),
+                    unexpectedColumns,
                     expectedColumns: expectedColumns,
                     uploadedColumns: uploadedColumns,
-                    suggestion: 'Please download the correct template and ensure all column headers match exactly.'
+                    suggestion: 'Please download the correct template. Header names are matched strictly after normalization.'
                 }
             }, { status: 400 });
         }
@@ -400,7 +430,7 @@ async function createSupabaseAccount(email, password) {
 }
 
 // Process individual row based on module
-async function processRow(module, row, schoolId, fieldMap) {
+export async function processRow(module, row, schoolId, fieldMap) {
     // Helper function to normalize column names for flexible matching
     const normalizeColumnName = (col) => {
         return col
@@ -426,6 +456,9 @@ async function processRow(module, row, schoolId, fieldMap) {
             // Convert numbers to strings for text fields (Excel reads "10" as number 10)
             if (typeof value === 'number') {
                 value = String(value);
+            }
+            if (dbField === 'religion') {
+                value = normalizeStudentReligion(value) || value;
             }
             mappedData[dbField] = value;
         }
@@ -531,6 +564,7 @@ async function importStudent(data, schoolId) {
                 sectionId: section.id,
                 schoolId,
                 gender: gender || 'Other',
+                religion: normalizeStudentReligion(rest.religion) || null,
                 dob,
                 rollNumber: rest.rollNumber || '',
                 contactNumber: rest.contactNumber || '',

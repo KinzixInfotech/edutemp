@@ -13,6 +13,7 @@ const MODULE_CONFIGS = {
             { name: 'sectionName', label: 'Section', required: true, example: 'A' },
             { name: 'gender', label: 'Gender', required: true, example: 'Male' },
             { name: 'dob', label: 'Date of Birth (YYYY-MM-DD)', required: true, example: '2010-05-15' },
+            { name: 'religion', label: 'Religion', required: false, example: 'Hindu' },
             { name: 'rollNumber', label: 'Roll Number', required: false, example: '01' },
             { name: 'contactNumber', label: 'Contact Number', required: false, example: '9876543210' },
             { name: 'address', label: 'Address', required: false, example: '123 Main Street' },
@@ -247,7 +248,7 @@ export async function GET(req, { params }) {
         return new NextResponse(buffer, {
             headers: {
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition': `attachment; filename="${module}_import_template.xlsx"`,
+                'Content-Disposition': `attachment; filename="${moduleKey}_import_template.xlsx"`,
             },
         });
     } catch (error) {
