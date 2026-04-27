@@ -6,7 +6,8 @@ import qstash from '@/lib/qstash';
 import { getBulkJob, updateBulkJob } from '@/lib/bulk-job-store';
 import { generateFileKey, uploadToR2 } from '@/lib/r2';
 import { FIELD_MAPPINGS, processRow } from '../../[schoolId]/import/route';
-import { getAccountCredentialsEmailTemplate, sendEmail } from '@/lib/email';
+import { getAccountCredentialsEmailTemplate } from '@/lib/email';
+import { sendResendEmail } from '@/lib/resend';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -206,7 +207,7 @@ async function handleWorker(req) {
                             loginUrl,
                         });
 
-                        await sendEmail({
+                        await sendResendEmail({
                             to: result.email,
                             subject: emailTemplate.subject,
                             html: emailTemplate.html,
@@ -260,7 +261,7 @@ async function handleWorker(req) {
 
             if (adminUser?.email) {
                 const email = buildCompletionEmail(updatedJob, updatedJob);
-                await sendEmail({
+                await sendResendEmail({
                     to: adminUser.email,
                     subject: email.subject,
                     html: email.html,

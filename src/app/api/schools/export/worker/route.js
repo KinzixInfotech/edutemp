@@ -4,7 +4,7 @@ import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { getBulkJob, updateBulkJob } from '@/lib/bulk-job-store';
 import { generateFileKey, uploadToR2 } from '@/lib/r2';
 import { EXPORT_CONFIGS } from '../../[schoolId]/export/route';
-import { sendEmail } from '@/lib/email';
+import { sendResendEmail } from '@/lib/resend';
 import prisma from '@/lib/prisma';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
@@ -72,7 +72,7 @@ async function handleWorker(req) {
                     `Exported File: ${fileUrl}`
                 ].join('\n');
 
-                await sendEmail({
+                await sendResendEmail({
                     to: adminUser.email,
                     subject: `Export completed: ${job.modules.length} modules`,
                     html,
