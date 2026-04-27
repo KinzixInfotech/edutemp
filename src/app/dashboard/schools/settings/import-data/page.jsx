@@ -167,7 +167,10 @@ export default function ImportDataPage() {
             return res.json();
         },
         enabled: !!schoolId && !!activeImportJobId,
-        refetchInterval: 3000,
+        refetchInterval: (data) => {
+            if (data?.status === 'completed' || data?.status === 'failed') return false;
+            return 3000;
+        },
         refetchOnWindowFocus: false,
     });
 
@@ -178,7 +181,10 @@ export default function ImportDataPage() {
             return res.json();
         },
         enabled: !!schoolId && !!activeExportJobId,
-        refetchInterval: 3000,
+        refetchInterval: (data) => {
+            if (data?.status === 'completed' || data?.status === 'failed') return false;
+            return 3000;
+        },
         refetchOnWindowFocus: false,
     });
 
