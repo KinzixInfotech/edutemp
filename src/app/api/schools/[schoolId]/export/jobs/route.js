@@ -30,7 +30,7 @@ async function enqueueWorker(jobId) {
 export async function POST(req, { params }) {
     try {
         const { schoolId } = await params;
-        const { modules } = await req.json();
+        const { modules, userId } = await req.json();
 
         if (!Array.isArray(modules) || !modules.length) {
             return NextResponse.json({ error: 'No modules selected' }, { status: 400 });
@@ -41,6 +41,7 @@ export async function POST(req, { params }) {
             id: jobId,
             type: 'export',
             schoolId,
+            userId,
             modules,
             status: 'queued',
             processedModules: 0,

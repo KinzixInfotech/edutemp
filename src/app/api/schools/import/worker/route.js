@@ -29,32 +29,34 @@ function toEtaSeconds(processedRows, totalRows, startedAt) {
 }
 
 function buildCompletionEmail(job, summary) {
-    const failedLine = summary.errorReportUrl ? `<p><a href="${summary.errorReportUrl}">Download failed rows report</a></p>` : '';
+    const errorCsvLine = summary.errorReportUrl ? `<p><strong>Error CSV:</strong> <a href="${summary.errorReportUrl}">Download failed rows report</a></p>` : '';
+    const uploadedFileLine = job.fileUrl ? `<p><strong>Uploaded File:</strong> <a href="${job.fileUrl}">Download original file</a></p>` : '';
+
     return {
         subject: `Import completed: ${job.moduleKey} (${summary.success}/${job.totalRows})`,
         html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
                 <h2 style="margin-bottom: 8px;">Bulk import completed</h2>
                 <p><strong>Module:</strong> ${job.moduleKey}</p>
-                <p><strong>File:</strong> ${job.fileName}</p>
-                <p><strong>Processed:</strong> ${job.totalRows}</p>
+                <p><strong>Total Rows:</strong> ${job.totalRows}</p>
                 <p><strong>Success:</strong> ${summary.success}</p>
                 <p><strong>Failed:</strong> ${summary.failed}</p>
                 <p><strong>Accounts created:</strong> ${summary.accountsCreated}</p>
                 <p><strong>Accounts failed:</strong> ${summary.accountsFailed}</p>
-                ${failedLine}
+                ${errorCsvLine}
+                ${uploadedFileLine}
             </div>
         `,
         text: [
             'Bulk import completed',
             `Module: ${job.moduleKey}`,
-            `File: ${job.fileName}`,
-            `Processed: ${job.totalRows}`,
+            `Total Rows: ${job.totalRows}`,
             `Success: ${summary.success}`,
             `Failed: ${summary.failed}`,
             `Accounts created: ${summary.accountsCreated}`,
             `Accounts failed: ${summary.accountsFailed}`,
-            summary.errorReportUrl ? `Failed rows report: ${summary.errorReportUrl}` : null,
+            summary.errorReportUrl ? `Error CSV: ${summary.errorReportUrl}` : null,
+            job.fileUrl ? `Uploaded File: ${job.fileUrl}` : null,
         ].filter(Boolean).join('\n'),
     };
 }

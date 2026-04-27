@@ -461,7 +461,7 @@ export default function ImportDataPage() {
             const res = await fetch(`/api/schools/${schoolId}/export/jobs`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modules: selectedExportModules })
+                body: JSON.stringify({ modules: selectedExportModules, userId: fullUser?.id })
             });
 
             const data = await res.json();

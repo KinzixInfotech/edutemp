@@ -4,6 +4,8 @@ import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { getBulkJob, updateBulkJob } from '@/lib/bulk-job-store';
 import { generateFileKey, uploadToR2 } from '@/lib/r2';
 import { EXPORT_CONFIGS } from '../../[schoolId]/export/route';
+import { sendEmail } from '@/lib/email';
+import prisma from '@/lib/prisma';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -53,6 +55,31 @@ async function handleWorker(req) {
             fileUrl,
             stats,
         });
+
+        if (job.userId) {
+            const adminUser = await prisma.user.findUnique({ where: { id: job.userId }, select: { email: true, name: true } });
+            if (adminUser?.email) {
+                const html = `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+                        <h2 style="margin-bottom: 8px;">Bulk export completed</h2>
+                        <p><strong>Modules:</strong> ${job.modules.join(', ')}</p>
+                        <p><strong>Exported File:</strong> <a href="${fileUrl}">Download your export</a></p>
+                    </div>
+                `;
+                const text = [
+                    'Bulk export completed',
+                    `Modules: ${job.modules.join(', ')}`,
+                    `Exported File: ${fileUrl}`
+                ].join('\n');
+
+                await sendEmail({
+                    to: adminUser.email,
+                    subject: `Export completed: ${job.modules.length} modules`,
+                    html,
+                    text,
+                });
+            }
+        }
 
         return NextResponse.json({ success: true, job: updated });
     } catch (error) {
