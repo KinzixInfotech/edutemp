@@ -92,6 +92,7 @@ export default function ClientLayout({ children }) {
     const [isNavigating, setIsNavigating] = useState(false);
     const pathname = usePathname();
     const previousPathname = useRef(pathname);
+    const lastSchoolAccessToast = useRef('');
 
     // Detect navigation within /dashboard/ routes
     useEffect(() => {
@@ -125,11 +126,6 @@ export default function ClientLayout({ children }) {
 
         document.addEventListener('click', handleClick);
         return () => document.removeEventListener('click', handleClick);
-    }, [pathname]);
-
-    // Reset navigation state when pathname changes
-    useEffect(() => {
-        setIsNavigating(false);
     }, [pathname]);
 
     // Global Error Interceptor and Loading State for Fetch and Axios
@@ -177,6 +173,21 @@ export default function ClientLayout({ children }) {
                 const response = await originalFetch(...args);
                 // clone response to read text without consuming body for caller
                 const clone = response.clone();
+
+                if ([402, 410, 423].includes(response.status)) {
+                    try {
+                        const payload = await clone.json();
+                        const nextMessage = `${payload?.schoolStatus || 'ACCOUNT'}:${payload?.error || 'Access blocked'}`;
+                        if (lastSchoolAccessToast.current !== nextMessage) {
+                            lastSchoolAccessToast.current = nextMessage;
+                            toast.error(payload?.error || 'School account access is restricted', {
+                                description: payload?.freezeReason || 'This action is unavailable until the school account is restored.',
+                            });
+                        }
+                    } catch (error) {
+                        // Ignore non-JSON blocked responses
+                    }
+                }
 
                 if (response.status === 500 || response.status === 503) {
                     try {

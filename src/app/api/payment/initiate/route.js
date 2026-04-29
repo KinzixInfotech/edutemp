@@ -110,4 +110,4 @@ export const POST = withSchoolAccess(async function POST(req) {
     console.error("Payment initiation error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-});
+}, { allowPastDueWrite: true });

@@ -232,7 +232,7 @@ export const POST = withSchoolAccess(async function POST(req) {
             { status: 500 }
         );
     }
-});
+}, { allowPastDueWrite: true });
 
 export async function DELETE(req, { params }) {
     // Handling single revoke here if routing allows methods in same file or separate dynamic route

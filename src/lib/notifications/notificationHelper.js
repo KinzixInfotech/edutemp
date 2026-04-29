@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { messaging } from "@/lib/firebase-admin";
 import { Client } from "@upstash/qstash";
+import { sendEmail } from "@/lib/email";
 
 /**
  * Send notification to users
@@ -186,6 +187,146 @@ export async function notifyNewDeviceLogin({
         },
         sendPush: true,
     });
+}
+
+function buildSchoolAccountStatusEmail({
+    recipientName,
+    schoolName,
+    status,
+    freezeType,
+    reason,
+    actionLabel,
+}) {
+    const statusLabel = status === 'PAST_DUE'
+        ? 'Soft Freeze'
+        : status === 'SUSPENDED'
+            ? 'Hard Freeze'
+            : status === 'TERMINATED'
+                ? 'Termination'
+                : 'Reactivated';
+
+    const safeReason = reason || 'No reason was provided.';
+    const greetingName = recipientName || 'Team';
+
+    return {
+        subject: `${schoolName}: ${statusLabel} update`,
+        text: `Hello ${greetingName}, ${schoolName} is now ${statusLabel}. Reason: ${safeReason}. ${actionLabel}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+                <p>Hello ${greetingName},</p>
+                <p><strong>${schoolName}</strong> has a school account status update.</p>
+                <p>
+                    <strong>Status:</strong> ${statusLabel}<br/>
+                    <strong>Freeze Type:</strong> ${freezeType || 'N/A'}<br/>
+                    <strong>Reason:</strong> ${safeReason}
+                </p>
+                <p>${actionLabel}</p>
+                <p>Regards,<br/>EduBreezy</p>
+            </div>
+        `,
+    };
+}
+
+export async function notifySchoolAccountStatusChange({
+    schoolId,
+    schoolName,
+    status,
+    freezeType = null,
+    reason = null,
+}) {
+    if (!schoolId) {
+        throw new Error('schoolId is required for school account notifications');
+    }
+
+    const [admins, directors, principals] = await Promise.all([
+        prisma.admin.findMany({
+            where: { schoolId },
+            select: { userId: true, User: { select: { name: true, email: true } } },
+        }),
+        prisma.director.findMany({
+            where: { schoolId },
+            select: { userId: true, user: { select: { name: true, email: true } } },
+        }),
+        prisma.principal.findMany({
+            where: { schoolId },
+            select: { userId: true, user: { select: { name: true, email: true } } },
+        }),
+    ]);
+
+    const recipients = [
+        ...admins.map((entry) => ({ userId: entry.userId, name: entry.User?.name, email: entry.User?.email })),
+        ...directors.map((entry) => ({ userId: entry.userId, name: entry.user?.name, email: entry.user?.email })),
+        ...principals.map((entry) => ({ userId: entry.userId, name: entry.user?.name, email: entry.user?.email })),
+    ].filter((entry, index, array) => entry.userId && array.findIndex((candidate) => candidate.userId === entry.userId) === index);
+
+    if (!recipients.length) {
+        return { success: true, notified: 0 };
+    }
+
+    const actionLabel = status === 'ACTIVE'
+        ? 'Your school account has been restored and regular operations can continue.'
+        : status === 'TERMINATED'
+            ? 'This school account has been terminated and access is no longer available.'
+            : 'Please renew the school subscription to continue the service without disruption.';
+
+    const title = status === 'ACTIVE'
+        ? 'School account restored'
+        : status === 'TERMINATED'
+            ? 'School account terminated'
+            : freezeType === 'HARD'
+                ? 'School account hard frozen'
+                : 'School account soft frozen';
+
+    const message = status === 'ACTIVE'
+        ? `${schoolName} has been reactivated. Regular access is available again.`
+        : `${schoolName} has been ${freezeType === 'HARD' ? 'hard frozen' : status === 'TERMINATED' ? 'terminated' : 'soft frozen'}${reason ? `: ${reason}` : ''}. Renew to continue service.`;
+
+    await sendNotification({
+        schoolId,
+        title,
+        message,
+        type: 'ACCOUNT_STATUS',
+        priority: status === 'ACTIVE' ? 'NORMAL' : 'HIGH',
+        icon: status === 'ACTIVE' ? '✅' : '⚠️',
+        targetOptions: {
+            userIds: recipients.map((recipient) => recipient.userId),
+        },
+        senderId: null,
+        actionUrl: '/dashboard',
+        metadata: {
+            schoolStatus: status,
+            freezeType,
+            reason,
+        },
+        sendPush: true,
+    });
+
+    await Promise.allSettled(
+        recipients
+            .filter((recipient) => recipient.email)
+            .map((recipient) => {
+                const emailPayload = buildSchoolAccountStatusEmail({
+                    recipientName: recipient.name,
+                    schoolName,
+                    status,
+                    freezeType,
+                    reason,
+                    actionLabel,
+                });
+
+                return sendEmail({
+                    to: recipient.email,
+                    subject: emailPayload.subject,
+                    html: emailPayload.html,
+                    text: emailPayload.text,
+                });
+            })
+    );
+
+    return {
+        success: true,
+        notified: recipients.length,
+    };
 }
 
 /**

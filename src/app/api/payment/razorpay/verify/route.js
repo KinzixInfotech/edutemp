@@ -113,4 +113,4 @@ export const POST = withSchoolAccess(async function POST(req) {
     console.error("Payment Verification Error:", error);
     return NextResponse.json({ error: "Verification failed: " + error.message }, { status: 500 });
   }
-});
+}, { allowPastDueWrite: true });

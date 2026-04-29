@@ -129,4 +129,4 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     console.error("Callback error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-});
+}, { allowPastDueWrite: true });

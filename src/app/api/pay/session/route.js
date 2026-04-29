@@ -72,4 +72,4 @@ export const DELETE = withSchoolAccess(async function DELETE(req) {
       { status: 500 }
     );
   }
-});
+}, { allowPastDueWrite: true });

@@ -104,30 +104,52 @@ export const GET = withSchoolAccess(async function GET(request, props) {
       );
 
       // Calculate plan info (from subscription or defaults)
-      const planInfo = subscription ? {
-        expectedStudents: subscription.expectedStudents,
-        unitsPurchased: subscription.unitsPurchased,
-        includedCapacity: subscription.includedCapacity,
-        softCapacity: subscription.softCapacity,
-        yearlyAmount: Number(subscription.yearlyAmount),
-        pricePerUnit: Number(subscription.pricePerUnit),
-        billingStartDate: subscription.billingStartDate,
-        billingEndDate: subscription.billingEndDate,
-        isTrial: subscription.isTrial,
-        trialDays: subscription.trialDays,
-        trialEndsAt: subscription.trialEndsAt,
-        status: subscription.status,
-        currentStudents: studentCount,
-        capacityUsed: subscription.includedCapacity > 0 ?
-        Math.round(studentCount / subscription.includedCapacity * 100) :
-        0,
-        isNearLimit: studentCount >= subscription.includedCapacity * 0.9,
-        isOverLimit: studentCount > subscription.softCapacity,
-        perStudentYearly: subscription.expectedStudents > 0 ?
-        Math.round(Number(subscription.yearlyAmount) / subscription.expectedStudents) :
-        0,
-        savings: subscription.unitsPurchased * BASE_PRICE_PER_UNIT - Number(subscription.yearlyAmount)
-      } : null;
+      const planInfo = subscription ? (() => {
+        const currentUnits = subscription.unitsPurchased || Math.max(1, Math.ceil((subscription.includedCapacity || 0) / STUDENTS_PER_UNIT));
+        const recommendedUnits = Math.max(1, Math.ceil(studentCount / STUDENTS_PER_UNIT));
+        const recommendedIncludedCapacity = recommendedUnits * STUDENTS_PER_UNIT;
+        const recommendedSoftCapacity = Math.floor(recommendedIncludedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
+        const currentYearlyAmount = Number(subscription.yearlyAmount);
+        const recommendedYearlyAmount = recommendedUnits * PRICE_PER_UNIT;
+        const additionalUnitsNeeded = Math.max(0, recommendedUnits - currentUnits);
+        const additionalYearlyAmount = Math.max(0, recommendedYearlyAmount - currentYearlyAmount);
+        const studentsAboveIncludedCapacity = Math.max(0, studentCount - subscription.includedCapacity);
+        const studentsAboveSoftCapacity = Math.max(0, studentCount - subscription.softCapacity);
+
+        return {
+          expectedStudents: subscription.expectedStudents,
+          unitsPurchased: subscription.unitsPurchased,
+          includedCapacity: subscription.includedCapacity,
+          softCapacity: subscription.softCapacity,
+          yearlyAmount: currentYearlyAmount,
+          pricePerUnit: Number(subscription.pricePerUnit),
+          billingStartDate: subscription.billingStartDate,
+          billingEndDate: subscription.billingEndDate,
+          isTrial: subscription.isTrial,
+          trialDays: subscription.trialDays,
+          trialEndsAt: subscription.trialEndsAt,
+          status: subscription.status,
+          currentStudents: studentCount,
+          capacityUsed: subscription.includedCapacity > 0 ?
+          Math.round(studentCount / subscription.includedCapacity * 100) :
+          0,
+          isNearLimit: studentCount >= subscription.includedCapacity * 0.9,
+          isOverLimit: studentCount > subscription.softCapacity,
+          perStudentYearly: subscription.expectedStudents > 0 ?
+          Math.round(currentYearlyAmount / subscription.expectedStudents) :
+          0,
+          savings: subscription.unitsPurchased * BASE_PRICE_PER_UNIT - currentYearlyAmount,
+          recommendedUnits,
+          recommendedIncludedCapacity,
+          recommendedSoftCapacity,
+          recommendedYearlyAmount,
+          additionalUnitsNeeded,
+          additionalYearlyAmount,
+          studentsAboveIncludedCapacity,
+          studentsAboveSoftCapacity,
+          renewalAmountDue: recommendedYearlyAmount,
+        };
+      })() : null;
 
       return {
         counts: {

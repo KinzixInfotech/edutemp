@@ -116,6 +116,7 @@ export async function enforceSchoolStateAccess({
     schoolId,
     method,
     bypass = false,
+    allowPastDueWrite = false,
 }) {
     if (bypass || !schoolId) {
         return { ok: true, school: null };
@@ -140,7 +141,7 @@ export async function enforceSchoolStateAccess({
         return { ok: false, school, response: buildSchoolAccessErrorResponse(SCHOOL_STATUS.SUSPENDED, school) };
     }
 
-    if (school.status === SCHOOL_STATUS.PAST_DUE && isWriteMethod(method)) {
+    if (school.status === SCHOOL_STATUS.PAST_DUE && isWriteMethod(method) && !allowPastDueWrite) {
         console.warn('[SCHOOL_ACCESS_BLOCKED]', { schoolId, status: school.status, method });
         return { ok: false, school, response: buildSchoolAccessErrorResponse(SCHOOL_STATUS.PAST_DUE, school) };
     }
@@ -151,7 +152,12 @@ export async function enforceSchoolStateAccess({
 export async function getSchoolAccessSnapshotForUser(user, method, options = {}) {
     const schoolId = options.schoolId ?? await resolveSchoolIdForUser(user);
     const bypass = options.bypass === true || user?.role?.name === 'SUPER_ADMIN';
-    const access = await enforceSchoolStateAccess({ schoolId, method, bypass });
+    const access = await enforceSchoolStateAccess({
+        schoolId,
+        method,
+        bypass,
+        allowPastDueWrite: options.allowPastDueWrite === true,
+    });
 
     return {
         ...access,

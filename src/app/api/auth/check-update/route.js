@@ -47,4 +47,4 @@ export const POST = withSchoolAccess(async function POST(req) {
         console.error("[CHECK_UPDATE]", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
-});
+}, { allowPastDueWrite: true });

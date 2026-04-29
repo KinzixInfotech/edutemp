@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { FREEZE_TYPE, SCHOOL_STATUS } from '@/lib/school-account-state';
 import { createSchoolAccountAuditLog } from '@/lib/school-account-audit';
+import { notifySchoolAccountStatusChange } from '@/lib/notifications/notificationHelper';
 
 export async function freezeSchoolAccount({
     schoolId,
@@ -63,6 +64,18 @@ export async function freezeSchoolAccount({
         },
     });
 
+    try {
+        await notifySchoolAccountStatusChange({
+            schoolId,
+            schoolName: updated.name,
+            status: updated.status,
+            freezeType: updated.freezeType,
+            reason,
+        });
+    } catch (error) {
+        console.error('[SCHOOL_FREEZE_NOTIFY_FAILED]', error);
+    }
+
     return updated;
 }
 
@@ -119,6 +132,18 @@ export async function unfreezeSchoolAccount({
             source: 'admin',
         },
     });
+
+    try {
+        await notifySchoolAccountStatusChange({
+            schoolId,
+            schoolName: updated.name,
+            status: updated.status,
+            freezeType: null,
+            reason: null,
+        });
+    } catch (error) {
+        console.error('[SCHOOL_UNFREEZE_NOTIFY_FAILED]', error);
+    }
 
     return updated;
 }
@@ -178,6 +203,18 @@ export async function markSchoolTerminated({
             reason,
         },
     });
+
+    try {
+        await notifySchoolAccountStatusChange({
+            schoolId,
+            schoolName: updated.name,
+            status: updated.status,
+            freezeType: updated.freezeType,
+            reason,
+        });
+    } catch (error) {
+        console.error('[SCHOOL_TERMINATE_NOTIFY_FAILED]', error);
+    }
 
     return updated;
 }
@@ -243,6 +280,18 @@ export async function applyAutomatedSchoolStatus({
                 reason,
             },
         });
+
+        try {
+            await notifySchoolAccountStatusChange({
+                schoolId,
+                schoolName: updated.name,
+                status: updated.status,
+                freezeType: updated.freezeType,
+                reason,
+            });
+        } catch (error) {
+            console.error('[SCHOOL_AUTOMATED_STATUS_NOTIFY_FAILED]', error);
+        }
     }
 
     return updated;

@@ -27,6 +27,12 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/context/AuthContext"
 import { useQuery } from "@tanstack/react-query"
 
+const RESTRICTED_NAV_KEYWORDS = /(create|send|add|edit|assign|builder|setup|onboarding|manage|settings|pricing|wallet|fees|payments|catalog|gallery|carousel|status updates?)/i
+
+function isRestrictedNavItem(item) {
+    const text = `${item?.label || ''} ${item?.url || ''}`
+    return RESTRICTED_NAV_KEYWORDS.test(text)
+}
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -39,6 +45,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const hasInitialized = useRef(false)
     const { unseenRequestsCount } = useLibraryNotifications()
     const { fullUser } = useAuth()
+    const isReadOnlySchool = fullUser?.school?.status === 'PAST_DUE' && userRole !== 'SUPER_ADMIN'
+    const readOnlyReason = 'Soft freeze active: school staff can view data, but create, edit, and delete actions stay locked until renewal.'
 
 
 
@@ -178,13 +186,15 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                     <span className="font-semibold dark:text-white">{item.label}</span>
                                                     {item.submenu.map((sub) => {
                                                         if (sub.roles && !sub.roles.includes(userRole)) return null
+                                                        const isRestricted = isReadOnlySchool && isRestrictedNavItem(sub)
                                                         return (
                                                             <Link
                                                                 key={sub.label}
-                                                                href={sub.url}
+                                                                href={isRestricted ? '#' : sub.url}
                                                                 prefetch={false}
-                                                                onClick={handleClick}
-                                                                className="text-xs dark:text-white hover:underline"
+                                                                onClick={isRestricted ? (event) => event.preventDefault() : handleClick}
+                                                                title={isRestricted ? readOnlyReason : undefined}
+                                                                className={`text-xs dark:text-white ${isRestricted ? 'pointer-events-none opacity-50' : 'hover:underline'}`}
                                                             >
                                                                 {sub.label}
                                                             </Link>
@@ -231,6 +241,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 <SidebarMenuSub className='mt-1.5'>
                                                     {item.submenu.map((sub) => {
                                                         if (sub.roles && !sub.roles.includes(userRole)) return null
+                                                        const isRestricted = isReadOnlySchool && isRestrictedNavItem(sub)
                                                         const isSubActive =
                                                             normalize(activePath) === normalize(sub.url)
                                                         return (
@@ -242,9 +253,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                     asChild
                                                                     className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isSubActive
                                                                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold" : ""
-                                                                        }`}
+                                                                        } ${isRestricted ? 'pointer-events-none opacity-50' : ''}`}
                                                                 >
-                                                                    <Link href={sub.url} prefetch={false} onClick={handleClick} className="flex items-center justify-between w-full">
+                                                                    <Link href={isRestricted ? '#' : sub.url} prefetch={false} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined} className="flex items-center justify-between w-full">
                                                                         <div className="flex items-center gap-2">
                                                                             {sub.icon && <sub.icon className="w-4 h-4" />}
                                                                             <span className="">{sub.label}</span>
@@ -271,6 +282,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
                                 // fallback → normal item
                                 if (isCollapsed) {
+                                    const isRestricted = isReadOnlySchool && isRestrictedNavItem(item)
                                     return (
                                         <Tooltip key={item.label}>
                                             <TooltipTrigger asChild>
@@ -281,9 +293,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         asChild
                                                         className={`w-full font-medium relative hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
                                                             ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
-                                                            }`}
+                                                            } ${isRestricted ? 'pointer-events-none opacity-50' : ''}`}
                                                     >
-                                                        <Link href={item.url} prefetch={false} onClick={handleClick}>
+                                                        <Link href={isRestricted ? '#' : item.url} prefetch={false} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Pulsing indicator for Self Attendance in collapsed mode */}
                                                             {item.label === "Self Attendance" && attendanceActionNeeded && (
@@ -305,6 +317,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                         </Tooltip>
                                     )
                                 }
+                                const isRestricted = isReadOnlySchool && isRestrictedNavItem(item)
                                 return (
                                     <SidebarMenuItem
                                         key={item.label}
@@ -314,9 +327,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             asChild
                                             className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
                                                 ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
-                                                }`}
+                                                } ${isRestricted ? 'pointer-events-none opacity-50' : ''}`}
                                         >
-                                            <Link href={item.url} prefetch={false} onClick={handleClick} className="flex items-center justify-between w-full">
+                                            <Link href={isRestricted ? '#' : item.url} prefetch={false} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined} className="flex items-center justify-between w-full">
                                                 <div className="flex items-center gap-2">
                                                     {item.icon && <item.icon className="w-4 h-4" />}
                                                     <span>{item.label}</span>

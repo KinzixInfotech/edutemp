@@ -93,4 +93,4 @@ export const DELETE = withSchoolAccess(async function DELETE(req) {
     console.error('[TEACHER LOGOUT ERROR]', error);
     return NextResponse.json({ error: 'Logout failed' }, { status: 500 });
   }
-});
+}, { allowPastDueWrite: true });

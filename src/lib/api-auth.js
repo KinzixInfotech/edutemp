@@ -39,6 +39,8 @@ async function resolveSchoolIdByLookup(kind, value) {
             return (await prisma.exam.findUnique({ where: { id: value }, select: { schoolId: true } }))?.schoolId ?? null;
         case 'receiptId':
             return (await prisma.receipt.findUnique({ where: { id: value }, select: { schoolId: true } }))?.schoolId ?? null;
+        case 'paymentId':
+            return (await prisma.feePayment.findUnique({ where: { id: value }, select: { schoolId: true } }))?.schoolId ?? null;
         case 'orderId':
             return (await prisma.feePayment.findFirst({ where: { gatewayOrderId: value }, select: { schoolId: true } }))?.schoolId ?? null;
         case 'homeworkId':
@@ -71,12 +73,17 @@ async function getSchoolIdFromRequest(request, params = null) {
     }
 
     const contentType = request.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-        return null;
-    }
 
     try {
-        const body = await request.clone().json();
+        let body = null;
+
+        if (contentType.includes('application/json')) {
+            body = await request.clone().json();
+        } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+            const formData = await request.clone().formData();
+            body = Object.fromEntries(formData.entries());
+        }
+
         if (body?.schoolId) {
             return body.schoolId;
         }
@@ -87,7 +94,8 @@ async function getSchoolIdFromRequest(request, params = null) {
             ['formId', body?.formId],
             ['examId', body?.examId],
             ['receiptId', body?.receiptId],
-            ['orderId', body?.orderId],
+            ['paymentId', body?.paymentId],
+            ['orderId', body?.orderId ?? body?.RefNo ?? body?.MerchantRefNo],
             ['homeworkId', body?.homeworkId],
         ];
 
@@ -104,6 +112,7 @@ async function getSchoolIdFromRequest(request, params = null) {
             ['formId', params?.formId],
             ['examId', params?.examId],
             ['receiptId', params?.receiptId],
+            ['paymentId', params?.paymentId],
             ['orderId', params?.orderId],
             ['homeworkId', params?.homeworkId],
         ];
@@ -149,6 +158,9 @@ async function getSchoolIdFromRequest(request, params = null) {
         }
         if (params?.receiptId) {
             return resolveSchoolIdByLookup('receiptId', params.receiptId);
+        }
+        if (params?.paymentId) {
+            return resolveSchoolIdByLookup('paymentId', params.paymentId);
         }
         if (params?.orderId) {
             return resolveSchoolIdByLookup('orderId', params.orderId);
@@ -345,6 +357,7 @@ export function withSchoolAccess(handler, options = {}) {
             {
                 schoolId: resolvedSchoolId,
                 bypass: options.bypass === true,
+                allowPastDueWrite: options.allowPastDueWrite === true,
             }
         );
 

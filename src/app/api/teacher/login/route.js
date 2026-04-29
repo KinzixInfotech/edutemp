@@ -195,4 +195,4 @@ export const POST = withSchoolAccess(async function POST(req) {
       { status: 500 }
     );
   }
-});
+}, { allowPastDueWrite: true });

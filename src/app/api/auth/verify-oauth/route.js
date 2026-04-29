@@ -77,6 +77,7 @@ export async function POST(req) {
                 const schoolAccess = await enforceSchoolStateAccess({
                     schoolId: response.schoolId,
                     method: req.method,
+                    allowPastDueWrite: true,
                 });
                 if (!schoolAccess.ok) {
                     return schoolAccess.response;

@@ -84,6 +84,7 @@ export async function POST(req) {
         const schoolAccess = await enforceSchoolStateAccess({
             schoolId: parent.schoolId,
             method: req.method,
+            allowPastDueWrite: true,
         });
         if (!schoolAccess.ok) {
             await supabase.auth.signOut();

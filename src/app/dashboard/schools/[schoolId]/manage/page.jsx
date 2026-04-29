@@ -158,6 +158,12 @@ export default function ManageSchoolPage({ params }) {
     const fees = stats?.fees || {}
     const classDistribution = stats?.classDistribution || []
     const plan = stats?.plan || null
+    const schoolStatus = school.status || 'ACTIVE'
+    const isSoftFrozen = schoolStatus === 'PAST_DUE'
+    const isHardFrozen = schoolStatus === 'SUSPENDED'
+    const hasRestriction = schoolStatus !== 'ACTIVE'
+    const freezeReason = school.freezeReason || 'No reason provided'
+    const freezeStartedAt = school.freezeStartedAt ? formatDate(school.freezeStartedAt) : null
 
     // Extract profiles from various response shapes
     const profiles = profilesData?.students || profilesData?.profiles || profilesData?.data || profilesData || []
@@ -175,6 +181,14 @@ export default function ManageSchoolPage({ params }) {
         if (val >= 1000) return `₹${(val / 1000).toFixed(1)}K`
         return `₹${val}`
     }
+
+    const restrictionMessage = isSoftFrozen
+        ? 'School staff should stay in read-only mode while this account is soft frozen. Parents can still pay outstanding fees to restore service.'
+        : isHardFrozen
+            ? 'This school is hard frozen. Operational access is blocked until the subscription issue is resolved.'
+            : schoolStatus === 'TERMINATED'
+                ? 'This school account has been terminated. Access is retained here only for audit and cleanup review.'
+                : null
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -246,6 +260,33 @@ export default function ManageSchoolPage({ params }) {
                     </Button>
                 </div>
             </div>
+
+            {hasRestriction && (
+                <Card className={`border ${isSoftFrozen ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/10' : 'border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/10'}`}>
+                    <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className={`w-5 h-5 mt-0.5 ${isSoftFrozen ? 'text-amber-600' : 'text-red-600'}`} />
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-semibold">
+                                        {isSoftFrozen ? 'Soft freeze active' : schoolStatus === 'TERMINATED' ? 'Termination active' : 'Hard freeze active'}
+                                    </p>
+                                    {school.freezeType && (
+                                        <Badge variant="outline" className="text-xs">
+                                            {school.freezeType}
+                                        </Badge>
+                                    )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">{restrictionMessage}</p>
+                                <p className="text-sm"><span className="font-medium">Reason:</span> {freezeReason}</p>
+                                {freezeStartedAt && (
+                                    <p className="text-xs text-muted-foreground">Started on {freezeStartedAt}</p>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* School Info Card */}
             <Card>
@@ -419,6 +460,44 @@ export default function ManageSchoolPage({ params }) {
                                         </div>
                                         <p className="text-2xl font-bold">₹{plan.perStudentYearly}</p>
                                         <p className="text-xs text-muted-foreground">Effective rate</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <Card className="border-dashed">
+                                    <CardContent className="pt-4">
+                                        <p className="text-sm text-muted-foreground">Renewal needed for current headcount</p>
+                                        <p className="text-2xl font-bold mt-1">{formatCurrency(plan.renewalAmountDue)}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Covers {plan.recommendedUnits} unit(s), {plan.recommendedIncludedCapacity} seats and {plan.recommendedSoftCapacity} with buffer
+                                        </p>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className={`border-dashed ${plan.additionalYearlyAmount > 0 ? 'bg-amber-50/60 dark:bg-amber-950/10' : ''}`}>
+                                    <CardContent className="pt-4">
+                                        <p className="text-sm text-muted-foreground">Additional amount to regularize</p>
+                                        <p className={`text-2xl font-bold mt-1 ${plan.additionalYearlyAmount > 0 ? 'text-amber-700 dark:text-amber-300' : ''}`}>
+                                            {formatCurrency(plan.additionalYearlyAmount)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {plan.additionalUnitsNeeded > 0
+                                                ? `${plan.additionalUnitsNeeded} more unit(s) required beyond the current plan`
+                                                : 'Current plan pricing already covers the headcount'}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className={`border-dashed ${plan.studentsAboveSoftCapacity > 0 ? 'bg-red-50/60 dark:bg-red-950/10' : ''}`}>
+                                    <CardContent className="pt-4">
+                                        <p className="text-sm text-muted-foreground">Students beyond buffer</p>
+                                        <p className={`text-2xl font-bold mt-1 ${plan.studentsAboveSoftCapacity > 0 ? 'text-red-600' : ''}`}>
+                                            {plan.studentsAboveSoftCapacity}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {plan.studentsAboveIncludedCapacity} above paid capacity, {plan.studentsAboveSoftCapacity} above soft buffer
+                                        </p>
                                     </CardContent>
                                 </Card>
                             </div>
