@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createClient } from '@supabase/supabase-js';
+import { enforceSchoolStateAccess } from '@/lib/school-account-state';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -78,6 +79,15 @@ export async function POST(req) {
                 { error: 'Only parents can login here. For school admin, use the main login.' },
                 { status: 403 }
             );
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId: parent.schoolId,
+            method: req.method,
+        });
+        if (!schoolAccess.ok) {
+            await supabase.auth.signOut();
+            return schoolAccess.response;
         }
 
         // Return session data with parent info

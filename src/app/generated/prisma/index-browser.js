@@ -123,6 +123,11 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
 exports.Prisma.SchoolScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  status: 'status',
+  freezeType: 'freezeType',
+  freezeReason: 'freezeReason',
+  freezeStartedAt: 'freezeStartedAt',
+  freezeUntil: 'freezeUntil',
   domain: 'domain',
   schoolCode: 'schoolCode',
   profilePicture: 'profilePicture',
@@ -2165,12 +2170,14 @@ exports.Prisma.AttendanceLockScalarFieldEnum = {
 exports.Prisma.AuditLogScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  schoolId: 'schoolId',
   action: 'action',
   tableName: 'tableName',
   rowId: 'rowId',
   timestamp: 'timestamp',
   oldData: 'oldData',
   newData: 'newData',
+  metadata: 'metadata',
   error: 'error'
 };
 
@@ -3629,6 +3636,18 @@ exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
 };
+exports.SchoolStatus = exports.$Enums.SchoolStatus = {
+  ACTIVE: 'ACTIVE',
+  PAST_DUE: 'PAST_DUE',
+  SUSPENDED: 'SUSPENDED',
+  TERMINATED: 'TERMINATED'
+};
+
+exports.FreezeType = exports.$Enums.FreezeType = {
+  SOFT: 'SOFT',
+  HARD: 'HARD'
+};
+
 exports.Status = exports.$Enums.Status = {
   DRAFT: 'DRAFT',
   PUBLISHED: 'PUBLISHED',
@@ -4013,7 +4032,11 @@ exports.AuditAction = exports.$Enums.AuditAction = {
   CREATE: 'CREATE',
   UPDATE: 'UPDATE',
   DELETE: 'DELETE',
-  ERROR: 'ERROR'
+  ERROR: 'ERROR',
+  SCHOOL_FREEZE: 'SCHOOL_FREEZE',
+  SCHOOL_UNFREEZE: 'SCHOOL_UNFREEZE',
+  SCHOOL_TERMINATE: 'SCHOOL_TERMINATE',
+  SCHOOL_STATUS_AUTOMATED: 'SCHOOL_STATUS_AUTOMATED'
 };
 
 exports.FeeCategory = exports.$Enums.FeeCategory = {

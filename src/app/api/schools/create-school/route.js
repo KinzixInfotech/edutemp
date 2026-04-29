@@ -1,3 +1,4 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { AuditAction, SubscriptionAction } from "@/app/generated/prisma/client";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { NextResponse } from "next/server";
@@ -50,20 +51,20 @@ const schoolSchema = z.object({
   billingStartDate: z.coerce.date().optional(),
   billingEndDate: z.coerce.date().optional(),
   isTrial: z.boolean().optional().default(false),
-  trialDays: z.coerce.number().optional(),
+  trialDays: z.coerce.number().optional()
 }).superRefine((data, ctx) => {
   if (data.domainMode === "tenant" && !data.tenantName) {
     ctx.addIssue({
       path: ["tenantName"],
       code: "custom",
-      message: "Tenant name is required when using tenant mode",
+      message: "Tenant name is required when using tenant mode"
     });
   }
   if (data.domainMode === "custom" && (!data.customDomain || data.customDomain.trim() === "")) {
     ctx.addIssue({
       path: ["customDomain"],
       code: "custom",
-      message: "Custom domain is required when using custom mode",
+      message: "Custom domain is required when using custom mode"
     });
   }
   // Validate Principal fields if createPrincipal is true
@@ -72,21 +73,21 @@ const schoolSchema = z.object({
       ctx.addIssue({
         path: ['principalName'],
         code: 'custom',
-        message: 'Principal name is required',
+        message: 'Principal name is required'
       });
     }
     if (!data.principalEmail || data.principalEmail.trim() === '') {
       ctx.addIssue({
         path: ['principalEmail'],
         code: 'custom',
-        message: 'Principal email is required',
+        message: 'Principal email is required'
       });
     }
     if (!data.principalPassword || data.principalPassword.length < 6) {
       ctx.addIssue({
         path: ['principalPassword'],
         code: 'custom',
-        message: 'Principal password must be at least 6 characters',
+        message: 'Principal password must be at least 6 characters'
       });
     }
   }
@@ -97,7 +98,7 @@ const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
 const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5;
 
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
   let createdAdminId = null;
   let createdDirectorId = null;
   let createdPrincipalId = null;
@@ -106,16 +107,16 @@ export async function POST(req) {
     const body = await req.json();
     const parsed = schoolSchema.parse(body);
 
-    const resolvedDomain = parsed.domainMode === "tenant"
-      ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
-      : parsed.customDomain || "";
+    const resolvedDomain = parsed.domainMode === "tenant" ?
+    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com` :
+    parsed.customDomain || "";
 
     // Calculate ERP capacity values
     const expectedStudents = parsed.expectedStudents || 100;
     const unitsPurchased = parsed.unitsPurchased || Math.ceil(expectedStudents / STUDENTS_PER_UNIT);
-    const includedCapacity = parsed.includedCapacity || (unitsPurchased * STUDENTS_PER_UNIT);
+    const includedCapacity = parsed.includedCapacity || unitsPurchased * STUDENTS_PER_UNIT;
     const softCapacity = parsed.softCapacity || Math.floor(includedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
-    const yearlyAmount = parsed.yearlyAmount || (unitsPurchased * PRICE_PER_UNIT);
+    const yearlyAmount = parsed.yearlyAmount || unitsPurchased * PRICE_PER_UNIT;
     const billingStartDate = parsed.billingStartDate || new Date();
     const billingEndDate = parsed.billingEndDate || addYears(billingStartDate, 1);
     const isTrial = parsed.isTrial || false;
@@ -127,7 +128,7 @@ export async function POST(req) {
     const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
       email: parsed.adminEmail,
       password: parsed.adminPassword,
-      email_confirm: true,
+      email_confirm: true
     });
 
     if (adminError || !adminData?.user?.id) {
@@ -139,7 +140,7 @@ export async function POST(req) {
     const { data: directorData, error: directorError } = await supabaseAdmin.auth.admin.createUser({
       email: parsed.directorEmail,
       password: parsed.directorPassword,
-      email_confirm: true,
+      email_confirm: true
     });
 
     if (directorError || !directorData?.user?.id) {
@@ -158,7 +159,7 @@ export async function POST(req) {
       const { data: principalData, error: principalError } = await supabaseAdmin.auth.admin.createUser({
         email: parsed.principalEmail,
         password: parsed.principalPassword,
-        email_confirm: true,
+        email_confirm: true
       });
 
       if (principalError || !principalData?.user?.id) {
@@ -210,10 +211,10 @@ export async function POST(req) {
             notices: [],
             gallery: [],
             facilities: [
-              { title: "Library", icon: "book" },
-              { title: "Science Lab", icon: "flask" },
-              { title: "Sports", icon: "trophy" }
-            ],
+            { title: "Library", icon: "book" },
+            { title: "Science Lab", icon: "flask" },
+            { title: "Sports", icon: "trophy" }],
+
             admissions: {
               title: "Admissions",
               content: "Admissions are open for the academic year...",
@@ -229,33 +230,33 @@ export async function POST(req) {
               secondaryColor: "#ffffff"
             },
             menus: [
-              { label: "Home", link: "#hero" },
-              { label: "About", link: "#about" },
-              { label: "Admissions", link: "#admissions" },
-              { label: "Contact", link: "#contact" }
-            ]
-          } : undefined,
-        },
+            { label: "Home", link: "#hero" },
+            { label: "About", link: "#about" },
+            { label: "Admissions", link: "#admissions" },
+            { label: "Contact", link: "#contact" }]
+
+          } : undefined
+        }
       });
 
       // Upsert roles
       const [adminRole, directorRole, principalRole] = await Promise.all([
-        tx.role.upsert({
-          where: { name: "ADMIN" },
-          update: {},
-          create: { name: "ADMIN" },
-        }),
-        tx.role.upsert({
-          where: { name: "DIRECTOR" },
-          update: {},
-          create: { name: "DIRECTOR" },
-        }),
-        tx.role.upsert({
-          where: { name: "PRINCIPAL" },
-          update: {},
-          create: { name: "PRINCIPAL" },
-        }),
-      ]);
+      tx.role.upsert({
+        where: { name: "ADMIN" },
+        update: {},
+        create: { name: "ADMIN" }
+      }),
+      tx.role.upsert({
+        where: { name: "DIRECTOR" },
+        update: {},
+        create: { name: "DIRECTOR" }
+      }),
+      tx.role.upsert({
+        where: { name: "PRINCIPAL" },
+        update: {},
+        create: { name: "PRINCIPAL" }
+      })]
+      );
 
       // Create Admin user
       const adminUser = await tx.user.create({
@@ -267,9 +268,9 @@ export async function POST(req) {
           school: { connect: { id: school.id } },
           role: { connect: { id: adminRole.id } },
           Admin: {
-            create: { schoolId: school.id },
-          },
-        },
+            create: { schoolId: school.id }
+          }
+        }
       });
 
       // Create Director user
@@ -282,9 +283,9 @@ export async function POST(req) {
           school: { connect: { id: school.id } },
           role: { connect: { id: directorRole.id } },
           director: {
-            create: { schoolId: school.id },
-          },
-        },
+            create: { schoolId: school.id }
+          }
+        }
       });
 
       // Create Principal user (if requested)
@@ -299,9 +300,9 @@ export async function POST(req) {
             school: { connect: { id: school.id } },
             role: { connect: { id: principalRole.id } },
             principal: {
-              create: { schoolId: school.id },
-            },
-          },
+              create: { schoolId: school.id }
+            }
+          }
         });
       }
 
@@ -321,50 +322,50 @@ export async function POST(req) {
           trialDays: isTrial ? trialDays : null,
           trialEndsAt,
           status: isTrial ? 'TRIAL' : 'ACTIVE',
-          createdBy: createdAdminId, // Super Admin who created
-        },
+          createdBy: createdAdminId // Super Admin who created
+        }
       });
 
       // Create Subscription Audit Logs
       await tx.subscriptionAuditLog.createMany({
         data: [
-          {
-            subscriptionId: subscription.id,
-            action: SubscriptionAction.SUBSCRIPTION_CREATED,
-            performedBy: createdAdminId,
-            newValue: {
-              schoolId: school.id,
-              schoolName: parsed.name,
-              domain: resolvedDomain,
-            },
-          },
-          {
-            subscriptionId: subscription.id,
-            action: SubscriptionAction.CAPACITY_ASSIGNED,
-            performedBy: createdAdminId,
-            newValue: {
-              expectedStudents,
-              unitsPurchased,
-              includedCapacity,
-              softCapacity,
-              yearlyAmount,
-              pricePerUnit: PRICE_PER_UNIT,
-            },
-          },
-          {
-            subscriptionId: subscription.id,
-            action: SubscriptionAction.HANDOVER_COMPLETED,
-            performedBy: createdAdminId,
-            newValue: {
-              adminEmail: parsed.adminEmail,
-              directorEmail: parsed.directorEmail,
-              principalEmail: parsed.createPrincipal ? parsed.principalEmail : null,
-              billingStart: billingStartDate,
-              billingEnd: billingEndDate,
-              isTrial,
-            },
-          },
-        ],
+        {
+          subscriptionId: subscription.id,
+          action: SubscriptionAction.SUBSCRIPTION_CREATED,
+          performedBy: createdAdminId,
+          newValue: {
+            schoolId: school.id,
+            schoolName: parsed.name,
+            domain: resolvedDomain
+          }
+        },
+        {
+          subscriptionId: subscription.id,
+          action: SubscriptionAction.CAPACITY_ASSIGNED,
+          performedBy: createdAdminId,
+          newValue: {
+            expectedStudents,
+            unitsPurchased,
+            includedCapacity,
+            softCapacity,
+            yearlyAmount,
+            pricePerUnit: PRICE_PER_UNIT
+          }
+        },
+        {
+          subscriptionId: subscription.id,
+          action: SubscriptionAction.HANDOVER_COMPLETED,
+          performedBy: createdAdminId,
+          newValue: {
+            adminEmail: parsed.adminEmail,
+            directorEmail: parsed.directorEmail,
+            principalEmail: parsed.createPrincipal ? parsed.principalEmail : null,
+            billingStart: billingStartDate,
+            billingEnd: billingEndDate,
+            isTrial
+          }
+        }]
+
       });
 
       // Audit log for school creation
@@ -385,10 +386,10 @@ export async function POST(req) {
               expectedStudents,
               unitsPurchased,
               softCapacity,
-              yearlyAmount,
-            },
-          },
-        },
+              yearlyAmount
+            }
+          }
+        }
       });
 
       // Track logo upload in prisma.upload table (Migrated from UploadThing callback)
@@ -399,8 +400,8 @@ export async function POST(req) {
             fileUrl: parsed.profilePicture,
             fileName: `School Logo - ${parsed.name}`,
             mimeType: "image/jpeg",
-            size: 0,
-          },
+            size: 0
+          }
         });
       }
 
@@ -409,7 +410,7 @@ export async function POST(req) {
       if (baseSlug) {
         const existingSlugs = await tx.schoolPublicProfile.findMany({
           where: { slug: { startsWith: baseSlug } },
-          select: { slug: true },
+          select: { slug: true }
         }).then((records) => records.map((record) => record.slug));
         finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
       }
@@ -421,7 +422,7 @@ export async function POST(req) {
           logoImage: parsed.profilePicture || null,
           publicPhone: parsed.phone || null,
           publicEmail: parsed.email || null,
-          website: resolvedDomain ? `https://${resolvedDomain}` : null,
+          website: resolvedDomain ? `https://${resolvedDomain}` : null
         },
         create: {
           schoolId: school.id,
@@ -431,15 +432,15 @@ export async function POST(req) {
           logoImage: parsed.profilePicture || null,
           publicPhone: parsed.phone || null,
           publicEmail: parsed.email || null,
-          website: resolvedDomain ? `https://${resolvedDomain}` : null,
+          website: resolvedDomain ? `https://${resolvedDomain}` : null
         },
-        select: { id: true, schoolId: true, slug: true },
+        select: { id: true, schoolId: true, slug: true }
       });
 
       return { school, adminUser, directorUser, principalUser, subscription, publicProfile };
     }, {
       timeout: 30000, // 30 seconds timeout
-      maxWait: 60000, // 60 seconds max wait
+      maxWait: 60000 // 60 seconds max wait
     });
 
     // Invalidate school search cache so new school appears immediately
@@ -466,13 +467,13 @@ export async function POST(req) {
       {
         success: false,
         error:
-          error instanceof Error
-            ? error.message
-            : typeof error === "string"
-              ? error
-              : JSON.stringify(error),
+        error instanceof Error ?
+        error.message :
+        typeof error === "string" ?
+        error :
+        JSON.stringify(error)
       },
       { status: 500 }
     );
   }
-}
+});

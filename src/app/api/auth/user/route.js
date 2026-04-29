@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
 
 // Helper: get current user from Supabase session
 async function getAuthenticatedUser(req) {
@@ -57,6 +58,16 @@ export async function GET(req) {
             return NextResponse.json({ user: null, found: false }, { status: 200 });
         }
 
+        const resolvedSchoolId = await resolveSchoolIdForUser(user);
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId: resolvedSchoolId,
+            method: req.method,
+            bypass: user.role?.name === 'SUPER_ADMIN',
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
+        }
+
         console.log(`✅ [API] User found: ${user.email} | Role: ${user.role?.name}`);
 
         // Base response
@@ -66,7 +77,7 @@ export async function GET(req) {
             name: user.name,
             role: user.role,
             profilePicture: user.profilePicture,
-            schoolId: null,
+            schoolId: resolvedSchoolId,
             twoFactorEnabled: user.twoFactorEnabled || false,
         };
 
@@ -280,6 +291,25 @@ export async function PUT(req) {
 
         if (!id || !role || !updates) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        const targetUser = await prisma.user.findUnique({
+            where: { id },
+            include: { role: true },
+        });
+
+        if (!targetUser) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const resolvedSchoolId = await resolveSchoolIdForUser(targetUser);
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId: resolvedSchoolId,
+            method: req.method,
+            bypass: targetUser.role?.name === 'SUPER_ADMIN',
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         // Only allow self-update unless SUPER_ADMIN

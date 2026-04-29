@@ -1,16 +1,16 @@
-// app/api/documents/[schoolId]/qr-settings/route.ts
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/documents/[schoolId]/qr-settings/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   const settings = await prisma.qrVerificationSettings.findUnique({
-    where: { schoolId: params.schoolId },
+    where: { schoolId: params.schoolId }
   });
   return NextResponse.json(settings || {});
-}
+});
 
-export async function POST(req, props) {
+export const POST = withSchoolAccess(async function POST(req, props) {
   const params = await props.params;
   const body = await req.json();
   const { userId, ...data } = body;
@@ -18,8 +18,8 @@ export async function POST(req, props) {
   const settings = await prisma.qrVerificationSettings.upsert({
     where: { schoolId: params.schoolId },
     update: { ...data, updatedAt: new Date() },
-    create: { ...data, schoolId: params.schoolId },
+    create: { ...data, schoolId: params.schoolId }
   });
 
   return NextResponse.json(settings);
-}
+});

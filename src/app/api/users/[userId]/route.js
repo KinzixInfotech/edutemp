@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { z } from "zod";
+import { withSchoolAccess } from "@/lib/api-auth";
 
 const roleMap = {
     students: "STUDENT",
@@ -120,7 +121,7 @@ const superAdminSchema = baseUserSchema.extend({
     email: z.string().email().optional(),
 });
 
-export async function PATCH(req, props) {
+export const PATCH = withSchoolAccess(async function PATCH(req, props) {
     const params = await props.params;
     try {
         const userId = params.userId;
@@ -345,4 +346,4 @@ export async function PATCH(req, props) {
             { status: 500 }
         );
     }
-}
+});

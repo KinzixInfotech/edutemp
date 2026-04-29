@@ -1,7 +1,8 @@
-import prisma from "@/lib/prisma"
-import { NextResponse } from "next/server"
-import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils"
-import { remember, generateKey, invalidatePattern } from "@/lib/cache"
+import { withSchoolAccess } from "@/lib/api-auth";
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 const normalizeClassName = (value) => value?.trim().replace(/\s+/g, " ") || "";
 
@@ -33,9 +34,9 @@ const dedupeClassesByName = (classes = []) => {
     const currentSections = cls?.sections?.length || 0;
 
     const shouldReplace =
-      currentStudents > existingStudents ||
-      (currentStudents === existingStudents && currentSections > existingSections) ||
-      (currentStudents === existingStudents && currentSections === existingSections && cls.id > existing.id);
+    currentStudents > existingStudents ||
+    currentStudents === existingStudents && currentSections > existingSections ||
+    currentStudents === existingStudents && currentSections === existingSections && cls.id > existing.id;
 
     if (shouldReplace) {
       deduped.set(key, cls);
@@ -46,25 +47,25 @@ const dedupeClassesByName = (classes = []) => {
 };
 
 // 👉 Create new class and automatically connect to active academic year
-export async function POST(req, props) {
-  const params = await props.params
+export const POST = withSchoolAccess(async function POST(req, props) {
+  const params = await props.params;
   try {
-    const { schoolId: routeSchoolId } = params
-    const { name, schoolId: bodySchoolId, capacity, sections: sectionCount } = await req.json()
-    const normalizedName = normalizeClassName(name)
-    const schoolId = routeSchoolId || bodySchoolId
+    const { schoolId: routeSchoolId } = params;
+    const { name, schoolId: bodySchoolId, capacity, sections: sectionCount } = await req.json();
+    const normalizedName = normalizeClassName(name);
+    const schoolId = routeSchoolId || bodySchoolId;
 
     if (!normalizedName || !schoolId) {
-      return NextResponse.json({ error: "Name and schoolId are required" }, { status: 400 })
+      return NextResponse.json({ error: "Name and schoolId are required" }, { status: 400 });
     }
 
     // Fetch the active academic year for the given schoolId
     const activeAcademicYear = await prisma.academicYear.findFirst({
       where: {
         schoolId,
-        isActive: true,
-      },
-    })
+        isActive: true
+      }
+    });
 
     // Prevent duplicates for the active academic year, while also catching
     // legacy rows that may have been created without an academicYearId.
@@ -72,28 +73,28 @@ export async function POST(req, props) {
       where: {
         schoolId,
         className: { equals: normalizedName, mode: "insensitive" },
-        ...(activeAcademicYear
-          ? {
-              OR: [
-                { academicYearId: activeAcademicYear.id },
-                { academicYearId: null },
-              ],
-            }
-          : {}),
+        ...(activeAcademicYear ?
+        {
+          OR: [
+          { academicYearId: activeAcademicYear.id },
+          { academicYearId: null }]
+
+        } :
+        {})
       },
       include: {
-        sections: { orderBy: { name: "asc" } },
-      },
-    })
+        sections: { orderBy: { name: "asc" } }
+      }
+    });
 
     if (existingClass) {
       return NextResponse.json(
         {
           error: `Class ${normalizedName} already exists for this school/academic year.`,
-          existingClass,
+          existingClass
         },
         { status: 409 }
-      )
+      );
     }
 
     // Use transaction to create class + sections in one go
@@ -104,65 +105,65 @@ export async function POST(req, props) {
           schoolId,
           capacity: capacity ? parseInt(capacity, 10) : null,
           ...(activeAcademicYear && {
-            academicYearId: activeAcademicYear.id,
-          }),
-        },
-      })
+            academicYearId: activeAcademicYear.id
+          })
+        }
+      });
 
       // Auto-generate sections if requested (1 → A, 2 → A,B, etc.)
-      const numSections = parseInt(sectionCount, 10) || 0
+      const numSections = parseInt(sectionCount, 10) || 0;
       if (numSections > 0) {
-        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        const sectionData = []
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const sectionData = [];
         for (let i = 0; i < Math.min(numSections, 26); i++) {
           sectionData.push({
             name: letters[i],
             classId: newClass.id,
-            schoolId,
-          })
+            schoolId
+          });
         }
-        await tx.section.createMany({ data: sectionData })
+        await tx.section.createMany({ data: sectionData });
       }
 
       // Return with sections included
       return tx.class.findUnique({
         where: { id: newClass.id },
         include: {
-          sections: { orderBy: { name: 'asc' } },
-        },
-      })
-    })
+          sections: { orderBy: { name: 'asc' } }
+        }
+      });
+    });
 
     // Invalidate classes cache (schoolId is in the middle of sorted key params)
-    await invalidatePattern(`classes:*schoolId:${schoolId}*`)
-    await invalidatePattern('classes:stats*')
+    await invalidatePattern(`classes:*schoolId:${schoolId}*`);
+    await invalidatePattern('classes:stats*');
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error(error)
-    return NextResponse.json({ error: "Failed to create class" }, { status: 500 })
+    console.error(error);
+    return NextResponse.json({ error: "Failed to create class" }, { status: 500 });
   }
-}
+});
 
 // Fetch classes with server-side search, filters, sort, and pagination
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   try {
-    const { schoolId } = params
-    const { searchParams } = new URL(req.url)
-    const academicYearId = searchParams.get("academicYearId")
-    const getAcademicYear = searchParams.get("getAcademicYear") === "true"
-    const getStudent = searchParams.get("getStudent") === "true"
-    const showStructure = searchParams.get("showStructure") === "true"
+    const { schoolId } = params;
+    const { searchParams } = new URL(req.url);
+    const academicYearId = searchParams.get("academicYearId");
+    const getAcademicYear = searchParams.get("getAcademicYear") === "true";
+    const getStudent = searchParams.get("getStudent") === "true";
+    const showStructure = searchParams.get("showStructure") === "true";
 
     // Server-side search & filter params
-    const search = searchParams.get("search")?.trim() || ""
-    const teacherFilter = searchParams.get("teacherFilter") || "ALL" // ALL | ASSIGNED | UNASSIGNED
-    const capacityFilter = searchParams.get("capacityFilter") || "ALL" // ALL | OVER | EMPTY
-    const sort = searchParams.get("sort") || "name_asc" // name_asc | name_desc
+    const search = searchParams.get("search")?.trim() || "";
+    const teacherFilter = searchParams.get("teacherFilter") || "ALL"; // ALL | ASSIGNED | UNASSIGNED
+    const capacityFilter = searchParams.get("capacityFilter") || "ALL"; // ALL | OVER | EMPTY
+    const sort = searchParams.get("sort") || "name_asc"; // name_asc | name_desc
 
     if (!schoolId) {
-      return errorResponse("schoolId is required", 400)
+      return errorResponse("schoolId is required", 400);
     }
 
     const { page, limit, skip } = getPagination(req);
@@ -188,50 +189,50 @@ export async function GET(req, props) {
       if (!effectiveAcademicYearId) {
         const activeYear = await prisma.academicYear.findFirst({
           where: { schoolId, isActive: true },
-          select: { id: true },
+          select: { id: true }
         });
         if (activeYear) effectiveAcademicYearId = activeYear.id;
       }
 
       const where = {
         schoolId,
-        ...(effectiveAcademicYearId && { academicYearId: effectiveAcademicYearId }),
+        ...(effectiveAcademicYearId && { academicYearId: effectiveAcademicYearId })
       };
 
       // If searching, match against class name, section name, or teacher name
       if (search) {
         where.OR = [
-          { className: { contains: search, mode: "insensitive" } },
-          {
-            sections: {
-              some: {
-                OR: [
-                  { name: { contains: search, mode: "insensitive" } },
-                  { teachingStaff: { name: { contains: search, mode: "insensitive" } } },
-                ]
-              }
+        { className: { contains: search, mode: "insensitive" } },
+        {
+          sections: {
+            some: {
+              OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { teachingStaff: { name: { contains: search, mode: "insensitive" } } }]
+
             }
-          },
-        ]
+          }
+        }];
+
       }
 
       // Teacher filter: only classes that have at least one section matching the criteria
       if (teacherFilter === "ASSIGNED") {
         where.sections = {
           ...where.sections,
-          some: { ...where.sections?.some, teachingStaffUserId: { not: null } },
-        }
+          some: { ...where.sections?.some, teachingStaffUserId: { not: null } }
+        };
       } else if (teacherFilter === "UNASSIGNED") {
         where.sections = {
           ...where.sections,
-          some: { ...where.sections?.some, teachingStaffUserId: null },
-        }
+          some: { ...where.sections?.some, teachingStaffUserId: null }
+        };
       }
 
       // Determine sort order
-      const orderBy = sort === "name_desc"
-        ? { className: "desc" }
-        : { className: "asc" }
+      const orderBy = sort === "name_desc" ?
+      { className: "desc" } :
+      { className: "asc" };
 
       const include = {
         FeeStructure: {
@@ -240,9 +241,9 @@ export async function GET(req, props) {
               include: {
                 StudentFeeParticular: {
                   include: {
-                    globalParticular: true,
+                    globalParticular: true
                   }
-                },
+                }
               }
             }
           }
@@ -250,7 +251,7 @@ export async function GET(req, props) {
         sections: {
           include: {
             subjectTeachers: {
-              include: { teacher: true, subject: true },
+              include: { teacher: true, subject: true }
             },
             teachingStaff: true,
             _count: {
@@ -259,13 +260,13 @@ export async function GET(req, props) {
               }
             }
           },
-          orderBy: { name: "asc" },
+          orderBy: { name: "asc" }
         },
         ...(getAcademicYear && { AcademicYear: true }),
-        ...(getStudent
-          ? { students: true }
-          : { _count: { select: { students: true, FeeStructure: true } } }),
-        ...(showStructure && { FeeStructure: true }),
+        ...(getStudent ?
+        { students: true } :
+        { _count: { select: { students: true, FeeStructure: true } } }),
+        ...(showStructure && { FeeStructure: true })
       };
 
       let classes;
@@ -276,31 +277,31 @@ export async function GET(req, props) {
         total = classes.length;
       } else {
         [classes, total] = await Promise.all([
-          prisma.class.findMany({
-            where,
-            include,
-            orderBy,
-            skip,
-            take: limit,
-          }),
-          prisma.class.count({ where }),
-        ]);
+        prisma.class.findMany({
+          where,
+          include,
+          orderBy,
+          skip,
+          take: limit
+        }),
+        prisma.class.count({ where })]
+        );
       }
 
       classes = dedupeClassesByName(classes);
 
       // Post-process: capacity filter (can't be done in Prisma where easily)
       if (capacityFilter === "OVER") {
-        classes = classes.filter(cls => {
-          if (!cls.capacity) return false
-          return cls.sections?.some(sec => (sec._count?.students || 0) > cls.capacity)
-        })
-        if (!isAll) total = classes.length // adjust total for capacity-filtered results
+        classes = classes.filter((cls) => {
+          if (!cls.capacity) return false;
+          return cls.sections?.some((sec) => (sec._count?.students || 0) > cls.capacity);
+        });
+        if (!isAll) total = classes.length; // adjust total for capacity-filtered results
       } else if (capacityFilter === "EMPTY") {
-        classes = classes.filter(cls => {
-          return cls.sections?.some(sec => (sec._count?.students || 0) === 0)
-        })
-        if (!isAll) total = classes.length
+        classes = classes.filter((cls) => {
+          return cls.sections?.some((sec) => (sec._count?.students || 0) === 0);
+        });
+        if (!isAll) total = classes.length;
       }
 
       // Post-process: fee structure assignment check
@@ -309,16 +310,16 @@ export async function GET(req, props) {
           const assigned = await prisma.class.findFirst({
             where: {
               id: cls.id,
-              academicYearId,
+              academicYearId
             },
             include: {
-              FeeStructure: true,
+              FeeStructure: true
             }
           });
 
           return {
             ...cls,
-            isStructureAssigned: !!assigned,
+            isStructureAssigned: !!assigned
           };
         })
       );
@@ -331,7 +332,7 @@ export async function GET(req, props) {
           total: processedClasses.length,
           page,
           limit,
-          totalPages: Math.ceil(processedClasses.length / (limit || 1)),
+          totalPages: Math.ceil(processedClasses.length / (limit || 1))
         }
       };
 
@@ -343,7 +344,7 @@ export async function GET(req, props) {
     }
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[CLASS_GET_ERROR]", error)
-    return errorResponse("Failed to fetch classes")
+    console.error("[CLASS_GET_ERROR]", error);
+    return errorResponse("Failed to fetch classes");
   }
-}
+});

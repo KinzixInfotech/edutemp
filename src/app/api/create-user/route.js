@@ -1,10 +1,11 @@
 // import { PrismaClient } from '@prisma/client';
 
 import prisma from "@/lib/prisma";
+import { withSchoolAccess } from "@/lib/api-auth";
 
 // const prisma = new PrismaClient();
 
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const { email, name, role, schoolId } = body;
@@ -30,4 +31,4 @@ export async function POST(req) {
         console.error(error);
         return Response.json({ error: 'Server error' }, { status: 500 });
     }
-}
+});

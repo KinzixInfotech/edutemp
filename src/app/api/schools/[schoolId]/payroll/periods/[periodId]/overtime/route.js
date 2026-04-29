@@ -1,14 +1,15 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getPayrollConfigForSchool } from '@/lib/payroll/config';
 
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   const { schoolId, periodId } = params;
 
   try {
     const period = await prisma.payrollPeriod.findUnique({
-      where: { id: periodId },
+      where: { id: periodId }
     });
 
     if (!period) {
@@ -25,16 +26,16 @@ export async function GET(req, props) {
         schoolId,
         date: {
           gte: period.startDate,
-          lte: period.endDate,
+          lte: period.endDate
         },
         overtimeHours: { gt: 0 },
         checkOutTime: { not: null },
         user: {
           payrollProfile: {
             schoolId,
-            isActive: true,
-          },
-        },
+            isActive: true
+          }
+        }
       },
       include: {
         user: {
@@ -45,17 +46,17 @@ export async function GET(req, props) {
             payrollProfile: {
               select: {
                 id: true,
-                employeeType: true,
-              },
-            },
-          },
-        },
+                employeeType: true
+              }
+            }
+          }
+        }
       },
       orderBy: [
-        { overtimeStatus: 'asc' },
-        { overtimeHours: 'desc' },
-        { date: 'asc' },
-      ],
+      { overtimeStatus: 'asc' },
+      { overtimeHours: 'desc' },
+      { date: 'asc' }]
+
     });
 
     return NextResponse.json({
@@ -64,7 +65,7 @@ export async function GET(req, props) {
         includeOvertimeInPayroll: payrollConfig.includeOvertimeInPayroll,
         overtimeRequiresApproval: payrollConfig.overtimeRequiresApproval,
         overtimeRate: payrollConfig.overtimeRate,
-        standardWorkingHours: payrollConfig.standardWorkingHours,
+        standardWorkingHours: payrollConfig.standardWorkingHours
       },
       records: records.map((record) => ({
         id: record.id,
@@ -82,32 +83,32 @@ export async function GET(req, props) {
         overtimeApprovedAt: record.overtimeApprovedAt,
         overtimeApprovalRemarks: record.overtimeApprovalRemarks,
         checkoutType: record.checkoutType,
-        isExtended: record.isExtended,
-      })),
+        isExtended: record.isExtended
+      }))
     });
   } catch (error) {
     console.error('Payroll overtime fetch error:', error);
     return NextResponse.json({
       error: 'Failed to fetch overtime records',
-      details: error.message,
+      details: error.message
     }, { status: 500 });
   }
-}
+});
 
-export async function PATCH(req, props) {
+export const PATCH = withSchoolAccess(async function PATCH(req, props) {
   const params = await props.params;
   const { schoolId, periodId } = params;
   const { attendanceId, action, approvedBy, remarks } = await req.json();
 
   if (!attendanceId || !action || !['APPROVE', 'REJECT'].includes(action)) {
     return NextResponse.json({
-      error: 'attendanceId and action (APPROVE/REJECT) are required',
+      error: 'attendanceId and action (APPROVE/REJECT) are required'
     }, { status: 400 });
   }
 
   try {
     const period = await prisma.payrollPeriod.findUnique({
-      where: { id: periodId },
+      where: { id: periodId }
     });
 
     if (!period) {
@@ -119,7 +120,7 @@ export async function PATCH(req, props) {
     }
 
     const attendance = await prisma.attendance.findUnique({
-      where: { id: attendanceId },
+      where: { id: attendanceId }
     });
 
     if (!attendance || attendance.schoolId !== schoolId) {
@@ -136,19 +137,19 @@ export async function PATCH(req, props) {
         overtimeStatus: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
         overtimeApprovedBy: approvedBy || null,
         overtimeApprovedAt: new Date(),
-        overtimeApprovalRemarks: remarks || null,
-      },
+        overtimeApprovalRemarks: remarks || null
+      }
     });
 
     return NextResponse.json({
       success: true,
-      record: updated,
+      record: updated
     });
   } catch (error) {
     console.error('Payroll overtime approval error:', error);
     return NextResponse.json({
       error: 'Failed to update overtime approval',
-      details: error.message,
+      details: error.message
     }, { status: 500 });
   }
-}
+});

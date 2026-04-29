@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
 
 // Parse incoming login body
 const loginSchema = z.object({
@@ -44,7 +45,7 @@ export async function POST(req) {
 
     // If SUPER_ADMIN - only allow without school code
     if (userRole === "SUPER_ADMIN") {
-      if (loginSchoolCode) {
+      if (schoolCode) {
         return NextResponse.json({ error: "Super admins should not use school code." }, { status: 403 });
       }
       console.log("Super Admin login successful.");
@@ -78,7 +79,7 @@ export async function POST(req) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "Role not permitted for school login." }, { status: 403 });
     }
-    if (!loginSchoolCode) {
+    if (!schoolCode) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "School code required for this role." }, { status: 400 });
     }
@@ -90,49 +91,31 @@ export async function POST(req) {
     });
 
     // Step 4️⃣: Resolve schoolId based on user role
-    let userSchoolId = null;
-
-    switch (userRole) {
-      case "ADMIN":
-        userSchoolId = (await prisma.admin.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "TEACHING_STAFF":
-        userSchoolId = (await prisma.teachingStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "NON_TEACHING_STAFF":
-        userSchoolId = (await prisma.nonTeachingStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "STUDENT":
-        userSchoolId = (await prisma.student.findFirst({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "PARENT":
-        const parent = await prisma.parent.findUnique({
-          where: { userId: user.id },
-          include: { studentLinks: { select: { student: { select: { schoolId: true } } }, take: 1 } },
-        });
-        userSchoolId = parent?.studentLinks?.[0]?.student?.schoolId || null;
-        break;
-      case "LIBRARIAN":
-        userSchoolId = (await prisma.librarian.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "ACCOUNTANT":
-        userSchoolId = (await prisma.accountant.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "DIRECTOR":
-        userSchoolId = (await prisma.director.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "PRINCIPAL":
-        userSchoolId = (await prisma.principal.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-      case "DRIVER":
-      case "CONDUCTOR":
-        userSchoolId = (await prisma.transportStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
-        break;
-    }
+    const userSchoolId = await resolveSchoolIdForUser(user);
 
     if (!userSchoolId) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "School not linked to user" }, { status: 400 });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: userSchoolId },
+      select: { id: true, schoolCode: true },
+    });
+
+    if (!school || school.schoolCode !== schoolCode) {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: "School code does not match the user's school" }, { status: 403 });
+    }
+
+    const schoolAccess = await enforceSchoolStateAccess({
+      schoolId: userSchoolId,
+      method: req.method,
+    });
+
+    if (!schoolAccess.ok) {
+      await supabase.auth.signOut();
+      return schoolAccess.response;
     }
 
     // ✅ All good
@@ -141,7 +124,7 @@ export async function POST(req) {
         id: user.id,
         email: user.email,
         role: user.role,
-        schoolId,
+        schoolId: userSchoolId,
       },
     });
 

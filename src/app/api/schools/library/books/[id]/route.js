@@ -1,34 +1,34 @@
-// pages/api/library/books/[id].js
+import { withSchoolAccess } from "@/lib/api-auth"; // pages/api/library/books/[id].js
 
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function PUT(req, props) {
+export const PUT = withSchoolAccess(async function PUT(req, props) {
   const params = await props.params;
-    const { id } = params; // ✅ await params before accessing id
-    try {
-        const body = await req.json(); // ✅ parse the body
-        const { title, ISBN, author, publisher, edition, category, status } = body;
+  const { id } = params; // ✅ await params before accessing id
+  try {
+    const body = await req.json(); // ✅ parse the body
+    const { title, ISBN, author, publisher, edition, category, status } = body;
 
-        const book = await prisma.libraryBook.update({
-            where: { id },
-            data: { title, ISBN, author, publisher, edition, category, status },
-        });
+    const book = await prisma.libraryBook.update({
+      where: { id },
+      data: { title, ISBN, author, publisher, edition, category, status }
+    });
 
-        return NextResponse.json(book); // ✅ return updated book
-    } catch (error) {
-        console.error("Update error:", error); // ✅ log actual error
-        return NextResponse.json({ error: "Failed to update book" }, { status: 500 });
-    }
-}
+    return NextResponse.json(book); // ✅ return updated book
+  } catch (error) {
+    console.error("Update error:", error); // ✅ log actual error
+    return NextResponse.json({ error: "Failed to update book" }, { status: 500 });
+  }
+});
 
-export async function DELETE(req, props) {
+export const DELETE = withSchoolAccess(async function DELETE(req, props) {
   const params = await props.params;
-    const { id } = params;
-    try {
-        await prisma.libraryBook.delete({ where: { id } });
-        return NextResponse.json({ message: "Book deleted successfully" }, { status: 200 });
-    } catch (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-}
+  const { id } = params;
+  try {
+    await prisma.libraryBook.delete({ where: { id } });
+    return NextResponse.json({ message: "Book deleted successfully" }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+});

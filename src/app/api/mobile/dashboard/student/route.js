@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { remember } from '@/lib/cache';
+import { enforceSchoolStateAccess } from '@/lib/school-account-state';
 
 /**
  * GET /api/mobile/dashboard/student
@@ -18,6 +19,11 @@ export async function GET(request) {
                 { error: 'Missing required parameters: schoolId, userId' },
                 { status: 400 }
             );
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({ schoolId, method: request.method });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         // Fetch the active academic year for this school
@@ -329,4 +335,3 @@ async function fetchStudentInfo(userId) {
         return null;
     }
 }
-

@@ -1,76 +1,77 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { remember, generateKey, delCache } from "@/lib/cache";
 
-export async function GET(request, { params }) {
-    try {
-        const { schoolId } = await params;
+export const GET = withSchoolAccess(async function GET(request, { params }) {
+  try {
+    const { schoolId } = await params;
 
-        const cacheKey = generateKey('library:stats', { schoolId });
+    const cacheKey = generateKey('library:stats', { schoolId });
 
-        const stats = await remember(cacheKey, async () => {
-            const [
-                totalBooks,
-                booksWithCopies,
-                totalCopies,
-                issuedCopies,
-                overdueTransactions,
-                totalFines,
-            ] = await Promise.all([
-                prisma.libraryBook.count({ where: { schoolId } }),
+    const stats = await remember(cacheKey, async () => {
+      const [
+      totalBooks,
+      booksWithCopies,
+      totalCopies,
+      issuedCopies,
+      overdueTransactions,
+      totalFines] =
+      await Promise.all([
+      prisma.libraryBook.count({ where: { schoolId } }),
 
-                // Books that have at least one copy added
-                prisma.libraryBook.count({
-                    where: {
-                        schoolId,
-                        copies: { some: {} },
-                    },
-                }),
+      // Books that have at least one copy added
+      prisma.libraryBook.count({
+        where: {
+          schoolId,
+          copies: { some: {} }
+        }
+      }),
 
-                prisma.libraryBookCopy.count({ where: { book: { schoolId } } }),
+      prisma.libraryBookCopy.count({ where: { book: { schoolId } } }),
 
-                prisma.libraryBookCopy.count({
-                    where: { book: { schoolId }, status: "ISSUED" },
-                }),
+      prisma.libraryBookCopy.count({
+        where: { book: { schoolId }, status: "ISSUED" }
+      }),
 
-                prisma.libraryTransaction.count({
-                    where: {
-                        copy: { book: { schoolId } },
-                        status: "ISSUED",
-                        dueDate: { lt: new Date() },
-                    },
-                }),
+      prisma.libraryTransaction.count({
+        where: {
+          copy: { book: { schoolId } },
+          status: "ISSUED",
+          dueDate: { lt: new Date() }
+        }
+      }),
 
-                prisma.libraryTransaction.aggregate({
-                    where: {
-                        copy: { book: { schoolId } },
-                        finePaid: true,
-                    },
-                    _sum: {
-                        fineAmount: true,
-                    },
-                }),
-            ]);
+      prisma.libraryTransaction.aggregate({
+        where: {
+          copy: { book: { schoolId } },
+          finePaid: true
+        },
+        _sum: {
+          fineAmount: true
+        }
+      })]
+      );
 
-            return {
-                totalBooks,
-                totalCopies,
-                issuedCopies,
-                availableCopies: totalCopies - issuedCopies,
-                booksWithCopies,
-                booksWithoutCopies: totalBooks - booksWithCopies,
-                overdueBooks: overdueTransactions,
-                totalFinesCollected: totalFines._sum.fineAmount || 0,
-                hello: "hello",
-            };
-        }, 300);
+      return {
+        totalBooks,
+        totalCopies,
+        issuedCopies,
+        availableCopies: totalCopies - issuedCopies,
+        booksWithCopies,
+        booksWithoutCopies: totalBooks - booksWithCopies,
+        overdueBooks: overdueTransactions,
+        totalFinesCollected: totalFines._sum.fineAmount || 0,
+        hello: "hello"
+      };
+    }, 300);
 
-        return NextResponse.json(stats);
-    } catch (error) {
-        console.error("Error fetching library stats:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch stats" },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(stats);
+  } catch (error) {
+    console.error("Error fetching library stats:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch stats" },
+      { status: 500 }
+    );
+  }
+});

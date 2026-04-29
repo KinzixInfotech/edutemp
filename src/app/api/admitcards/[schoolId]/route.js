@@ -1,12 +1,11 @@
-// app/api/admitcards/[schoolId]/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/admitcards/[schoolId]/route.js
 import { NextResponse } from 'next/server';
 
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import prisma from '@/lib/prisma';
 
-
-export async function GET(request, props) {
+export const GET = withSchoolAccess(async function GET(request, props) {
   const params = await props.params;
   const schoolId = params.schoolId;
   const { searchParams } = new URL(request.url);
@@ -25,8 +24,8 @@ export async function GET(request, props) {
       include: {
         student: { include: { user: true, class: true } },
         exam: true,
-        school: true,
-      },
+        school: true
+      }
     });
 
     return NextResponse.json(admitCards);
@@ -34,9 +33,9 @@ export async function GET(request, props) {
     console.error('Error fetching admit cards:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
-export async function POST(request, props) {
+export const POST = withSchoolAccess(async function POST(request, props) {
   const params = await props.params;
   const schoolId = params.schoolId;
   const body = await request.json(); // { examId, studentIds: [], center: '' }
@@ -47,7 +46,7 @@ export async function POST(request, props) {
     }
 
     const exam = await prisma.exam.findUnique({
-      where: { id: body.examId },
+      where: { id: body.examId }
     });
 
     if (!exam) {
@@ -57,7 +56,7 @@ export async function POST(request, props) {
     const admitCards = [];
     for (const studentId of body.studentIds) {
       const student = await prisma.student.findUnique({
-        where: { userId: studentId },
+        where: { userId: studentId }
       });
 
       if (!student) continue;
@@ -87,10 +86,10 @@ export async function POST(request, props) {
           schoolId,
           seatNumber,
           center: body.center,
-          layoutConfig: { /* default layout */ },
-          fileUrl,
+          layoutConfig: {/* default layout */},
+          fileUrl
         },
-        include: { student: true, exam: true },
+        include: { student: true, exam: true }
       });
 
       admitCards.push(admitCard);
@@ -101,4 +100,4 @@ export async function POST(request, props) {
     console.error('Error generating admit cards:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

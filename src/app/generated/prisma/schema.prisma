@@ -10,6 +10,11 @@ generator client {
 model School {
   id                     String                  @id @default(uuid()) @db.Uuid
   name                   String
+  status                 SchoolStatus            @default(ACTIVE)
+  freezeType             FreezeType?
+  freezeReason           String?
+  freezeStartedAt        DateTime?
+  freezeUntil            DateTime?
   domain                 String                  @unique
   schoolCode             String                  @unique
   profilePicture         String
@@ -161,6 +166,7 @@ model School {
 
   // Profile Change Requests
   profileChangeRequests ProfileChangeRequest[]
+  auditLogs             AuditLog[]
 
   // Chat / Messaging System
   conversations Conversation[]
@@ -174,6 +180,20 @@ model School {
   globalSubjects   GlobalSubject[]
 
   @@index([name])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+enum SchoolStatus {
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  TERMINATED
+}
+
+enum FreezeType {
+  SOFT
+  HARD
 }
 
 // ============================================
@@ -4352,14 +4372,20 @@ model AttendanceLock {
 model AuditLog {
   id        Int         @id @default(autoincrement())
   userId    String?     @db.Uuid
+  schoolId  String?     @db.Uuid
   action    AuditAction
   tableName String
   rowId     String
   timestamp DateTime    @default(now())
   oldData   Json?
   newData   Json?
+  metadata  Json?
   error     String?
   user      User?       @relation(fields: [userId], references: [id])
+  school    School?     @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, timestamp])
+  @@index([action, timestamp])
 }
 
 enum AuditAction {
@@ -4367,6 +4393,10 @@ enum AuditAction {
   UPDATE
   DELETE
   ERROR
+  SCHOOL_FREEZE
+  SCHOOL_UNFREEZE
+  SCHOOL_TERMINATE
+  SCHOOL_STATUS_AUTOMATED
 }
 
 enum UserStatus {

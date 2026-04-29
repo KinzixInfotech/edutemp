@@ -1,11 +1,11 @@
-// app/api/schools/[schoolId]/attendance/admin/settings/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/schools/[schoolId]/attendance/admin/settings/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getAttendanceConfigSnapshot } from '@/lib/attendance/config';
 import { getSchoolTimezone } from '@/lib/attendance/timezone';
 
 // GET - Fetch current attendance config (auto-creates if not exists)
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   console.log('Attendance settings GET for schoolId:', schoolId);
@@ -24,7 +24,7 @@ export async function GET(req, props) {
       console.log('No attendance config found, creating config row for:', schoolId);
       config = await prisma.attendanceConfig.create({
         data: {
-          school: { connect: { id: schoolId } },
+          school: { connect: { id: schoolId } }
         }
       });
       console.log('Attendance config row created from schema defaults');
@@ -80,10 +80,10 @@ export async function GET(req, props) {
       error: 'Failed to fetch settings'
     }, { status: 500 });
   }
-}
+});
 
 // PUT - Update attendance config
-export async function PUT(req, props) {
+export const PUT = withSchoolAccess(async function PUT(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const updates = await req.json();
@@ -113,9 +113,9 @@ export async function PUT(req, props) {
       enableGeoFencing: updates.enableGeoFencing,
       schoolLatitude: updates.schoolLatitude === '' || updates.schoolLatitude == null ? null : Number(updates.schoolLatitude),
       schoolLongitude: updates.schoolLongitude === '' || updates.schoolLongitude == null ? null : Number(updates.schoolLongitude),
-      allowedRadiusMeters: updates.allowedRadius === '' || updates.allowedRadius == null
-        ? null
-        : Number(updates.allowedRadius ?? updates.allowedRadiusMeters),
+      allowedRadiusMeters: updates.allowedRadius === '' || updates.allowedRadius == null ?
+      null :
+      Number(updates.allowedRadius ?? updates.allowedRadiusMeters),
       autoMarkAbsent: updates.autoMarkAbsent,
       autoMarkTime: updates.autoMarkTime,
       requireApprovalDays: updates.approvalAfterDays ?? updates.requireApprovalDays,
@@ -125,7 +125,7 @@ export async function PUT(req, props) {
       notifyParents: updates.notifyParents,
       enableBiometricAttendance: updates.enableBiometricAttendance,
       calculateOnWeekends: updates.calculateOnWeekends,
-      minAttendancePercent: updates.attendanceThreshold ?? updates.minAttendancePercent,
+      minAttendancePercent: updates.attendanceThreshold ?? updates.minAttendancePercent
     };
 
     Object.keys(normalizedUpdates).forEach((key) => {
@@ -142,15 +142,15 @@ export async function PUT(req, props) {
         select: { websiteConfig: true }
       });
       const nextWebsiteConfig = {
-        ...(school?.websiteConfig || {}),
+        ...(school?.websiteConfig || {})
       };
       if (timezone) {
         nextWebsiteConfig.timezone = timezone;
       }
       if (updates.parentNotifyBeforeMinutes !== undefined) {
-        nextWebsiteConfig.parentNotifyBeforeMinutes = updates.parentNotifyBeforeMinutes === '' || updates.parentNotifyBeforeMinutes == null
-          ? 30
-          : Number(updates.parentNotifyBeforeMinutes);
+        nextWebsiteConfig.parentNotifyBeforeMinutes = updates.parentNotifyBeforeMinutes === '' || updates.parentNotifyBeforeMinutes == null ?
+        30 :
+        Number(updates.parentNotifyBeforeMinutes);
       }
       updatedSchool = await prisma.school.update({
         where: { id: schoolId },
@@ -240,7 +240,7 @@ export async function PUT(req, props) {
       config: {
         ...updatedConfig,
         timezone: getSchoolTimezone(updatedSchool || { websiteConfig: { timezone: updates.timezone || updates.schoolTimezone } }),
-        parentNotifyBeforeMinutes: updatedSchool?.websiteConfig?.parentNotifyBeforeMinutes ?? updates.parentNotifyBeforeMinutes ?? 30,
+        parentNotifyBeforeMinutes: updatedSchool?.websiteConfig?.parentNotifyBeforeMinutes ?? updates.parentNotifyBeforeMinutes ?? 30
       }
     });
 
@@ -250,10 +250,10 @@ export async function PUT(req, props) {
       error: 'Failed to update settings'
     }, { status: 500 });
   }
-}
+});
 
 // POST - Test geofencing configuration
-export async function POST(req, props) {
+export const POST = withSchoolAccess(async function POST(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const { latitude, longitude } = await req.json();
@@ -283,9 +283,9 @@ export async function POST(req, props) {
       distance: Math.round(distance),
       allowedRadius: config.allowedRadiusMeters,
       isWithinRadius,
-      message: isWithinRadius
-        ? `Location is within ${config.allowedRadiusMeters}m radius`
-        : `Location is ${Math.round(distance - config.allowedRadiusMeters)}m outside allowed radius`
+      message: isWithinRadius ?
+      `Location is within ${config.allowedRadiusMeters}m radius` :
+      `Location is ${Math.round(distance - config.allowedRadiusMeters)}m outside allowed radius`
     });
 
   } catch (error) {
@@ -294,19 +294,19 @@ export async function POST(req, props) {
       error: 'Failed to test geofencing'
     }, { status: 500 });
   }
-}
+});
 
 // Helper function
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
 
   const a =
-    Math.sin(Δφ / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  Math.sin(Δφ / 2) ** 2 +
+  Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;

@@ -2,8 +2,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import supabaseServer from '@/lib/supabase-server'; // Use singleton
+import { withSchoolAccess } from '@/lib/api-auth';
 
-export async function GET(req) {
+export const GET = withSchoolAccess(async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
         const schoolId = searchParams.get('schoolId');
@@ -54,4 +55,4 @@ export async function GET(req) {
         console.error('[PARENT CHECK ERROR]', error);
         return NextResponse.json({ error: 'Failed to verify parent status' }, { status: 500 });
     }
-}
+});

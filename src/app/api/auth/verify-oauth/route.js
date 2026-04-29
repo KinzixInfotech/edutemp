@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supbase-admin";
+import { enforceSchoolStateAccess } from "@/lib/school-account-state";
 
 /**
  * POST /api/auth/verify-oauth
@@ -71,6 +72,16 @@ export async function POST(req) {
 
             // Fetch role-specific data
             response = await enrichUserByRole(response, prismaUser);
+
+            if (response.schoolId) {
+                const schoolAccess = await enforceSchoolStateAccess({
+                    schoolId: response.schoolId,
+                    method: req.method,
+                });
+                if (!schoolAccess.ok) {
+                    return schoolAccess.response;
+                }
+            }
 
             return NextResponse.json(response);
         }

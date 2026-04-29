@@ -15,9 +15,7 @@ import {
     BookOpen,
     Building2,
     Snowflake,
-    Trash2,
     AlertTriangle,
-    Loader2,
     ArrowLeft,
     RefreshCw,
     MapPin,
@@ -48,6 +46,8 @@ import { Progress } from '@/components/ui/progress'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
+import SchoolAccountActionDialog from '@/components/schools/SchoolAccountActionDialog'
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316']
 
@@ -68,12 +68,13 @@ export default function ManageSchoolPage({ params }) {
 
     const [activeTab, setActiveTab] = useState('teacher')
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [actionDialog, setActionDialog] = useState({ open: false, action: null })
 
     // ─── Fetch school data ───
     const { data: schoolData, isLoading: schoolLoading } = useQuery({
         queryKey: ['school', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/get-school/${schoolId}`)
+            const res = await fetchWithAuth(`/api/schools/get-school/${schoolId}`)
             if (!res.ok) throw new Error('Failed to fetch school')
             return res.json()
         },
@@ -83,7 +84,7 @@ export default function ManageSchoolPage({ params }) {
     const { data: stats, isLoading: statsLoading } = useQuery({
         queryKey: ['school-stats', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/stats`)
+            const res = await fetchWithAuth(`/api/schools/${schoolId}/stats`)
             if (!res.ok) throw new Error('Failed to fetch stats')
             return res.json()
         },
@@ -95,23 +96,44 @@ export default function ManageSchoolPage({ params }) {
         queryFn: async () => {
             const roleTab = ROLE_TABS.find(t => t.key === activeTab)
             const model = roleTab?.model || activeTab
-            const res = await fetch(`/api/schools/${schoolId}/profiles?role=${model}`)
+            const res = await fetchWithAuth(`/api/schools/${schoolId}/profiles?role=${model}`)
             if (!res.ok) throw new Error('Failed to fetch profiles')
             return res.json()
         },
     })
 
     // ─── Freeze mutation ───
-    const freezeMutation = useMutation({
-        mutationFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/freeze`, { method: 'PATCH' })
-            if (!res.ok) throw new Error('Failed to update school status')
+    const schoolActionMutation = useMutation({
+        mutationFn: async ({ action, reason }) => {
+            let url = `/api/admin/schools/${schoolId}/freeze`
+            let body = { type: 'SOFT', reason }
+
+            if (action === 'freeze-hard') {
+                body = { type: 'HARD', reason }
+            } else if (action === 'unfreeze') {
+                url = `/api/admin/schools/${schoolId}/unfreeze`
+                body = {}
+            } else if (action === 'terminate') {
+                url = `/api/admin/schools/${schoolId}/terminate`
+                body = { reason }
+            }
+
+            const res = await fetchWithAuth(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({}))
+                throw new Error(payload.error || 'Failed to update school status')
+            }
             return res.json()
         },
         onSuccess: (data) => {
             toast.success(data.message)
             queryClient.invalidateQueries(['school', schoolId])
             queryClient.invalidateQueries(['schools-enhanced'])
+            setActionDialog({ open: false, action: null })
         },
         onError: (err) => toast.error(err.message),
     })
@@ -119,7 +141,7 @@ export default function ManageSchoolPage({ params }) {
     // ─── Delete mutation ───
     const deleteMutation = useMutation({
         mutationFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/delete`, { method: 'DELETE' })
+            const res = await fetchWithAuth(`/api/schools/${schoolId}/delete`, { method: 'DELETE' })
             if (!res.ok) throw new Error('Failed to delete school')
             return res.json()
         },
@@ -132,7 +154,6 @@ export default function ManageSchoolPage({ params }) {
     })
 
     const school = schoolData?.school || schoolData || {}
-    const isFrozen = !!school.deletedAt
     const counts = stats?.counts || {}
     const fees = stats?.fees || {}
     const classDistribution = stats?.classDistribution || []
@@ -170,12 +191,17 @@ export default function ManageSchoolPage({ params }) {
                             {schoolLoading ? <Skeleton className="h-8 w-64" /> : (
                                 <>
                                     {school.name || 'School'}
-                                    {isFrozen && (
-                                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400">
-                                            <Snowflake className="w-3 h-3 mr-1" />
-                                            Frozen
-                                        </Badge>
-                                    )}
+                                    <Badge variant="outline" className={
+                                        school.status === 'SUSPENDED'
+                                            ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400'
+                                            : school.status === 'PAST_DUE'
+                                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300'
+                                                : school.status === 'TERMINATED'
+                                                    ? 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-900/40 dark:text-zinc-300'
+                                                    : 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/30 dark:text-green-400'
+                                    }>
+                                        {school.status || 'ACTIVE'}
+                                    </Badge>
                                 </>
                             )}
                         </h1>
@@ -198,18 +224,25 @@ export default function ManageSchoolPage({ params }) {
                     </Button>
                     <Button
                         variant="outline"
-                        onClick={() => freezeMutation.mutate()}
-                        disabled={freezeMutation.isPending}
+                        onClick={() => setActionDialog({ open: true, action: school.status === 'ACTIVE' ? 'freeze-soft' : 'unfreeze' })}
+                        disabled={schoolActionMutation.isPending}
                     >
-                        <Snowflake className={`w-4 h-4 mr-2 ${isFrozen ? 'text-blue-500' : ''}`} />
-                        {isFrozen ? 'Unfreeze' : 'Freeze'}
+                        <Snowflake className="w-4 h-4 mr-2" />
+                        {school.status === 'ACTIVE' ? 'Soft Freeze' : 'Unfreeze'}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => setActionDialog({ open: true, action: 'freeze-hard' })}
+                        disabled={schoolActionMutation.isPending}
+                    >
+                        Hard Freeze
                     </Button>
                     <Button
                         variant="destructive"
-                        onClick={() => setDeleteDialogOpen(true)}
+                        onClick={() => setActionDialog({ open: true, action: 'terminate' })}
+                        disabled={schoolActionMutation.isPending || school.status === 'TERMINATED'}
                     >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete School
+                        Terminate School
                     </Button>
                 </div>
             </div>
@@ -685,6 +718,15 @@ export default function ManageSchoolPage({ params }) {
                 confirmLabel={deleteMutation.isPending ? 'Deleting...' : 'Yes, delete permanently'}
                 onConfirm={() => deleteMutation.mutate()}
                 loading={deleteMutation.isPending}
+            />
+            <SchoolAccountActionDialog
+                key={`${actionDialog.action || 'none'}-${actionDialog.open ? 'open' : 'closed'}`}
+                open={actionDialog.open}
+                onOpenChange={(open) => setActionDialog((state) => ({ ...state, open }))}
+                schoolName={school.name || ''}
+                action={actionDialog.action}
+                loading={schoolActionMutation.isPending}
+                onConfirm={({ reason }) => schoolActionMutation.mutate({ action: actionDialog.action, reason })}
             />
         </div>
     )

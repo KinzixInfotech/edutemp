@@ -1,8 +1,8 @@
-// app/api/documents/[schoolId]/[templateId]/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/documents/[schoolId]/[templateId]/route.js
 import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
-export async function PUT(request, props) {
+export const PUT = withSchoolAccess(async function PUT(request, props) {
   const params = await props.params;
   const { schoolId, templateId } = params;
   const body = await request.json();
@@ -15,7 +15,7 @@ export async function PUT(request, props) {
     const template = await prisma.certificateTemplate.update({
       where: { id: templateId },
       data: body,
-      include: { school: { select: { name: true } } },
+      include: { school: { select: { name: true } } }
     });
 
     return NextResponse.json(template);
@@ -23,9 +23,9 @@ export async function PUT(request, props) {
     console.error('Error updating template:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(request, props) {
+export const DELETE = withSchoolAccess(async function DELETE(request, props) {
   const params = await props.params;
   const { schoolId, templateId } = params;
 
@@ -35,7 +35,7 @@ export async function DELETE(request, props) {
     }
 
     await prisma.certificateTemplate.delete({
-      where: { id: templateId },
+      where: { id: templateId }
     });
 
     return NextResponse.json({ message: 'Template deleted' });
@@ -43,4 +43,4 @@ export async function DELETE(request, props) {
     console.error('Error deleting template:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

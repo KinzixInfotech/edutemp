@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
 import {
     School,
     Search,
@@ -11,12 +10,10 @@ import {
     Users,
     GraduationCap,
     Building2,
-    Snowflake,
     ChevronLeft,
     ChevronRight,
     ArrowUpDown,
     RotateCcw,
-    Loader2,
     Eye,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,10 +24,9 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 
 export default function AllSchoolsPage() {
-    const queryClient = useQueryClient()
-
     // State
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -60,37 +56,21 @@ export default function AllSchoolsPage() {
                 ...(debouncedSearch && { search: debouncedSearch }),
                 ...(subscriptionFilter !== 'all' && { subscription: subscriptionFilter }),
             })
-            const res = await fetch(`/api/schools/all-enhanced?${params}`)
+            const res = await fetchWithAuth(`/api/schools/all-enhanced?${params}`)
             if (!res.ok) throw new Error('Failed to fetch schools')
             return res.json()
         },
         keepPreviousData: true,
     })
 
-    const schools = data?.schools || []
     const meta = data?.meta || {}
     const stats = data?.stats || {}
 
-    // Freeze mutation
-    const freezeMutation = useMutation({
-        mutationFn: async (schoolId) => {
-            const res = await fetch(`/api/schools/${schoolId}/freeze`, { method: 'PATCH' })
-            if (!res.ok) throw new Error('Failed to update school status')
-            return res.json()
-        },
-        onSuccess: (data) => {
-            toast.success(data.message)
-            queryClient.invalidateQueries(['schools-enhanced'])
-        },
-        onError: (err) => {
-            toast.error(err.message)
-        },
-    })
-
     // Sort locally within the current page
     const sortedSchools = useMemo(() => {
-        if (!schools.length) return []
-        return [...schools].sort((a, b) => {
+        const rows = data?.schools || []
+        if (!rows.length) return []
+        return [...rows].sort((a, b) => {
             let aVal, bVal
             switch (sortColumn) {
                 case 'name':
@@ -117,7 +97,7 @@ export default function AllSchoolsPage() {
             }
             return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
         })
-    }, [schools, sortColumn, sortDirection])
+    }, [data?.schools, sortColumn, sortDirection])
 
     const clearAllFilters = () => {
         setSearch('')
@@ -135,19 +115,19 @@ export default function AllSchoolsPage() {
         }
     }
 
-    const SortableHeader = ({ column, children }) => (
+    const renderSortableHeader = (column, label) => (
         <TableHead
             className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
             onClick={() => handleSort(column)}
         >
             <div className="flex items-center gap-1">
-                {children}
+                {label}
                 <ArrowUpDown className={`w-4 h-4 ${sortColumn === column ? 'text-primary' : 'text-muted-foreground/50'}`} />
             </div>
         </TableHead>
     )
 
-    const TableLoadingRows = () => (
+    const renderTableLoadingRows = () => (
         <>
             {[1, 2, 3, 4, 5].map(i => (
                 <TableRow key={i}>
@@ -292,19 +272,19 @@ export default function AllSchoolsPage() {
                             <TableHeader>
                                 <TableRow className="dark:bg-background/50 bg-muted/50">
                                     <TableHead className="w-[50px]">Logo</TableHead>
-                                    <SortableHeader column="code">Code</SortableHeader>
-                                    <SortableHeader column="name">School Name</SortableHeader>
+                                    {renderSortableHeader('code', 'Code')}
+                                    {renderSortableHeader('name', 'School Name')}
                                     <TableHead>Location</TableHead>
-                                    <SortableHeader column="students">Students</SortableHeader>
-                                    <SortableHeader column="staff">Staff</SortableHeader>
-                                    <SortableHeader column="classes">Classes</SortableHeader>
+                                    {renderSortableHeader('students', 'Students')}
+                                    {renderSortableHeader('staff', 'Staff')}
+                                    {renderSortableHeader('classes', 'Classes')}
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableLoadingRows />
+                                    renderTableLoadingRows()
                                 ) : sortedSchools.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={9} className="text-center py-12">
@@ -319,7 +299,6 @@ export default function AllSchoolsPage() {
                                     </TableRow>
                                 ) : (
                                     sortedSchools.map((school, index) => {
-                                        const isFrozen = !!school.deletedAt
                                         const totalStaff = (school._count?.TeachingStaff || 0) + (school._count?.NonTeachingStaff || 0)
                                         return (
                                             <TableRow key={school.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? 'bg-muted dark:bg-background/50' : ''}`}>
@@ -360,28 +339,20 @@ export default function AllSchoolsPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {isFrozen ? (
-                                                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">
-                                                            <Snowflake className="w-3 h-3 mr-1" />
-                                                            Frozen
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                                                            Active
-                                                        </Badge>
-                                                    )}
+                                                    <Badge variant="outline" className={
+                                                        school.status === 'SUSPENDED'
+                                                            ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                                                            : school.status === 'PAST_DUE'
+                                                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800'
+                                                                : school.status === 'TERMINATED'
+                                                                    ? 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-900/40 dark:text-zinc-300 dark:border-zinc-800'
+                                                                    : 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
+                                                    }>
+                                                        {school.status}
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="text-xs"
-                                                            onClick={() => freezeMutation.mutate(school.id)}
-                                                            disabled={freezeMutation.isPending}
-                                                        >
-                                                            <Snowflake className="w-3.5 h-3.5" />
-                                                        </Button>
                                                         <Link href={`/dashboard/schools/${school.id}/manage`}>
                                                             <Button size="sm" variant="outline">
                                                                 <Eye className="w-3.5 h-3.5 mr-1" />
@@ -431,6 +402,7 @@ export default function AllSchoolsPage() {
                     )}
                 </CardContent>
             </Card>
+
         </div>
     )
 }

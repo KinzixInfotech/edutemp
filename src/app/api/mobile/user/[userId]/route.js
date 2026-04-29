@@ -5,6 +5,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey, delCache } from '@/lib/cache';
+import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
 
 // Cache TTL: 5 minutes for user profiles (they can change but not that frequently)
 const PROFILE_CACHE_TTL = 300;
@@ -273,6 +274,15 @@ export async function GET(req, context) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId: profile.schoolId,
+            method: req.method,
+            bypass: profile.role?.name === 'SUPER_ADMIN',
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
+        }
+
         const end = performance.now();
         const cacheStatus = end - start < 50 ? 'HIT' : 'MISS';
         console.log(`� [Mobile API] Profile for ${userId} | ${cacheStatus} | ${(end - start).toFixed(2)}ms`);
@@ -299,6 +309,29 @@ export async function PUT(req, context) {
         // Validate input
         if (!profilePicture) {
             return NextResponse.json({ error: 'Missing profilePicture' }, { status: 400 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                schoolId: true,
+                role: { select: { name: true } },
+            },
+        });
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const schoolId = await resolveSchoolIdForUser(user);
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId,
+            method: req.method,
+            bypass: user.role?.name === 'SUPER_ADMIN',
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         console.log(`📱 [Mobile API] Updating profile picture for userId: ${userId}`);

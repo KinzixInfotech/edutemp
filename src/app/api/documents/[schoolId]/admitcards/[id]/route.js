@@ -1,4 +1,4 @@
-// import { NextResponse } from 'next/server';
+import { withSchoolAccess } from "@/lib/api-auth"; // import { NextResponse } from 'next/server';
 // import prisma from '@/lib/prisma';
 
 // export async function GET(request, { params }) {
@@ -150,84 +150,84 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, id } = params;
+export const GET = withSchoolAccess(async function GET(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, id } = params;
 
-        const admitCard = await prisma.admitCard.findFirst({
-            where: {
-                id,
-                schoolId,
+    const admitCard = await prisma.admitCard.findFirst({
+      where: {
+        id,
+        schoolId
+      },
+      include: {
+        student: {
+          select: {
+            name: true,
+            email: true,
+            rollNumber: true,
+            admissionNo: true,
+            class: {
+              select: {
+                className: true
+              }
             },
-            include: {
-                student: {
-                    select: {
-                        name: true,
-                        email: true,
-                        rollNumber: true,
-                        admissionNo: true,
-                        class: {
-                            select: {
-                                className: true,
-                            },
-                        },
-                        section: {
-                            select: {
-                                name: true,
-                            },
-                        },
-                    },
-                },
-                exam: {
-                    select: {
-                        id: true,
-                        title: true,
-                    },
-                },
-            },
-        });
-
-        if (!admitCard) {
-            return NextResponse.json({ error: 'Admit card not found' }, { status: 404 });
+            section: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        exam: {
+          select: {
+            id: true,
+            title: true
+          }
         }
+      }
+    });
 
-        return NextResponse.json(admitCard);
-    } catch (error) {
-        console.error('Error fetching admit card:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch admit card', message: error.message },
-            { status: 500 }
-        );
+    if (!admitCard) {
+      return NextResponse.json({ error: 'Admit card not found' }, { status: 404 });
     }
-}
 
-export async function DELETE(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, id } = params;
+    return NextResponse.json(admitCard);
+  } catch (error) {
+    console.error('Error fetching admit card:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch admit card', message: error.message },
+      { status: 500 }
+    );
+  }
+});
 
-        const admitCard = await prisma.admitCard.findFirst({
-            where: {
-                id,
-                schoolId,
-            },
-        });
+export const DELETE = withSchoolAccess(async function DELETE(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, id } = params;
 
-        if (!admitCard) {
-            return NextResponse.json({ error: 'Admit card not found' }, { status: 404 });
-        }
+    const admitCard = await prisma.admitCard.findFirst({
+      where: {
+        id,
+        schoolId
+      }
+    });
 
-        await prisma.admitCard.delete({
-            where: { id },
-        });
-
-        return NextResponse.json({ message: 'Admit card deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting admit card:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete admit card', message: error.message },
-            { status: 500 }
-        );
+    if (!admitCard) {
+      return NextResponse.json({ error: 'Admit card not found' }, { status: 404 });
     }
-}
+
+    await prisma.admitCard.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ message: 'Admit card deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting admit card:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete admit card', message: error.message },
+      { status: 500 }
+    );
+  }
+});

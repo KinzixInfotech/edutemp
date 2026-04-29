@@ -1,4 +1,4 @@
-
+import { withSchoolAccess } from "@/lib/api-auth";
 // ============================================
 // API: /api/fee/admin/dashboard/route.js
 // Admin fee collection dashboard stats
@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { remember, generateKey } from "@/lib/cache";
 import prisma from "@/lib/prisma";
 
-export async function GET(req) {
+export const GET = withSchoolAccess(async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     // Sanitize UUIDs - remove any trailing characters like :200
@@ -45,7 +45,7 @@ export async function GET(req) {
     // This prevents cache storms when users switch between class filters.
     const cacheKey = generateKey('fee-dashboard', {
       schoolId,
-      academicYearId,
+      academicYearId
     });
 
     // Use Redis caching with 60 second TTL
@@ -55,116 +55,116 @@ export async function GET(req) {
 
       // Parallel queries for performance
       const [
-        totalExpected,
-        totalCollected,
-        totalDiscount,
-        totalBalance,
-        paidCount,
-        partialCount,
-        unpaidCount,
-        overdueCount,
-        recentPayments,
-        overdueStudents,
-        classWiseStats,
-        paymentMethodStats,
-        monthlyCollection,
-      ] = await Promise.all([
-        // Total Expected
-        prisma.studentFee.aggregate({
-          where,
-          _sum: { originalAmount: true },
-        }),
+      totalExpected,
+      totalCollected,
+      totalDiscount,
+      totalBalance,
+      paidCount,
+      partialCount,
+      unpaidCount,
+      overdueCount,
+      recentPayments,
+      overdueStudents,
+      classWiseStats,
+      paymentMethodStats,
+      monthlyCollection] =
+      await Promise.all([
+      // Total Expected
+      prisma.studentFee.aggregate({
+        where,
+        _sum: { originalAmount: true }
+      }),
 
-        // Total Collected
-        prisma.studentFee.aggregate({
-          where,
-          _sum: { paidAmount: true },
-        }),
+      // Total Collected
+      prisma.studentFee.aggregate({
+        where,
+        _sum: { paidAmount: true }
+      }),
 
-        // Total Discount
-        prisma.studentFee.aggregate({
-          where,
-          _sum: { discountAmount: true },
-        }),
+      // Total Discount
+      prisma.studentFee.aggregate({
+        where,
+        _sum: { discountAmount: true }
+      }),
 
-        // Total Balance
-        prisma.studentFee.aggregate({
-          where,
-          _sum: { balanceAmount: true },
-        }),
+      // Total Balance
+      prisma.studentFee.aggregate({
+        where,
+        _sum: { balanceAmount: true }
+      }),
 
-        // Status Counts
-        prisma.studentFee.count({ where: { ...where, status: "PAID" } }),
-        prisma.studentFee.count({ where: { ...where, status: "PARTIAL" } }),
-        prisma.studentFee.count({ where: { ...where, status: "UNPAID" } }),
-        prisma.studentFee.count({ where: { ...where, status: "OVERDUE" } }),
+      // Status Counts
+      prisma.studentFee.count({ where: { ...where, status: "PAID" } }),
+      prisma.studentFee.count({ where: { ...where, status: "PARTIAL" } }),
+      prisma.studentFee.count({ where: { ...where, status: "UNPAID" } }),
+      prisma.studentFee.count({ where: { ...where, status: "OVERDUE" } }),
 
-        // Recent Payments - all payments for the year (client-side pagination)
-        prisma.feePayment.findMany({
-          where: {
-            schoolId,
-            academicYearId,
-            status: "SUCCESS",
-            // Use academic year dates for filtering
-            paymentDate: {
-              gte: startDate,
-              lte: endDate,
-            },
+      // Recent Payments - all payments for the year (client-side pagination)
+      prisma.feePayment.findMany({
+        where: {
+          schoolId,
+          academicYearId,
+          status: "SUCCESS",
+          // Use academic year dates for filtering
+          paymentDate: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        select: {
+          id: true,
+          receiptNumber: true,
+          amount: true,
+          paymentDate: true,
+          paymentMethod: true,
+          paymentMode: true,
+          status: true,
+          receiptUrl: true,
+          transactionId: true,
+          gatewayPaymentId: true,
+          student: {
+            select: {
+              name: true,
+              admissionNo: true,
+              class: { select: { className: true } }
+            }
+          }
+        },
+        orderBy: { paymentDate: "desc" },
+        take: 100
+      }),
+      // Overdue Students
+      prisma.studentFee.findMany({
+        where: {
+          ...where,
+          status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
+          installments: {
+            some: {
+              isOverdue: true,
+              status: { not: "PAID" }
+            }
+          }
+        },
+        include: {
+          student: {
+            select: {
+              userId: true,
+              name: true,
+              admissionNo: true,
+              class: { select: { className: true } },
+              section: { select: { name: true } }
+            }
           },
-          select: {
-            id: true,
-            receiptNumber: true,
-            amount: true,
-            paymentDate: true,
-            paymentMethod: true,
-            paymentMode: true,
-            status: true,
-            receiptUrl: true,
-            transactionId: true,
-            gatewayPaymentId: true,
-            student: {
-              select: {
-                name: true,
-                admissionNo: true,
-                class: { select: { className: true } },
-              },
-            },
-          },
-          orderBy: { paymentDate: "desc" },
-          take: 100,
-        }),
-        // Overdue Students
-        prisma.studentFee.findMany({
-          where: {
-            ...where,
-            status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
-            installments: {
-              some: {
-                isOverdue: true,
-                status: { not: "PAID" },
-              },
-            },
-          },
-          include: {
-            student: {
-              select: {
-                userId: true,
-                name: true,
-                admissionNo: true,
-                class: { select: { className: true } },
-                section: { select: { name: true } },
-              },
-            },
-            installments: {
-              where: { isOverdue: true, status: { not: "PAID" } },
-              orderBy: { dueDate: "asc" },
-            },
-          },
-          take: 20,
-        }),
+          installments: {
+            where: { isOverdue: true, status: { not: "PAID" } },
+            orderBy: { dueDate: "asc" }
+          }
+        },
+        take: 20
+      }),
 
-        // Class-wise collection stats — single raw SQL join (was a 3-query N+1 waterfall)
-        prisma.$queryRaw`
+      // Class-wise collection stats — single raw SQL join (was a 3-query N+1 waterfall)
+      prisma.$queryRaw`
           SELECT
             c.id AS "classId",
             c."className",
@@ -179,34 +179,34 @@ export async function GET(req) {
             AND sf."academicYearId" = ${academicYearId}::uuid
           GROUP BY c.id, c."className"
           ORDER BY c."className"
-        `.then(rows => rows.map(r => ({
-          classId: Number(r.classId),
-          className: r.className,
-          expected: Number(r.expected || 0),
-          collected: Number(r.collected || 0),
-          balance: Number(r.balance || 0),
-          count: Number(r.count || 0),
-        }))).catch(() => []),
+        `.then((rows) => rows.map((r) => ({
+        classId: Number(r.classId),
+        className: r.className,
+        expected: Number(r.expected || 0),
+        collected: Number(r.collected || 0),
+        balance: Number(r.balance || 0),
+        count: Number(r.count || 0)
+      }))).catch(() => []),
 
 
-        // Payment method distribution
-        prisma.feePayment.groupBy({
-          by: ["paymentMethod"],
-          where: {
-            schoolId,
-            academicYearId,
-            status: "SUCCESS",
-            paymentDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-          _sum: { amount: true },
-          _count: true,
-        }),
+      // Payment method distribution
+      prisma.feePayment.groupBy({
+        by: ["paymentMethod"],
+        where: {
+          schoolId,
+          academicYearId,
+          status: "SUCCESS",
+          paymentDate: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        _sum: { amount: true },
+        _count: true
+      }),
 
-        // Monthly collection trend
-        prisma.$queryRaw`
+      // Monthly collection trend
+      prisma.$queryRaw`
   SELECT 
     DATE_TRUNC('month', "paymentDate") AS month,
     SUM("amount") AS total,
@@ -219,9 +219,9 @@ export async function GET(req) {
   GROUP BY month
   ORDER BY month DESC
   LIMIT 12;
-`,
+`]
 
-      ]);
+      );
 
       return safeJSON({
         summary: {
@@ -229,30 +229,30 @@ export async function GET(req) {
           totalCollected: totalCollected._sum.paidAmount || 0,
           totalDiscount: totalDiscount._sum.discountAmount || 0,
           totalBalance: totalBalance._sum.balanceAmount || 0,
-          collectionPercentage: totalExpected._sum.originalAmount
-            ? (
-              (totalCollected._sum.paidAmount /
-                totalExpected._sum.originalAmount) *
-              100
-            ).toFixed(2)
-            : 0,
+          collectionPercentage: totalExpected._sum.originalAmount ?
+          (
+          totalCollected._sum.paidAmount /
+          totalExpected._sum.originalAmount *
+          100).
+          toFixed(2) :
+          0
         },
         statusCounts: {
           paid: paidCount,
           partial: partialCount,
           unpaid: unpaidCount,
           overdue: overdueCount,
-          total: paidCount + partialCount + unpaidCount + overdueCount,
+          total: paidCount + partialCount + unpaidCount + overdueCount
         },
         recentPayments,
         overdueStudents: overdueStudents.map((sf) => ({
           ...sf.student,
           balanceAmount: sf.balanceAmount,
-          overdueInstallments: sf.installments,
+          overdueInstallments: sf.installments
         })),
         classWiseStats,
         paymentMethodStats,
-        monthlyCollection,
+        monthlyCollection
       });
     }, 60); // Cache for 60 seconds
 
@@ -262,7 +262,7 @@ export async function GET(req) {
       const classIdInt = parseInt(classId);
       stats = {
         ...rawStats,
-        classWiseStats: rawStats.classWiseStats?.filter(c => c.classId === classIdInt) || [],
+        classWiseStats: rawStats.classWiseStats?.filter((c) => c.classId === classIdInt) || []
       };
     }
 
@@ -274,12 +274,12 @@ export async function GET(req) {
       { status: 500 }
     );
   }
-}
+});
 
 // Convert BigInt safely
 const safeJSON = (obj) =>
-  JSON.parse(
-    JSON.stringify(obj, (_, value) =>
-      typeof value === 'bigint' ? Number(value) : value
-    )
-  );
+JSON.parse(
+  JSON.stringify(obj, (_, value) =>
+  typeof value === 'bigint' ? Number(value) : value
+  )
+);

@@ -1,49 +1,56 @@
-import prisma from "@/lib/prisma"
-import { NextResponse } from "next/server"
-import { invalidatePattern } from "@/lib/cache"
+import { NextResponse } from 'next/server';
+import { verifyRoleAccess } from '@/lib/api-auth';
+import { freezeSchoolAccount, unfreezeSchoolAccount } from '@/lib/school-account-service';
+import { FREEZE_TYPE, SCHOOL_STATUS, getSchoolAccountState } from '@/lib/school-account-state';
+import { invalidatePattern } from '@/lib/cache';
 
 export async function PATCH(request, props) {
+    const auth = await verifyRoleAccess(request, ['SUPER_ADMIN']);
+    if (auth.error) {
+        return auth.response;
+    }
+
     const params = await props.params;
-    const { schoolId } = params;
+    const schoolId = params.schoolId;
 
     try {
-        // Get current state
-        const school = await prisma.school.findUnique({
-            where: { id: schoolId },
-            select: { id: true, deletedAt: true, name: true },
-        });
-
-        if (!school) {
-            return NextResponse.json({ error: "School not found" }, { status: 404 });
+        const current = await getSchoolAccountState(schoolId);
+        if (!current) {
+            return NextResponse.json({ error: 'School not found' }, { status: 404 });
         }
 
-        const isFrozen = !!school.deletedAt;
+        let school;
+        let message;
 
-        // Toggle freeze state
-        const updated = await prisma.school.update({
-            where: { id: schoolId },
-            data: {
-                deletedAt: isFrozen ? null : new Date(),
-            },
-            select: {
-                id: true,
-                name: true,
-                deletedAt: true,
-            },
-        });
+        if (current.status === SCHOOL_STATUS.ACTIVE) {
+            school = await freezeSchoolAccount({
+                schoolId,
+                type: FREEZE_TYPE.HARD,
+                reason: 'Legacy freeze action from school manage screen',
+                performedBy: auth.user.id,
+            });
+            message = `School "${school.name}" has been hard frozen and suspended.`;
+        } else {
+            school = await unfreezeSchoolAccount({
+                schoolId,
+                performedBy: auth.user.id,
+            });
+            message = `School "${school.name}" is active again.`;
+        }
 
-        // Invalidate caches
         await invalidatePattern('schools:*');
-        await invalidatePattern(`school:stats:*`);
+        await invalidatePattern(`school:*:${schoolId}*`);
 
         return NextResponse.json({
             success: true,
-            school: updated,
-            action: isFrozen ? 'unfrozen' : 'frozen',
-            message: `School "${updated.name}" has been ${isFrozen ? 'unfrozen' : 'frozen'} successfully.`,
+            school,
+            message,
         });
-    } catch (err) {
-        console.error("[SCHOOL_FREEZE]", err);
-        return NextResponse.json({ error: "Failed to update school status" }, { status: 500 });
+    } catch (error) {
+        console.error('[SCHOOL_FREEZE_LEGACY]', error);
+        return NextResponse.json(
+            { error: error.message || 'Failed to update school status' },
+            { status: 500 },
+        );
     }
 }

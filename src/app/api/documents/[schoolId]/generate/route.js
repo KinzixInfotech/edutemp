@@ -1,9 +1,10 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import { generatePDF } from '@/lib/pdf-generator';
 import { generateCertificateNumber } from '@/lib/utils';
 import prisma from '@/lib/prisma';
 
-export async function POST(request, props) {
+export const POST = withSchoolAccess(async function POST(request, props) {
   const params = await props.params;
   const schoolId = params.schoolId;
   const body = await request.json();
@@ -15,7 +16,7 @@ export async function POST(request, props) {
 
     const template = await prisma.documentTemplate.findUnique({
       where: { id: body.templateId },
-      include: { school: true },
+      include: { school: true }
     });
 
     if (!template) {
@@ -24,7 +25,7 @@ export async function POST(request, props) {
 
     const student = await prisma.student.findUnique({
       where: { userId: body.studentId },
-      include: { user: true, class: true, section: true },
+      include: { user: true, class: true, section: true }
     });
 
     if (!student) {
@@ -41,7 +42,7 @@ export async function POST(request, props) {
         ...student,
         name: student.user.name, // Flatten user data
         photoUrl: student.user.profilePicture,
-        studentId: student.admissionNo || student.userId, // Use admission no as student ID if available
+        studentId: student.admissionNo || student.userId // Use admission no as student ID if available
       },
       certificateNumber,
       issueDate: new Date(),
@@ -70,13 +71,13 @@ export async function POST(request, props) {
         issuedById: body.issuedById || null,
         customFields: body.customFields || {},
         fileUrl: "placeholder_url_pending_upload", // Don't save base64 to DB
-        status: body.status || 'issued',
+        status: body.status || 'issued'
       },
       include: {
         student: { include: { user: true } },
         template: true,
-        school: true,
-      },
+        school: true
+      }
     });
 
     // Return the PDF data so the client can download/view it
@@ -85,4 +86,4 @@ export async function POST(request, props) {
     console.error('Error generating certificate:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

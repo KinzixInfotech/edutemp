@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { uploadToR2, generateFileKey } from "@/lib/r2";
 import prisma from "@/lib/prisma";
+import { enforceSchoolStateAccess } from '@/lib/school-account-state';
 
 /**
  * Mobile Upload API
@@ -27,6 +28,11 @@ export async function POST(req) {
                 { error: "School ID is required" },
                 { status: 400 }
             );
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({ schoolId, method: req.method });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         // Convert file to buffer for R2 upload

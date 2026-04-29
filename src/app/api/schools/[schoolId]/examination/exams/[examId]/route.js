@@ -1,154 +1,155 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/exams/[examId]
-export async function GET(req, props) {
-    const params = await props.params;
-    try {
-        const { examId } = params;
+export const GET = withSchoolAccess(async function GET(req, props) {
+  const params = await props.params;
+  try {
+    const { examId } = params;
 
-        const exam = await prisma.exam.findUnique({
-            where: { id: examId },
-            include: {
-                academicYear: true,
-                classes: true,
-                subjects: {
-                    include: {
-                        subject: true,
-                    },
-                    orderBy: {
-                        date: 'asc',
-                    },
-                },
-                school: true,
-            },
-        });
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        academicYear: true,
+        classes: true,
+        subjects: {
+          include: {
+            subject: true
+          },
+          orderBy: {
+            date: 'asc'
+          }
+        },
+        school: true
+      }
+    });
 
-        if (!exam) {
-            return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
-        }
-
-        return NextResponse.json(exam);
-    } catch (error) {
-        console.error('Error fetching exam:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch exam' },
-            { status: 500 }
-        );
+    if (!exam) {
+      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
-}
+
+    return NextResponse.json(exam);
+  } catch (error) {
+    console.error('Error fetching exam:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch exam' },
+      { status: 500 }
+    );
+  }
+});
 
 // PUT /api/schools/[schoolId]/examination/exams/[examId]
-export async function PUT(req, props) {
-    const params = await props.params;
-    try {
-        const { examId } = params;
-        const body = await req.json();
-        const { title, type, startDate, endDate, status, classIds } = body;
+export const PUT = withSchoolAccess(async function PUT(req, props) {
+  const params = await props.params;
+  try {
+    const { examId } = params;
+    const body = await req.json();
+    const { title, type, startDate, endDate, status, classIds } = body;
 
-        const exam = await prisma.exam.update({
-            where: { id: examId },
-            data: {
-                title,
-                type,
-                startDate: startDate ? new Date(startDate) : undefined,
-                endDate: endDate ? new Date(endDate) : undefined,
-                status,
-                classes: classIds
-                    ? {
-                        set: classIds.map((id) => ({ id: parseInt(id) })),
-                    }
-                    : undefined,
-                securitySettings: body.securitySettings !== undefined ? body.securitySettings : undefined,
-            },
-            include: {
-                classes: true // Needed for notification targeting
-            }
-        });
+    const exam = await prisma.exam.update({
+      where: { id: examId },
+      data: {
+        title,
+        type,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        status,
+        classes: classIds ?
+        {
+          set: classIds.map((id) => ({ id: parseInt(id) }))
+        } :
+        undefined,
+        securitySettings: body.securitySettings !== undefined ? body.securitySettings : undefined
+      },
+      include: {
+        classes: true // Needed for notification targeting
+      }
+    });
 
-        // Trigger Notification if Published and Offline
-        if (status === 'PUBLISHED' && exam.type === 'OFFLINE' && exam.classes.length > 0) {
-            // Check if status WAS NOT published before?Ideally yes, but for now we trust the PUT is a status update.
-            // Actually, we should check if it's a state CHANGE. But since we don't fetch old state, we just send it.
-            // Optimization: If multiple PUTs happen, multiple notifs might send. This is acceptable for MVP.
+    // Trigger Notification if Published and Offline
+    if (status === 'PUBLISHED' && exam.type === 'OFFLINE' && exam.classes.length > 0) {
+      // Check if status WAS NOT published before?Ideally yes, but for now we trust the PUT is a status update.
+      // Actually, we should check if it's a state CHANGE. But since we don't fetch old state, we just send it.
+      // Optimization: If multiple PUTs happen, multiple notifs might send. This is acceptable for MVP.
 
-            const { notifyExamPublished } = require('@/lib/notifications/notificationHelper');
-            notifyExamPublished({
-                schoolId: params.schoolId,
-                examId: exam.id,
-                examTitle: exam.title,
-                startDate: exam.startDate,
-                classIds: exam.classes.map(c => c.id),
-                senderId: req.headers.get('x-user-id') // Assuming user ID is in headers
-            }).catch(err => console.error('Failed to notify exam publish:', err));
-        }
-
-        return NextResponse.json(exam);
-    } catch (error) {
-        console.error('Error updating exam:', error);
-        return NextResponse.json(
-            { error: 'Failed to update exam' },
-            { status: 500 }
-        );
+      const { notifyExamPublished } = require('@/lib/notifications/notificationHelper');
+      notifyExamPublished({
+        schoolId: params.schoolId,
+        examId: exam.id,
+        examTitle: exam.title,
+        startDate: exam.startDate,
+        classIds: exam.classes.map((c) => c.id),
+        senderId: req.headers.get('x-user-id') // Assuming user ID is in headers
+      }).catch((err) => console.error('Failed to notify exam publish:', err));
     }
-}
+
+    return NextResponse.json(exam);
+  } catch (error) {
+    console.error('Error updating exam:', error);
+    return NextResponse.json(
+      { error: 'Failed to update exam' },
+      { status: 500 }
+    );
+  }
+});
 
 // DELETE /api/schools/[schoolId]/examination/exams/[examId]
-export async function DELETE(req, props) {
-    const params = await props.params;
-    try {
-        const { examId } = params;
-        const id = examId;
+export const DELETE = withSchoolAccess(async function DELETE(req, props) {
+  const params = await props.params;
+  try {
+    const { examId } = params;
+    const id = examId;
 
-        // Delete all related records in proper order to avoid foreign key constraints
-        await prisma.$transaction(async (tx) => {
-            // Delete hall attendance records
-            await tx.hallAttendance.deleteMany({
-                where: { examId: id }
-            });
+    // Delete all related records in proper order to avoid foreign key constraints
+    await prisma.$transaction(async (tx) => {
+      // Delete hall attendance records
+      await tx.hallAttendance.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete student exam attempts
-            await tx.studentExamAttempt.deleteMany({
-                where: { examId: id }
-            });
+      // Delete student exam attempts
+      await tx.studentExamAttempt.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete online exam questions
-            await tx.onlineExamQuestion.deleteMany({
-                where: { examId: id }
-            });
+      // Delete online exam questions
+      await tx.onlineExamQuestion.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete seat allocations
-            await tx.seatAllocation.deleteMany({
-                where: { examId: id }
-            });
+      // Delete seat allocations
+      await tx.seatAllocation.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete exam results
-            await tx.examResult.deleteMany({
-                where: { examId: id }
-            });
+      // Delete exam results
+      await tx.examResult.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete exam subjects
-            await tx.examSubject.deleteMany({
-                where: { examId: id }
-            });
+      // Delete exam subjects
+      await tx.examSubject.deleteMany({
+        where: { examId: id }
+      });
 
-            // Delete hall invigilators
-            await tx.examHallInvigilator.deleteMany({
-                where: { examId: id }
-            });
+      // Delete hall invigilators
+      await tx.examHallInvigilator.deleteMany({
+        where: { examId: id }
+      });
 
-            // Finally, delete the exam
-            await tx.exam.delete({
-                where: { id }
-            });
-        });
+      // Finally, delete the exam
+      await tx.exam.delete({
+        where: { id }
+      });
+    });
 
-        return NextResponse.json({ message: 'Exam deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting exam:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete exam. Please try again.' },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json({ message: 'Exam deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting exam:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete exam. Please try again.' },
+      { status: 500 }
+    );
+  }
+});

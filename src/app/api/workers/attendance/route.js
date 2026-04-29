@@ -1,3 +1,4 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import prisma from '@/lib/prisma';
@@ -19,41 +20,41 @@ async function handleWorker(req) {
     securityAssessment,
     jobType,
     windowMinutes,
-    now,
+    now
   } = body;
 
   if (jobType === 'SCHEDULED_ATTENDANCE_NOTIFICATIONS') {
     const [notificationStats, lifecycleStats] = await Promise.all([
-      processScheduledAttendanceNotifications({
-        now: now || new Date(),
-        windowMinutes,
-      }),
-      processAttendanceLifecycleWorker({
-        now: now || new Date(),
-        windowMinutes,
-      }),
-    ]);
+    processScheduledAttendanceNotifications({
+      now: now || new Date(),
+      windowMinutes
+    }),
+    processAttendanceLifecycleWorker({
+      now: now || new Date(),
+      windowMinutes
+    })]
+    );
 
     return NextResponse.json({
       success: true,
       jobType,
       stats: {
         notifications: notificationStats,
-        lifecycle: lifecycleStats,
-      },
+        lifecycle: lifecycleStats
+      }
     });
   }
 
   if (jobType === 'SCHEDULED_ATTENDANCE_LIFECYCLE') {
     const stats = await processAttendanceLifecycleWorker({
       now: now || new Date(),
-      windowMinutes,
+      windowMinutes
     });
 
     return NextResponse.json({
       success: true,
       jobType,
-      stats,
+      stats
     });
   }
 
@@ -62,40 +63,40 @@ async function handleWorker(req) {
   }
 
   const [attendance, config, user] = await Promise.all([
-    prisma.attendance.findUnique({
-      where: { id: attendanceId },
-      include: {
-        user: {
-          select: { name: true, role: { select: { name: true } } },
-        },
-      },
-    }),
-    prisma.attendanceConfig.findUnique({
-      where: { schoolId },
-      select: { minAttendancePercent: true },
-    }),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    }),
-  ]);
+  prisma.attendance.findUnique({
+    where: { id: attendanceId },
+    include: {
+      user: {
+        select: { name: true, role: { select: { name: true } } }
+      }
+    }
+  }),
+  prisma.attendanceConfig.findUnique({
+    where: { schoolId },
+    select: { minAttendancePercent: true }
+  }),
+  prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true }
+  })]
+  );
 
   if (!attendance) {
     return NextResponse.json({ error: 'Attendance not found' }, { status: 404 });
   }
 
   const suspiciousSignals = securityAssessment?.suspiciousSignals || [];
-  const belowThreshold = attendance.userId && config?.minAttendancePercent != null
-    ? await prisma.attendanceStats.findFirst({
-      where: {
-        userId: attendance.userId,
-        schoolId,
-        attendancePercentage: { lt: config.minAttendancePercent },
-      },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }],
-      select: { attendancePercentage: true, month: true, year: true },
-    })
-    : null;
+  const belowThreshold = attendance.userId && config?.minAttendancePercent != null ?
+  await prisma.attendanceStats.findFirst({
+    where: {
+      userId: attendance.userId,
+      schoolId,
+      attendancePercentage: { lt: config.minAttendancePercent }
+    },
+    orderBy: [{ year: 'desc' }, { month: 'desc' }],
+    select: { attendancePercentage: true, month: true, year: true }
+  }) :
+  null;
 
   if (suspiciousSignals.length > 0) {
     await createAttendanceAuditLog({
@@ -105,8 +106,8 @@ async function handleWorker(req) {
       action: `${action}_SUSPICIOUS`,
       payload: {
         suspiciousSignals,
-        attendanceDate: attendance.date,
-      },
+        attendanceDate: attendance.date
+      }
     });
 
     await sendNotification({
@@ -120,8 +121,8 @@ async function handleWorker(req) {
       metadata: {
         attendanceId,
         userId,
-        suspiciousSignals,
-      },
+        suspiciousSignals
+      }
     });
   }
 
@@ -139,19 +140,17 @@ async function handleWorker(req) {
         userId,
         thresholdMonth: belowThreshold.month,
         thresholdYear: belowThreshold.year,
-        attendancePercentage: belowThreshold.attendancePercentage,
-      },
+        attendancePercentage: belowThreshold.attendancePercentage
+      }
     });
   }
 
   return NextResponse.json({
     success: true,
     suspiciousSignals,
-    belowThreshold: belowThreshold?.attendancePercentage ?? null,
+    belowThreshold: belowThreshold?.attendancePercentage ?? null
   });
-}
-
-export async function POST(req) {
+}export const POST = withSchoolAccess(async function POST(req) {
   if (IS_DEV) {
     const key = req.headers.get('x-internal-key');
     if (key !== INTERNAL_KEY) {
@@ -161,4 +160,4 @@ export async function POST(req) {
   }
 
   return verifySignatureAppRouter(handleWorker)(req);
-}
+});

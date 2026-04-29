@@ -1,501 +1,501 @@
-// app/api/schools/[schoolId]/attendance/admin/regularization/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/schools/[schoolId]/attendance/admin/regularization/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import {
-    notifyRegularizationRequestCreated,
-    notifyRegularizationApproved,
-    notifyRegularizationRejected
-} from '@/lib/notifications/notificationHelper';
+  notifyRegularizationRequestCreated,
+  notifyRegularizationApproved,
+  notifyRegularizationRejected } from
+'@/lib/notifications/notificationHelper';
 
 // GET - Fetch regularization requests
-export async function GET(req, props) {
-    const params = await props.params;
-    const { schoolId } = params; // Fix: await params
-    const { searchParams } = new URL(req.url);
+export const GET = withSchoolAccess(async function GET(req, props) {
+  const params = await props.params;
+  const { schoolId } = params; // Fix: await params
+  const { searchParams } = new URL(req.url);
 
-    const statusParam = searchParams.get('status');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const userId = searchParams.get('userId');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+  const statusParam = searchParams.get('status');
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '20');
+  const userId = searchParams.get('userId');
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
 
-    try {
-        const skip = (page - 1) * limit;
+  try {
+    const skip = (page - 1) * limit;
 
-        // Smart status handling
-        let approvalStatusCondition;
-        if (statusParam) {
-            const statuses = statusParam.includes(',')
-                ? statusParam.split(',').map(s => s.trim())
-                : [statusParam];
-            approvalStatusCondition = statuses.length === 1
-                ? { approvalStatus: statuses[0] }
-                : { approvalStatus: { in: statuses } };
-        } else {
-            approvalStatusCondition = { approvalStatus: 'PENDING' };
-        }
-
-        const where = {
-            schoolId,
-            ...approvalStatusCondition, // Use smart condition
-            requiresApproval: true,
-            ...(userId && { userId }),
-            ...(startDate && endDate && {
-                date: {
-                    gte: new Date(startDate),
-                    lte: new Date(endDate)
-                }
-            })
-        };
-
-        const [requests, total] = await Promise.all([
-            prisma.attendance.findMany({
-                where,
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            profilePicture: true,
-                            role: { select: { name: true } },
-                            student: {
-                                select: {
-                                    admissionNo: true,
-                                    rollNumber: true,
-                                    class: { select: { className: true } },
-                                    section: { select: { name: true } }
-                                }
-                            },
-                            teacher: {
-                                select: {
-                                    employeeId: true,
-                                    designation: true
-                                }
-                            }
-                        }
-                    },
-                    marker: {
-                        select: { name: true, role: { select: { name: true } } }
-                    },
-                    approver: {
-                        select: { name: true }
-                    },
-                    documents: true
-                },
-                orderBy: [
-                    { date: 'desc' },
-                    { markedAt: 'desc' }
-                ],
-                skip,
-                take: limit
-            }),
-            prisma.attendance.count({ where })
-        ]);
-
-        // Calculate days difference for each request
-        const requestsWithDays = requests.map(req => {
-            const daysDiff = Math.floor(
-                (new Date() - new Date(req.date)) / (1000 * 60 * 60 * 24)
-            );
-
-            return {
-                ...req,
-                daysOld: daysDiff,
-                isPastDate: new Date(req.date) < new Date(new Date().toDateString())
-            };
-        });
-
-        return NextResponse.json({
-            requests: requestsWithDays,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
-        });
-
-    } catch (error) {
-        console.error('Fetch regularization error:', error);
-        return NextResponse.json({
-            error: 'Failed to fetch requests'
-        }, { status: 500 });
+    // Smart status handling
+    let approvalStatusCondition;
+    if (statusParam) {
+      const statuses = statusParam.includes(',') ?
+      statusParam.split(',').map((s) => s.trim()) :
+      [statusParam];
+      approvalStatusCondition = statuses.length === 1 ?
+      { approvalStatus: statuses[0] } :
+      { approvalStatus: { in: statuses } };
+    } else {
+      approvalStatusCondition = { approvalStatus: 'PENDING' };
     }
-}
+
+    const where = {
+      schoolId,
+      ...approvalStatusCondition, // Use smart condition
+      requiresApproval: true,
+      ...(userId && { userId }),
+      ...(startDate && endDate && {
+        date: {
+          gte: new Date(startDate),
+          lte: new Date(endDate)
+        }
+      })
+    };
+
+    const [requests, total] = await Promise.all([
+    prisma.attendance.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            profilePicture: true,
+            role: { select: { name: true } },
+            student: {
+              select: {
+                admissionNo: true,
+                rollNumber: true,
+                class: { select: { className: true } },
+                section: { select: { name: true } }
+              }
+            },
+            teacher: {
+              select: {
+                employeeId: true,
+                designation: true
+              }
+            }
+          }
+        },
+        marker: {
+          select: { name: true, role: { select: { name: true } } }
+        },
+        approver: {
+          select: { name: true }
+        },
+        documents: true
+      },
+      orderBy: [
+      { date: 'desc' },
+      { markedAt: 'desc' }],
+
+      skip,
+      take: limit
+    }),
+    prisma.attendance.count({ where })]
+    );
+
+    // Calculate days difference for each request
+    const requestsWithDays = requests.map((req) => {
+      const daysDiff = Math.floor(
+        (new Date() - new Date(req.date)) / (1000 * 60 * 60 * 24)
+      );
+
+      return {
+        ...req,
+        daysOld: daysDiff,
+        isPastDate: new Date(req.date) < new Date(new Date().toDateString())
+      };
+    });
+
+    return NextResponse.json({
+      requests: requestsWithDays,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Fetch regularization error:', error);
+    return NextResponse.json({
+      error: 'Failed to fetch requests'
+    }, { status: 500 });
+  }
+});
 
 // POST - Approve or reject requests
-export async function POST(req, props) {
-    const params = await props.params;
-    const { schoolId } = params;
-    const { attendanceIds, action, approvedBy, remarks } = await req.json();
+export const POST = withSchoolAccess(async function POST(req, props) {
+  const params = await props.params;
+  const { schoolId } = params;
+  const { attendanceIds, action, approvedBy, remarks } = await req.json();
 
-    if (!attendanceIds || !action || !approvedBy) {
-        return NextResponse.json({
-            error: 'attendanceIds, action, and approvedBy are required'
-        }, { status: 400 });
-    }
+  if (!attendanceIds || !action || !approvedBy) {
+    return NextResponse.json({
+      error: 'attendanceIds, action, and approvedBy are required'
+    }, { status: 400 });
+  }
 
-    if (!['APPROVE', 'REJECT'].includes(action)) {
-        return NextResponse.json({
-            error: 'Invalid action'
-        }, { status: 400 });
-    }
+  if (!['APPROVE', 'REJECT'].includes(action)) {
+    return NextResponse.json({
+      error: 'Invalid action'
+    }, { status: 400 });
+  }
 
-    try {
-        const results = {
-            approved: [],
-            rejected: [],
-            failed: []
-        };
+  try {
+    const results = {
+      approved: [],
+      rejected: [],
+      failed: []
+    };
 
-        await prisma.$transaction(async (tx) => {
-            for (const id of attendanceIds) {
-                try {
-                    const attendance = await tx.attendance.findUnique({
-                        where: { id },
-                        include: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    email: true,
-                                    fcmToken: true
-                                }
-                            }
-                        }
-                    });
-
-                    if (!attendance) {
-                        results.failed.push({ id, reason: 'Not found' });
-                        continue;
-                    }
-
-                    if (attendance.schoolId !== schoolId) {
-                        results.failed.push({ id, reason: 'Unauthorized' });
-                        continue;
-                    }
-
-                    const updated = await tx.attendance.update({
-                        where: { id },
-                        data: {
-                            approvalStatus: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
-                            approvedBy,
-                            approvedAt: new Date(),
-                            approvalRemarks: remarks || null,
-                        }
-                    });
-
-                    if (action === 'APPROVE') {
-                        results.approved.push(updated);
-
-                        // Update stats after approval
-                        await updateAttendanceStats(
-                            tx,
-                            schoolId,
-                            attendance.userId,
-                            new Date(attendance.date)
-                        );
-                    } else {
-                        results.rejected.push(updated);
-                    }
-
-                    // Create notification record in DB
-                    await tx.attendanceNotification.create({
-                        data: {
-                            schoolId,
-                            userId: attendance.userId,
-                            notificationType: action === 'APPROVE' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED',
-                            title: action === 'APPROVE'
-                                ? 'Attendance Regularization Approved'
-                                : 'Attendance Regularization Rejected',
-                            message: `Your attendance request for ${new Date(attendance.date).toLocaleDateString()} has been ${action.toLowerCase()}d. ${remarks ? `Reason: ${remarks}` : ''}`,
-                            scheduledFor: new Date(),
-                            status: 'PENDING'
-                        }
-                    });
-
-                    // Send push notification to teacher
-                    try {
-                        if (action === 'APPROVE') {
-                            await notifyRegularizationApproved({
-                                schoolId,
-                                userId: attendance.userId,
-                                date: attendance.date,
-                                status: attendance.status,
-                                remarks
-                            });
-                        } else {
-                            await notifyRegularizationRejected({
-                                schoolId,
-                                userId: attendance.userId,
-                                date: attendance.date,
-                                reason: remarks
-                            });
-                        }
-                    } catch (notifyError) {
-                        console.error('Failed to send regularization notification to teacher:', notifyError);
-                    }
-
-                } catch (error) {
-                    results.failed.push({ id, error: error.message });
+    await prisma.$transaction(async (tx) => {
+      for (const id of attendanceIds) {
+        try {
+          const attendance = await tx.attendance.findUnique({
+            where: { id },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  fcmToken: true
                 }
+              }
             }
-        });
+          });
 
-        return NextResponse.json({
-            success: true,
-            results,
-            summary: {
-                approved: results.approved.length,
-                rejected: results.rejected.length,
-                failed: results.failed.length
+          if (!attendance) {
+            results.failed.push({ id, reason: 'Not found' });
+            continue;
+          }
+
+          if (attendance.schoolId !== schoolId) {
+            results.failed.push({ id, reason: 'Unauthorized' });
+            continue;
+          }
+
+          const updated = await tx.attendance.update({
+            where: { id },
+            data: {
+              approvalStatus: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+              approvedBy,
+              approvedAt: new Date(),
+              approvalRemarks: remarks || null
             }
-        });
+          });
 
-    } catch (error) {
-        console.error('Approval error:', error);
-        return NextResponse.json({
-            error: 'Failed to process approvals'
-        }, { status: 500 });
-    }
-}
+          if (action === 'APPROVE') {
+            results.approved.push(updated);
+
+            // Update stats after approval
+            await updateAttendanceStats(
+              tx,
+              schoolId,
+              attendance.userId,
+              new Date(attendance.date)
+            );
+          } else {
+            results.rejected.push(updated);
+          }
+
+          // Create notification record in DB
+          await tx.attendanceNotification.create({
+            data: {
+              schoolId,
+              userId: attendance.userId,
+              notificationType: action === 'APPROVE' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED',
+              title: action === 'APPROVE' ?
+              'Attendance Regularization Approved' :
+              'Attendance Regularization Rejected',
+              message: `Your attendance request for ${new Date(attendance.date).toLocaleDateString()} has been ${action.toLowerCase()}d. ${remarks ? `Reason: ${remarks}` : ''}`,
+              scheduledFor: new Date(),
+              status: 'PENDING'
+            }
+          });
+
+          // Send push notification to teacher
+          try {
+            if (action === 'APPROVE') {
+              await notifyRegularizationApproved({
+                schoolId,
+                userId: attendance.userId,
+                date: attendance.date,
+                status: attendance.status,
+                remarks
+              });
+            } else {
+              await notifyRegularizationRejected({
+                schoolId,
+                userId: attendance.userId,
+                date: attendance.date,
+                reason: remarks
+              });
+            }
+          } catch (notifyError) {
+            console.error('Failed to send regularization notification to teacher:', notifyError);
+          }
+
+        } catch (error) {
+          results.failed.push({ id, error: error.message });
+        }
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      results,
+      summary: {
+        approved: results.approved.length,
+        rejected: results.rejected.length,
+        failed: results.failed.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Approval error:', error);
+    return NextResponse.json({
+      error: 'Failed to process approvals'
+    }, { status: 500 });
+  }
+});
 
 // PUT - Request regularization (for teachers/staff to request correction)
-export async function PUT(req, props) {
-    const params = await props.params;
-    const { schoolId } = params;
-    const {
+export const PUT = withSchoolAccess(async function PUT(req, props) {
+  const params = await props.params;
+  const { schoolId } = params;
+  const {
+    userId,
+    date,
+    requestedStatus,
+    reason,
+    documents
+  } = await req.json();
+
+  if (!userId || !date || !requestedStatus || !reason) {
+    return NextResponse.json({
+      error: 'userId, date, requestedStatus, and reason are required'
+    }, { status: 400 });
+  }
+
+  try {
+    const requestDate = new Date(date);
+    const today = new Date(new Date().toDateString());
+
+    // Check if requesting for past date
+    if (requestDate >= today) {
+      return NextResponse.json({
+        error: 'Can only request regularization for past dates'
+      }, { status: 400 });
+    }
+
+    // Check if attendance exists
+    const existing = await prisma.attendance.findUnique({
+      where: {
+        userId_schoolId_date: {
+          userId,
+          schoolId,
+          date: requestDate
+        }
+      }
+    });
+
+    let result;
+
+    if (existing) {
+      // Update existing attendance with approval required
+      result = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          status: requestedStatus,
+          remarks: reason,
+          requiresApproval: true,
+          approvalStatus: 'PENDING',
+          markedAt: new Date()
+        }
+      });
+    } else {
+      // Create new attendance record pending approval
+      result = await prisma.attendance.create({
+        data: {
+          userId,
+          schoolId,
+          date: requestDate,
+          status: requestedStatus,
+          remarks: reason,
+          requiresApproval: true,
+          approvalStatus: 'PENDING',
+          markedBy: userId
+        }
+      });
+    }
+
+    // Add documents if provided
+    if (documents && documents.length > 0) {
+      await prisma.attendanceDocument.createMany({
+        data: documents.map((doc) => ({
+          attendanceId: result.id,
+          documentType: doc.type,
+          fileUrl: doc.url,
+          fileName: doc.name
+        }))
+      });
+    }
+
+    // Get user name for notification
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true }
+    });
+
+    // Notify school admins about the new regularization request
+    try {
+      await notifyRegularizationRequestCreated({
+        schoolId,
         userId,
-        date,
+        userName: user?.name || 'Staff Member',
+        date: requestDate.toISOString(),
         requestedStatus,
         reason,
-        documents
-    } = await req.json();
-
-    if (!userId || !date || !requestedStatus || !reason) {
-        return NextResponse.json({
-            error: 'userId, date, requestedStatus, and reason are required'
-        }, { status: 400 });
+        senderId: userId
+      });
+    } catch (notifyError) {
+      console.error('Failed to send regularization notification to admins:', notifyError);
+      // Don't fail the request if notification fails
     }
 
-    try {
-        const requestDate = new Date(date);
-        const today = new Date(new Date().toDateString());
+    return NextResponse.json({
+      success: true,
+      message: 'Regularization request submitted',
+      attendance: result
+    });
 
-        // Check if requesting for past date
-        if (requestDate >= today) {
-            return NextResponse.json({
-                error: 'Can only request regularization for past dates'
-            }, { status: 400 });
-        }
-
-        // Check if attendance exists
-        const existing = await prisma.attendance.findUnique({
-            where: {
-                userId_schoolId_date: {
-                    userId,
-                    schoolId,
-                    date: requestDate
-                }
-            }
-        });
-
-        let result;
-
-        if (existing) {
-            // Update existing attendance with approval required
-            result = await prisma.attendance.update({
-                where: { id: existing.id },
-                data: {
-                    status: requestedStatus,
-                    remarks: reason,
-                    requiresApproval: true,
-                    approvalStatus: 'PENDING',
-                    markedAt: new Date()
-                }
-            });
-        } else {
-            // Create new attendance record pending approval
-            result = await prisma.attendance.create({
-                data: {
-                    userId,
-                    schoolId,
-                    date: requestDate,
-                    status: requestedStatus,
-                    remarks: reason,
-                    requiresApproval: true,
-                    approvalStatus: 'PENDING',
-                    markedBy: userId
-                }
-            });
-        }
-
-        // Add documents if provided
-        if (documents && documents.length > 0) {
-            await prisma.attendanceDocument.createMany({
-                data: documents.map(doc => ({
-                    attendanceId: result.id,
-                    documentType: doc.type,
-                    fileUrl: doc.url,
-                    fileName: doc.name
-                }))
-            });
-        }
-
-        // Get user name for notification
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true }
-        });
-
-        // Notify school admins about the new regularization request
-        try {
-            await notifyRegularizationRequestCreated({
-                schoolId,
-                userId,
-                userName: user?.name || 'Staff Member',
-                date: requestDate.toISOString(),
-                requestedStatus,
-                reason,
-                senderId: userId
-            });
-        } catch (notifyError) {
-            console.error('Failed to send regularization notification to admins:', notifyError);
-            // Don't fail the request if notification fails
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Regularization request submitted',
-            attendance: result
-        });
-
-    } catch (error) {
-        console.error('Regularization request error:', error);
-        return NextResponse.json({
-            error: 'Failed to submit request'
-        }, { status: 500 });
-    }
-}
+  } catch (error) {
+    console.error('Regularization request error:', error);
+    return NextResponse.json({
+      error: 'Failed to submit request'
+    }, { status: 500 });
+  }
+});
 
 // Helper function
 async function updateAttendanceStats(tx, schoolId, userId, date) {
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
 
-    const academicYear = await tx.academicYear.findFirst({
-        where: { schoolId, isActive: true },
-        select: { id: true }
-    });
+  const academicYear = await tx.academicYear.findFirst({
+    where: { schoolId, isActive: true },
+    select: { id: true }
+  });
 
-    if (!academicYear) return;
+  if (!academicYear) return;
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
 
-    const stats = await tx.attendance.groupBy({
-        by: ['status'],
-        where: {
-            userId,
-            schoolId,
-            date: { gte: monthStart, lte: monthEnd }
-        },
-        _count: { id: true }
-    });
+  const stats = await tx.attendance.groupBy({
+    by: ['status'],
+    where: {
+      userId,
+      schoolId,
+      date: { gte: monthStart, lte: monthEnd }
+    },
+    _count: { id: true }
+  });
 
-    const totalPresent = stats.find(s => s.status === 'PRESENT')?._count.id || 0;
-    const totalAbsent = stats.find(s => s.status === 'ABSENT')?._count.id || 0;
-    const totalHalfDay = stats.find(s => s.status === 'HALF_DAY')?._count.id || 0;
-    const totalLate = stats.find(s => s.status === 'LATE')?._count.id || 0;
-    const totalLeaves = stats.find(s => s.status === 'ON_LEAVE')?._count.id || 0;
+  const totalPresent = stats.find((s) => s.status === 'PRESENT')?._count.id || 0;
+  const totalAbsent = stats.find((s) => s.status === 'ABSENT')?._count.id || 0;
+  const totalHalfDay = stats.find((s) => s.status === 'HALF_DAY')?._count.id || 0;
+  const totalLate = stats.find((s) => s.status === 'LATE')?._count.id || 0;
+  const totalLeaves = stats.find((s) => s.status === 'ON_LEAVE')?._count.id || 0;
 
-    const totalDays = totalPresent + totalAbsent + totalHalfDay + totalLate + totalLeaves;
-    const attendancePercentage = totalDays > 0
-        ? ((totalPresent + totalLate + (totalHalfDay * 0.5)) / totalDays) * 100
-        : 0;
+  const totalDays = totalPresent + totalAbsent + totalHalfDay + totalLate + totalLeaves;
+  const attendancePercentage = totalDays > 0 ?
+  (totalPresent + totalLate + totalHalfDay * 0.5) / totalDays * 100 :
+  0;
 
-    await tx.attendanceStats.upsert({
-        where: {
-            userId_academicYearId_month_year: {
-                userId,
-                academicYearId: academicYear.id,
-                month,
-                year
-            }
-        },
-        update: {
-            totalPresent,
-            totalAbsent,
-            totalHalfDay,
-            totalLate,
-            totalLeaves,
-            attendancePercentage,
-            lastCalculated: new Date(),
-        },
-        create: {
-            userId,
-            schoolId,
-            academicYearId: academicYear.id,
-            month,
-            year,
-            totalPresent,
-            totalAbsent,
-            totalHalfDay,
-            totalLate,
-            totalLeaves,
-            attendancePercentage,
-        }
-    });
+  await tx.attendanceStats.upsert({
+    where: {
+      userId_academicYearId_month_year: {
+        userId,
+        academicYearId: academicYear.id,
+        month,
+        year
+      }
+    },
+    update: {
+      totalPresent,
+      totalAbsent,
+      totalHalfDay,
+      totalLate,
+      totalLeaves,
+      attendancePercentage,
+      lastCalculated: new Date()
+    },
+    create: {
+      userId,
+      schoolId,
+      academicYearId: academicYear.id,
+      month,
+      year,
+      totalPresent,
+      totalAbsent,
+      totalHalfDay,
+      totalLate,
+      totalLeaves,
+      attendancePercentage
+    }
+  });
 }
 
 // DELETE - Delete rejected regularization requests
-export async function DELETE(req, props) {
-    const params = await props.params;
-    const { schoolId } = params;
-    const { searchParams } = new URL(req.url);
-    const requestId = searchParams.get('requestId');
-    const userId = searchParams.get('userId');
+export const DELETE = withSchoolAccess(async function DELETE(req, props) {
+  const params = await props.params;
+  const { schoolId } = params;
+  const { searchParams } = new URL(req.url);
+  const requestId = searchParams.get('requestId');
+  const userId = searchParams.get('userId');
 
-    if (!requestId) {
-        return NextResponse.json({
-            error: 'requestId required'
-        }, { status: 400 });
+  if (!requestId) {
+    return NextResponse.json({
+      error: 'requestId required'
+    }, { status: 400 });
+  }
+
+  try {
+    const request = await prisma.attendance.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!request) {
+      return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    try {
-        const request = await prisma.attendance.findUnique({
-            where: { id: requestId }
-        });
-
-        if (!request) {
-            return NextResponse.json({ error: 'Request not found' }, { status: 404 });
-        }
-
-        if (request.schoolId !== schoolId || request.userId !== userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-        }
-
-        // Only allow deleting REJECTED regularization requests
-        if (request.approvalStatus === 'REJECTED') {
-            await prisma.attendance.delete({
-                where: { id: requestId }
-            });
-            return NextResponse.json({
-                success: true,
-                message: 'Regularization request deleted'
-            });
-        } else {
-            return NextResponse.json({
-                error: 'Can only delete rejected regularization requests'
-            }, { status: 400 });
-        }
-
-    } catch (error) {
-        console.error('Regularization deletion error:', error);
-        return NextResponse.json({
-            error: 'Failed to delete regularization request'
-        }, { status: 500 });
+    if (request.schoolId !== schoolId || request.userId !== userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-}
+
+    // Only allow deleting REJECTED regularization requests
+    if (request.approvalStatus === 'REJECTED') {
+      await prisma.attendance.delete({
+        where: { id: requestId }
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Regularization request deleted'
+      });
+    } else {
+      return NextResponse.json({
+        error: 'Can only delete rejected regularization requests'
+      }, { status: 400 });
+    }
+
+  } catch (error) {
+    console.error('Regularization deletion error:', error);
+    return NextResponse.json({
+      error: 'Failed to delete regularization request'
+    }, { status: 500 });
+  }
+});

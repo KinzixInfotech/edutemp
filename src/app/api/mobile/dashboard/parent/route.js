@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { enforceSchoolStateAccess } from '@/lib/school-account-state';
 
 /**
  * GET /api/mobile/dashboard/parent
@@ -19,6 +20,11 @@ export async function GET(request) {
                 { error: 'Missing required parameters: schoolId, parentId' },
                 { status: 400 }
             );
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({ schoolId, method: request.method });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         const now = new Date();

@@ -1,8 +1,8 @@
-// app/api/documents/[schoolId]/issued/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/documents/[schoolId]/issued/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export async function GET(request, props) {
+export const GET = withSchoolAccess(async function GET(request, props) {
   const params = await props.params;
   const schoolId = params.schoolId;
   const { searchParams } = new URL(request.url);
@@ -23,9 +23,9 @@ export async function GET(request, props) {
       include: {
         student: { include: { user: true, class: true } },
         template: true,
-        issuedBy: { select: { name: true } },
+        issuedBy: { select: { name: true } }
       },
-      orderBy: { issueDate: 'desc' },
+      orderBy: { issueDate: 'desc' }
     });
 
     return NextResponse.json(certificates);
@@ -33,4 +33,4 @@ export async function GET(request, props) {
     console.error('Error fetching issued certificates:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

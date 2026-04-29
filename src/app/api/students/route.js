@@ -1,4 +1,4 @@
-// /api/students/route.js - For fetching all students with filters
+import { withSchoolAccess } from "@/lib/api-auth"; // /api/students/route.js - For fetching all students with filters
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
@@ -47,86 +47,86 @@ import { remember, generateKey } from "@/lib/cache";
 //         return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
 //     }
 // }
-export async function GET(req) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const schoolId = searchParams.get("schoolId");
-        const classIdParam = searchParams.get("classId");
-        const sectionIdParam = searchParams.get("sectionId");
-        const admissionNumber = searchParams.get("admissionNumber") || undefined;
-        const academicYearId = searchParams.get("academicYearId") || undefined;
-        const fetchAll = searchParams.get("all") === "true";
+export const GET = withSchoolAccess(async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
+    const classIdParam = searchParams.get("classId");
+    const sectionIdParam = searchParams.get("sectionId");
+    const admissionNumber = searchParams.get("admissionNumber") || undefined;
+    const academicYearId = searchParams.get("academicYearId") || undefined;
+    const fetchAll = searchParams.get("all") === "true";
 
-        const classId = classIdParam ? parseInt(classIdParam) : undefined;
-        const sectionId = sectionIdParam ? parseInt(sectionIdParam) : undefined;
+    const classId = classIdParam ? parseInt(classIdParam) : undefined;
+    const sectionId = sectionIdParam ? parseInt(sectionIdParam) : undefined;
 
-        if (!schoolId) {
-            return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
-        }
-
-        const { page, limit } = getPagination(req);
-
-        const where = {
-            schoolId,
-            ...(classId && { classId }),
-            ...(sectionId && { sectionId }),
-            ...(academicYearId && { academicYearId }),  // ADDED
-            ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } }),
-        };
-
-        const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit, fetchAll });
-
-        const result = await remember(cacheKey, async () => {
-            const queryArgs = {
-                where,
-                include: {
-                    user: {
-                        select: {
-                            name: true,
-                            profilePicture: true,
-                        }
-                    },
-                    class: {
-                        select: {
-                            id: true,
-                            className: true,
-                            teachingStaffUserId: true,
-                        },
-                    },
-                    section: {
-                        select: {
-                            id: true,
-                            name: true,
-                            teachingStaffUserId: true,
-                        },
-                    },
-                },
-                orderBy: { user: { name: "asc" } },
-            };
-
-            if (fetchAll) {
-                return { data: await prisma.student.findMany(queryArgs), meta: null };
-            }
-
-            return paginate(prisma.student, queryArgs, page, limit);
-        }, 300);
-
-        // Normalize shape for certificate mapper
-        const normalized = result.data.map(s => ({
-            ...s,
-            // Prisma stores these as PascalCase — normalize to camelCase for mapper
-            fatherName: s.FatherName || s.fatherName || '',   // ADDED
-            motherName: s.MotherName || s.motherName || '',   // ADDED
-            // Prisma Section.name → section.sectionName (what the alias expects)
-            section: s.section ? {
-                ...s.section,
-                sectionName: s.section.name || '',            // ADDED
-            } : null,
-        }));
-
-        return apiResponse(normalized);
-    } catch (err) {
-        console.error("Fetch Students API error:", err);
-        return errorResponse(err.message || "Internal server error");
+    if (!schoolId) {
+      return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
     }
-}
+
+    const { page, limit } = getPagination(req);
+
+    const where = {
+      schoolId,
+      ...(classId && { classId }),
+      ...(sectionId && { sectionId }),
+      ...(academicYearId && { academicYearId }), // ADDED
+      ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } })
+    };
+
+    const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit, fetchAll });
+
+    const result = await remember(cacheKey, async () => {
+      const queryArgs = {
+        where,
+        include: {
+          user: {
+            select: {
+              name: true,
+              profilePicture: true
+            }
+          },
+          class: {
+            select: {
+              id: true,
+              className: true,
+              teachingStaffUserId: true
+            }
+          },
+          section: {
+            select: {
+              id: true,
+              name: true,
+              teachingStaffUserId: true
+            }
+          }
+        },
+        orderBy: { user: { name: "asc" } }
+      };
+
+      if (fetchAll) {
+        return { data: await prisma.student.findMany(queryArgs), meta: null };
+      }
+
+      return paginate(prisma.student, queryArgs, page, limit);
+    }, 300);
+
+    // Normalize shape for certificate mapper
+    const normalized = result.data.map((s) => ({
+      ...s,
+      // Prisma stores these as PascalCase — normalize to camelCase for mapper
+      fatherName: s.FatherName || s.fatherName || '', // ADDED
+      motherName: s.MotherName || s.motherName || '', // ADDED
+      // Prisma Section.name → section.sectionName (what the alias expects)
+      section: s.section ? {
+        ...s.section,
+        sectionName: s.section.name || '' // ADDED
+      } : null
+    }));
+
+    return apiResponse(normalized);
+  } catch (err) {
+    console.error("Fetch Students API error:", err);
+    return errorResponse(err.message || "Internal server error");
+  }
+});

@@ -1,75 +1,76 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { invalidatePattern } from "@/lib/cache";
 
-export async function POST(request, { params }) {
-    try {
-        const { schoolId } = await params;
-        const body = await request.json();
-        const { copyId, userId, userType, dueDate } = body;
+export const POST = withSchoolAccess(async function POST(request, { params }) {
+  try {
+    const { schoolId } = await params;
+    const body = await request.json();
+    const { copyId, userId, userType, dueDate } = body;
 
-        if (!copyId || !userId || !userType || !dueDate) {
-            return NextResponse.json(
-                { error: "Missing required fields" },
-                { status: 400 }
-            );
-        }
-
-        // Check if copy is available
-        const copy = await prisma.libraryBookCopy.findUnique({
-            where: { id: copyId },
-        });
-
-        if (!copy) {
-            return NextResponse.json({ error: "Copy not found" }, { status: 404 });
-        }
-
-        if (copy.status !== "AVAILABLE") {
-            return NextResponse.json(
-                { error: `Copy is currently ${copy.status}` },
-                { status: 400 }
-            );
-        }
-
-        // Auto-resolve active academic year
-        const activeYear = await prisma.academicYear.findFirst({
-            where: { schoolId, isActive: true },
-            select: { id: true },
-        });
-
-        // Start transaction
-        const transaction = await prisma.$transaction(async (tx) => {
-            // Create transaction record
-            const newTransaction = await tx.libraryTransaction.create({
-                data: {
-                    schoolId,
-                    copyId,
-                    userId,
-                    userType,
-                    issueDate: new Date(),
-                    dueDate: new Date(dueDate),
-                    status: "ISSUED",
-                    ...(activeYear && { academicYearId: activeYear.id }),
-                },
-            });
-
-            // Update copy status
-            await tx.libraryBookCopy.update({
-                where: { id: copyId },
-                data: { status: "ISSUED" },
-            });
-
-            return newTransaction;
-        });
-
-        await invalidatePattern(`library:*${schoolId}*`);
-
-        return NextResponse.json(transaction, { status: 201 });
-    } catch (error) {
-        console.error("Error issuing book:", error);
-        return NextResponse.json(
-            { error: "Failed to issue book" },
-            { status: 500 }
-        );
+    if (!copyId || !userId || !userType || !dueDate) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
-}
+
+    // Check if copy is available
+    const copy = await prisma.libraryBookCopy.findUnique({
+      where: { id: copyId }
+    });
+
+    if (!copy) {
+      return NextResponse.json({ error: "Copy not found" }, { status: 404 });
+    }
+
+    if (copy.status !== "AVAILABLE") {
+      return NextResponse.json(
+        { error: `Copy is currently ${copy.status}` },
+        { status: 400 }
+      );
+    }
+
+    // Auto-resolve active academic year
+    const activeYear = await prisma.academicYear.findFirst({
+      where: { schoolId, isActive: true },
+      select: { id: true }
+    });
+
+    // Start transaction
+    const transaction = await prisma.$transaction(async (tx) => {
+      // Create transaction record
+      const newTransaction = await tx.libraryTransaction.create({
+        data: {
+          schoolId,
+          copyId,
+          userId,
+          userType,
+          issueDate: new Date(),
+          dueDate: new Date(dueDate),
+          status: "ISSUED",
+          ...(activeYear && { academicYearId: activeYear.id })
+        }
+      });
+
+      // Update copy status
+      await tx.libraryBookCopy.update({
+        where: { id: copyId },
+        data: { status: "ISSUED" }
+      });
+
+      return newTransaction;
+    });
+
+    await invalidatePattern(`library:*${schoolId}*`);
+
+    return NextResponse.json(transaction, { status: 201 });
+  } catch (error) {
+    console.error("Error issuing book:", error);
+    return NextResponse.json(
+      { error: "Failed to issue book" },
+      { status: 500 }
+    );
+  }
+});

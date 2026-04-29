@@ -4,8 +4,9 @@
 // ============================================
 
 import { google } from "googleapis";
+import { withSchoolAccess } from "@/lib/api-auth";
 
-export async function GET(req) {
+export const GET = withSchoolAccess(async function GET(req) {
     try {
         const url = new URL(req.url);
         const userId = url.searchParams.get('userId');
@@ -60,6 +61,5 @@ export async function GET(req) {
             { status: 500 }
         );
     }
-}
-
+});
 

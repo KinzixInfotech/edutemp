@@ -6,6 +6,7 @@
 import { google } from "googleapis";
 import prisma from "@/lib/prisma";
 import { invalidatePattern } from "@/lib/cache";
+import { enforceSchoolStateAccess } from "@/lib/school-account-state";
 
 export async function GET(req) {
     try {
@@ -39,6 +40,14 @@ export async function GET(req) {
                 JSON.stringify({ error: "Missing userId or schoolId" }),
                 { status: 400 }
             );
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId,
+            method: req.method,
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         const oauth2Client = new google.auth.OAuth2(

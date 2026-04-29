@@ -1,201 +1,202 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { invalidatePattern } from "@/lib/cache";
 
-export async function GET(req, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, bookId } = params;
+export const GET = withSchoolAccess(async function GET(req, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, bookId } = params;
 
-        // Fetch book with all related data
-        const book = await prisma.libraryBook.findUnique({
-            where: {
-                id: bookId,
-                schoolId: schoolId,
-            },
-            include: {
-                copies: {
-                    orderBy: {
-                        accessionNumber: "asc",
-                    },
-                },
-            },
-        });
-
-        if (!book) {
-            return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    // Fetch book with all related data
+    const book = await prisma.libraryBook.findUnique({
+      where: {
+        id: bookId,
+        schoolId: schoolId
+      },
+      include: {
+        copies: {
+          orderBy: {
+            accessionNumber: "asc"
+          }
         }
+      }
+    });
 
-        // Fetch all transactions for this book's copies
-        const copyIds = book.copies.map((copy) => copy.id);
-        const transactions = await prisma.libraryTransaction.findMany({
-            where: {
-                copyId: {
-                    in: copyIds,
-                },
-            },
-            include: {
-                copy: {
-                    select: {
-                        accessionNumber: true,
-                    },
-                },
-            },
-            orderBy: {
-                issueDate: "desc",
-            },
-        });
-
-        // Fetch user details for transactions
-        const userIds = [...new Set(transactions.map((t) => t.userId))];
-        const users = await prisma.user.findMany({
-            where: {
-                id: {
-                    in: userIds,
-                },
-            },
-            select: {
-                id: true,
-                name: true,
-                profilePicture: true,
-            },
-        });
-
-        // Create user map for quick lookup
-        const userMap = {};
-        users.forEach((user) => {
-            userMap[user.id] = user;
-        });
-
-        // Enrich transactions with user data
-        const enrichedTransactions = transactions.map((transaction) => ({
-            ...transaction,
-            user: userMap[transaction.userId] || {
-                id: transaction.userId,
-                name: "Unknown User",
-                profilePicture: null,
-            },
-        }));
-
-        // Calculate stats
-        const totalCopies = book.copies.length;
-        const availableCopies = book.copies.filter(
-            (c) => c.status === "AVAILABLE"
-        ).length;
-        const issuedCopies = book.copies.filter((c) => c.status === "ISSUED").length;
-        const damagedCopies = book.copies.filter(
-            (c) => c.status === "DAMAGED"
-        ).length;
-        const lostCopies = book.copies.filter((c) => c.status === "LOST").length;
-
-        // Calculate total fines collected for this book
-        const totalFines = transactions.reduce(
-            (sum, t) => sum + (t.finePaid ? t.fineAmount : 0),
-            0
-        );
-
-        return NextResponse.json({
-            book: {
-                ...book,
-                totalCopies,
-                availableCopies,
-                issuedCopies,
-                damagedCopies,
-                lostCopies,
-                totalFines,
-            },
-            transactions: enrichedTransactions,
-        });
-    } catch (error) {
-        console.error("Error fetching book details:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch book details" },
-            { status: 500 }
-        );
+    if (!book) {
+      return NextResponse.json({ error: "Book not found" }, { status: 404 });
     }
-}
+
+    // Fetch all transactions for this book's copies
+    const copyIds = book.copies.map((copy) => copy.id);
+    const transactions = await prisma.libraryTransaction.findMany({
+      where: {
+        copyId: {
+          in: copyIds
+        }
+      },
+      include: {
+        copy: {
+          select: {
+            accessionNumber: true
+          }
+        }
+      },
+      orderBy: {
+        issueDate: "desc"
+      }
+    });
+
+    // Fetch user details for transactions
+    const userIds = [...new Set(transactions.map((t) => t.userId))];
+    const users = await prisma.user.findMany({
+      where: {
+        id: {
+          in: userIds
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        profilePicture: true
+      }
+    });
+
+    // Create user map for quick lookup
+    const userMap = {};
+    users.forEach((user) => {
+      userMap[user.id] = user;
+    });
+
+    // Enrich transactions with user data
+    const enrichedTransactions = transactions.map((transaction) => ({
+      ...transaction,
+      user: userMap[transaction.userId] || {
+        id: transaction.userId,
+        name: "Unknown User",
+        profilePicture: null
+      }
+    }));
+
+    // Calculate stats
+    const totalCopies = book.copies.length;
+    const availableCopies = book.copies.filter(
+      (c) => c.status === "AVAILABLE"
+    ).length;
+    const issuedCopies = book.copies.filter((c) => c.status === "ISSUED").length;
+    const damagedCopies = book.copies.filter(
+      (c) => c.status === "DAMAGED"
+    ).length;
+    const lostCopies = book.copies.filter((c) => c.status === "LOST").length;
+
+    // Calculate total fines collected for this book
+    const totalFines = transactions.reduce(
+      (sum, t) => sum + (t.finePaid ? t.fineAmount : 0),
+      0
+    );
+
+    return NextResponse.json({
+      book: {
+        ...book,
+        totalCopies,
+        availableCopies,
+        issuedCopies,
+        damagedCopies,
+        lostCopies,
+        totalFines
+      },
+      transactions: enrichedTransactions
+    });
+  } catch (error) {
+    console.error("Error fetching book details:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch book details" },
+      { status: 500 }
+    );
+  }
+});
 
 // DELETE - Delete a book
-export async function DELETE(req, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, bookId } = params;
+export const DELETE = withSchoolAccess(async function DELETE(req, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, bookId } = params;
 
-        // Check if there are active loans
-        const activeLoans = await prisma.libraryTransaction.findFirst({
-            where: {
-                copy: {
-                    bookId: bookId
-                },
-                status: 'ISSUED'
-            }
-        });
+    // Check if there are active loans
+    const activeLoans = await prisma.libraryTransaction.findFirst({
+      where: {
+        copy: {
+          bookId: bookId
+        },
+        status: 'ISSUED'
+      }
+    });
 
-        if (activeLoans) {
-            return NextResponse.json(
-                { error: "Cannot delete book with active loans. Please return all copies first." },
-                { status: 400 }
-            );
-        }
-
-        // Delete book
-        await prisma.libraryBook.delete({
-            where: {
-                id: bookId,
-                schoolId: schoolId,
-            }
-        });
-
-        return NextResponse.json({ message: "Book deleted successfully" });
-    } catch (error) {
-        console.error("Error deleting book:", error);
-        return NextResponse.json(
-            { error: "Failed to delete book" },
-            { status: 500 }
-        );
+    if (activeLoans) {
+      return NextResponse.json(
+        { error: "Cannot delete book with active loans. Please return all copies first." },
+        { status: 400 }
+      );
     }
-}
+
+    // Delete book
+    await prisma.libraryBook.delete({
+      where: {
+        id: bookId,
+        schoolId: schoolId
+      }
+    });
+
+    return NextResponse.json({ message: "Book deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting book:", error);
+    return NextResponse.json(
+      { error: "Failed to delete book" },
+      { status: 500 }
+    );
+  }
+});
 
 // PUT - Update a book
-export async function PUT(req, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, bookId } = params;
-        const body = await req.json();
-        const { title, author, category, publisher, edition, description, coverImage } = body;
+export const PUT = withSchoolAccess(async function PUT(req, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, bookId } = params;
+    const body = await req.json();
+    const { title, author, category, publisher, edition, description, coverImage } = body;
 
-        if (!title || !author) {
-            return NextResponse.json(
-                { error: "Title and Author are required" },
-                { status: 400 }
-            );
-        }
-
-        const updatedBook = await prisma.libraryBook.update({
-            where: {
-                id: bookId,
-                schoolId: schoolId,
-            },
-            data: {
-                title,
-                author,
-                category: category || "General",
-                publisher,
-                edition,
-                description,
-                coverImage,
-            },
-        });
-
-        await invalidatePattern(`library:books:*${schoolId}*`);
-        await invalidatePattern(`library:stats:*${schoolId}*`);
-
-        return NextResponse.json(updatedBook);
-    } catch (error) {
-        console.error("Error updating book:", error);
-        return NextResponse.json(
-            { error: "Failed to update book" },
-            { status: 500 }
-        );
+    if (!title || !author) {
+      return NextResponse.json(
+        { error: "Title and Author are required" },
+        { status: 400 }
+      );
     }
-}
+
+    const updatedBook = await prisma.libraryBook.update({
+      where: {
+        id: bookId,
+        schoolId: schoolId
+      },
+      data: {
+        title,
+        author,
+        category: category || "General",
+        publisher,
+        edition,
+        description,
+        coverImage
+      }
+    });
+
+    await invalidatePattern(`library:books:*${schoolId}*`);
+    await invalidatePattern(`library:stats:*${schoolId}*`);
+
+    return NextResponse.json(updatedBook);
+  } catch (error) {
+    console.error("Error updating book:", error);
+    return NextResponse.json(
+      { error: "Failed to update book" },
+      { status: 500 }
+    );
+  }
+});

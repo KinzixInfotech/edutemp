@@ -1,4 +1,4 @@
-// ═══════════════════════════════════════════════════════════════
+import { withSchoolAccess } from "@/lib/api-auth"; // ═══════════════════════════════════════════════════════════════
 // FILE: app/api/schools/fee/assign/route.js
 // ═══════════════════════════════════════════════════════════════
 
@@ -27,7 +27,7 @@ export async function updateJob(jobId, patch) {
 }
 
 // ── POST /api/schools/fee/assign ──────────────────────────────
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
   try {
     const body = await req.json();
     const {
@@ -37,7 +37,7 @@ export async function POST(req) {
       classId,
       sectionId,
       academicYearId,
-      schoolId,
+      schoolId
     } = body;
 
     if (!globalFeeStructureId || !schoolId || !academicYearId) {
@@ -51,11 +51,11 @@ export async function POST(req) {
         where: {
           schoolId,
           classId: parseInt(classId),
-          ...(sectionId && sectionId !== 'all' && { sectionId: parseInt(sectionId) }),
+          ...(sectionId && sectionId !== 'all' && { sectionId: parseInt(sectionId) })
         },
-        select: { userId: true },
+        select: { userId: true }
       });
-      targetIds = students.map(s => s.userId);
+      targetIds = students.map((s) => s.userId);
     }
 
     if (!targetIds.length) {
@@ -65,17 +65,17 @@ export async function POST(req) {
     // ── 2. Filter already-assigned ─────────────────────────
     const existing = await prisma.studentFee.findMany({
       where: { studentId: { in: targetIds }, academicYearId },
-      select: { studentId: true },
+      select: { studentId: true }
     });
-    const alreadyAssigned = new Set(existing.map(f => f.studentId));
-    const toAssign = targetIds.filter(id => !alreadyAssigned.has(id));
+    const alreadyAssigned = new Set(existing.map((f) => f.studentId));
+    const toAssign = targetIds.filter((id) => !alreadyAssigned.has(id));
 
     if (!toAssign.length) {
       return NextResponse.json({
         jobId: null,
         message: 'All selected students already have fees assigned',
         skipped: targetIds.length,
-        assigned: 0,
+        assigned: 0
       });
     }
 
@@ -94,7 +94,7 @@ export async function POST(req) {
       schoolId,
       studentIds: toAssign,
       processedCount: 0, // tracks how many have been processed across QStash hops
-      startedAt: Date.now(),
+      startedAt: Date.now()
     });
 
     // ── 4. Kick worker ─────────────────────────────────────
@@ -108,16 +108,16 @@ export async function POST(req) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-internal-key': process.env.INTERNAL_API_KEY || 'edubreezy_internal',
+          'x-internal-key': process.env.INTERNAL_API_KEY || 'edubreezy_internal'
         },
-        body: JSON.stringify({ jobId }),
-      }).catch(e => console.error('[FeeAssign] Worker kick failed:', e));
+        body: JSON.stringify({ jobId })
+      }).catch((e) => console.error('[FeeAssign] Worker kick failed:', e));
     } else {
       // Production: use QStash (handles retries + no timeout)
       await qstash.publishJSON({
         url: workerUrl,
         body: { jobId },
-        retries: 3,
+        retries: 3
       });
     }
 
@@ -125,11 +125,11 @@ export async function POST(req) {
       jobId,
       total: toAssign.length,
       skipped: alreadyAssigned.size,
-      status: 'running',
+      status: 'running'
     });
 
   } catch (error) {
     console.error('[FeeAssign POST]', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+});

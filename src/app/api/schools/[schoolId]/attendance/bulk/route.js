@@ -1,3 +1,4 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { notifyBulkAttendanceMarked } from '@/lib/notifications/notificationHelper';
@@ -37,18 +38,18 @@ export const ISTDate = (input) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-}
+};
 
 const getNextDay = (date) => {
   const d = new Date(date);
   d.setDate(d.getDate() + 1);
   return d;
-}
+};
 
-const toInt = (v) => (typeof v === 'number' ? v : parseInt(v, 10));
+const toInt = (v) => typeof v === 'number' ? v : parseInt(v, 10);
 
 // GET - Fetch students for bulk marking
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const { searchParams } = new URL(req.url);
@@ -109,16 +110,16 @@ export async function GET(req, props) {
                   status: true,
                   checkInTime: true,
                   remarks: true,
-                  isLateCheckIn: true,
+                  isLateCheckIn: true
                 }
               }
             }
           }
         },
         orderBy: [
-          { rollNumber: 'asc' },
-          { name: 'asc' }
-        ]
+        { rollNumber: 'asc' },
+        { name: 'asc' }]
+
       });
 
       // Check if bulk attendance already marked
@@ -151,7 +152,7 @@ export async function GET(req, props) {
           profilePicture: student.user?.profilePicture,
           attendance: student.user.attendance[0] || null,
           isMarked: !!student.user.attendance[0],
-          attendancePercent: 0,
+          attendancePercent: 0
         };
       }));
 
@@ -162,7 +163,7 @@ export async function GET(req, props) {
       });
 
       if (academicYear) {
-        const studentIds = students.map(s => s.userId);
+        const studentIds = students.map((s) => s.userId);
 
         // Count Present/Late/HalfDay for YTD
         const attendanceCounts = await prisma.attendance.groupBy({
@@ -187,7 +188,7 @@ export async function GET(req, props) {
 
         // Group counts by user
         const userCounts = {};
-        attendanceCounts.forEach(record => {
+        attendanceCounts.forEach((record) => {
           if (!userCounts[record.userId]) {
             userCounts[record.userId] = { present: 0, total: 0 };
           }
@@ -198,14 +199,14 @@ export async function GET(req, props) {
           if (['PRESENT', 'LATE'].includes(record.status)) {
             userCounts[record.userId].present += count;
           } else if (record.status === 'HALF_DAY') {
-            userCounts[record.userId].present += (count * 0.5);
+            userCounts[record.userId].present += count * 0.5;
           }
         });
 
-        studentsWithAttendance.forEach(s => {
+        studentsWithAttendance.forEach((s) => {
           const stats = userCounts[s.userId];
           if (stats && stats.total > 0) {
-            s.attendancePercent = Math.round((stats.present / stats.total) * 100);
+            s.attendancePercent = Math.round(stats.present / stats.total * 100);
           } else {
             s.attendancePercent = 0;
           }
@@ -215,9 +216,9 @@ export async function GET(req, props) {
       return {
         students: studentsWithAttendance,
         totalStudents: students.length,
-        markedCount: studentsWithAttendance.filter(s => s.isMarked).length,
+        markedCount: studentsWithAttendance.filter((s) => s.isMarked).length,
         existingBulk,
-        date: date.toISOString(),
+        date: date.toISOString()
       };
     }, CACHE_TTL);
 
@@ -235,9 +236,9 @@ export async function GET(req, props) {
       details: error.message
     }, { status: 500 });
   }
-}
+});
 // POST - Submit bulk attendance (UPDATED)
-export async function POST(req, props) {
+export const POST = withSchoolAccess(async function POST(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const body = await req.json();
@@ -372,7 +373,7 @@ export async function POST(req, props) {
           status: true,
           checkInTime: true,
           markedAt: true
-        },
+        }
       });
 
       debugLog('📋 TEACHER ATTENDANCE QUERY RESULT', {
@@ -443,12 +444,12 @@ export async function POST(req, props) {
           select: { userId: true }
         });
 
-        attendanceData = students.map(s => ({ userId: s.userId, status: 'PRESENT' }));
+        attendanceData = students.map((s) => ({ userId: s.userId, status: 'PRESENT' }));
         debugLog('markAllPresent -> created attendanceData', { count: attendanceData.length });
       }
 
       // Check for protected status students
-      const studentUserIds = attendanceData.map(a => a.userId);
+      const studentUserIds = attendanceData.map((a) => a.userId);
       const existingAttendanceRecords = await tx.attendance.findMany({
         where: {
           userId: { in: studentUserIds },
@@ -463,10 +464,10 @@ export async function POST(req, props) {
       });
 
       const PROTECTED_STATUSES = ['ON_LEAVE', 'HALF_DAY'];
-      const existingProtectedAttendance = existingAttendanceRecords.filter(record =>
-        PROTECTED_STATUSES.includes(record.status)
+      const existingProtectedAttendance = existingAttendanceRecords.filter((record) =>
+      PROTECTED_STATUSES.includes(record.status)
       );
-      const protectedUserIds = existingProtectedAttendance.map(a => a.userId);
+      const protectedUserIds = existingProtectedAttendance.map((a) => a.userId);
 
       // Bulk upsert attendance records
       for (const record of attendanceData) {
@@ -481,7 +482,7 @@ export async function POST(req, props) {
 
           // Skip protected statuses
           if (protectedUserIds.includes(record.userId)) {
-            const protectedRecord = existingProtectedAttendance.find(a => a.userId === record.userId);
+            const protectedRecord = existingProtectedAttendance.find((a) => a.userId === record.userId);
             results.skipped.push({
               userId: record.userId,
               reason: `Already marked as ${protectedRecord.status}`,
@@ -585,13 +586,13 @@ export async function POST(req, props) {
       });
 
       // Build attendance records for notification
-      const attendanceRecords = (Array.isArray(attendance) ? attendance : [])
-        .filter(a => results.success.includes(a.userId))
-        .map(a => ({
-          userId: a.userId,
-          status: a.status,
-          studentName: null // Will be fetched in the notification function
-        }));
+      const attendanceRecords = (Array.isArray(attendance) ? attendance : []).
+      filter((a) => results.success.includes(a.userId)).
+      map((a) => ({
+        userId: a.userId,
+        status: a.status,
+        studentName: null // Will be fetched in the notification function
+      }));
 
       // Fire and forget - notifyBulkAttendanceMarked uses setImmediate internally
       notifyBulkAttendanceMarked({
@@ -600,7 +601,7 @@ export async function POST(req, props) {
         date: attendanceDate.toISOString(),
         markedBy,
         className: classInfo?.className || ''
-      }).catch(err => console.error('Notification dispatch error:', err));
+      }).catch((err) => console.error('Notification dispatch error:', err));
     }
 
     // Invalidate cache to ensure "Marked By" and stats are fresh on next fetch
@@ -618,7 +619,7 @@ export async function POST(req, props) {
         total: providedAttendance.length || (markAllPresent ? results.success.length : 0),
         successful: results.success.length,
         failed: results.failed.length,
-        skipped: results.skipped.length,
+        skipped: results.skipped.length
       },
       requiresApproval,
       teacherName: teacher.name,
@@ -638,7 +639,7 @@ export async function POST(req, props) {
       details: error.message
     }, { status: 500 });
   }
-}
+});
 
 //                         await tx.attendance.create({
 //                             data: {
@@ -768,16 +769,16 @@ async function updateAttendanceStats(client, schoolId, date) {
         _count: { id: true }
       });
 
-      const totalPresent = stats.find(s => s.status === 'PRESENT')?._count.id || 0;
-      const totalAbsent = stats.find(s => s.status === 'ABSENT')?._count.id || 0;
-      const totalHalfDay = stats.find(s => s.status === 'HALF_DAY')?._count.id || 0;
-      const totalLate = stats.find(s => s.status === 'LATE')?._count.id || 0;
-      const totalLeaves = stats.find(s => s.status === 'ON_LEAVE')?._count.id || 0;
+      const totalPresent = stats.find((s) => s.status === 'PRESENT')?._count.id || 0;
+      const totalAbsent = stats.find((s) => s.status === 'ABSENT')?._count.id || 0;
+      const totalHalfDay = stats.find((s) => s.status === 'HALF_DAY')?._count.id || 0;
+      const totalLate = stats.find((s) => s.status === 'LATE')?._count.id || 0;
+      const totalLeaves = stats.find((s) => s.status === 'ON_LEAVE')?._count.id || 0;
 
       const totalDays = totalPresent + totalAbsent + totalHalfDay + totalLate + totalLeaves;
-      const attendancePercentage = totalDays > 0
-        ? ((totalPresent + totalLate + (totalHalfDay * 0.5)) / totalDays) * 100
-        : 0;
+      const attendancePercentage = totalDays > 0 ?
+      (totalPresent + totalLate + totalHalfDay * 0.5) / totalDays * 100 :
+      0;
 
       await client.attendanceStats.upsert({
         where: {
@@ -795,7 +796,7 @@ async function updateAttendanceStats(client, schoolId, date) {
           totalLate,
           totalLeaves,
           attendancePercentage,
-          lastCalculated: new Date(),
+          lastCalculated: new Date()
         },
         create: {
           userId: user.userId,
@@ -808,7 +809,7 @@ async function updateAttendanceStats(client, schoolId, date) {
           totalHalfDay,
           totalLate,
           totalLeaves,
-          attendancePercentage,
+          attendancePercentage
         }
       });
     }
@@ -820,7 +821,7 @@ async function updateAttendanceStats(client, schoolId, date) {
 }
 
 // PUT - Update existing bulk attendance
-export async function PUT(req, props) {
+export const PUT = withSchoolAccess(async function PUT(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const body = await req.json();
@@ -860,7 +861,7 @@ export async function PUT(req, props) {
             lt: nextDay
           }
         },
-        select: { status: true },
+        select: { status: true }
       });
 
       debugLog('Teacher attendance check (PUT)', {
@@ -912,8 +913,8 @@ export async function PUT(req, props) {
 
           // Skip if trying to overwrite protected status
           if (existingAttendance &&
-            PROTECTED_STATUSES.includes(existingAttendance.status) &&
-            !update.forceUpdate) {
+          PROTECTED_STATUSES.includes(existingAttendance.status) &&
+          !update.forceUpdate) {
             results.skipped.push({
               userId: update.userId,
               reason: `Cannot overwrite ${existingAttendance.status}`,
@@ -935,7 +936,7 @@ export async function PUT(req, props) {
               status: update.status,
               remarks: update.remarks,
               markedBy,
-              markedAt: new Date(),
+              markedAt: new Date()
             }
           });
 
@@ -964,4 +965,4 @@ export async function PUT(req, props) {
       details: error.message
     }, { status: 500 });
   }
-}
+});

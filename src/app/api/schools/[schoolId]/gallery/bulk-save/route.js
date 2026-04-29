@@ -1,3 +1,4 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
@@ -12,82 +13,81 @@ import prisma from '@/lib/prisma';
  *   uploadedById: string,
  *   files: [{ url, fileName, fileSize, mimeType }]
  * }
- */
-export async function POST(request, { params }) {
-    try {
-        const { schoolId } = await params;
-        const { albumId, uploadedById, files } = await request.json();
+ */export const POST = withSchoolAccess(async function POST(request, { params }) {
+  try {
+    const { schoolId } = await params;
+    const { albumId, uploadedById, files } = await request.json();
 
-        if (!albumId || !uploadedById || !files?.length) {
-            return NextResponse.json(
-                { error: 'albumId, uploadedById, and files are required' },
-                { status: 400 }
-            );
-        }
-
-        // Get settings once for approval status
-        const settings = await prisma.gallerySettings.findUnique({
-            where: { schoolId },
-        });
-
-        const approvalStatus = settings?.requireApproval ? 'PENDING' : 'APPROVED';
-        const totalSize = files.reduce((sum, f) => sum + (f.fileSize || 0), 0);
-        const totalSizeBigInt = BigInt(totalSize);
-
-        // Check quota before saving (BigInt-safe comparison)
-        if (settings && (settings.storageUsed ?? 0n) + totalSizeBigInt > (settings.storageQuota ?? 0n)) {
-            return NextResponse.json(
-                { error: 'QUOTA_EXCEEDED', message: 'Storage quota would be exceeded' },
-                { status: 400 }
-            );
-        }
-
-        // Single transaction: create all image records + update album count + update storage
-        const result = await prisma.$transaction(async (tx) => {
-            // Create all gallery image records in bulk
-            const createdImages = await tx.galleryImage.createMany({
-                data: files.map((file) => ({
-                    albumId,
-                    schoolId,
-                    originalUrl: file.url,
-                    optimizedUrl: file.url,
-                    thumbnailUrl: file.url,
-                    fileName: file.fileName,
-                    fileSize: file.fileSize || 0,
-                    optimizedSize: file.fileSize || 0,
-                    mimeType: file.mimeType || 'image/webp',
-                    uploadedById,
-                    processingStatus: 'COMPLETED',
-                    approvalStatus,
-                })),
-            });
-
-            // Update album image count
-            await tx.galleryAlbum.update({
-                where: { id: albumId },
-                data: { imageCount: { increment: files.length } },
-            });
-
-            // Update storage quota
-            await tx.gallerySettings.upsert({
-                where: { schoolId },
-                update: { storageUsed: { increment: totalSize } },
-                create: { schoolId, storageUsed: totalSize },
-            });
-
-            return { count: createdImages.count };
-        });
-
-        return NextResponse.json({
-            success: true,
-            savedCount: result.count,
-            totalSize,
-        });
-    } catch (error) {
-        console.error('Bulk save error:', error);
-        return NextResponse.json(
-            { error: 'Failed to save images', message: error.message },
-            { status: 500 }
-        );
+    if (!albumId || !uploadedById || !files?.length) {
+      return NextResponse.json(
+        { error: 'albumId, uploadedById, and files are required' },
+        { status: 400 }
+      );
     }
-}
+
+    // Get settings once for approval status
+    const settings = await prisma.gallerySettings.findUnique({
+      where: { schoolId }
+    });
+
+    const approvalStatus = settings?.requireApproval ? 'PENDING' : 'APPROVED';
+    const totalSize = files.reduce((sum, f) => sum + (f.fileSize || 0), 0);
+    const totalSizeBigInt = BigInt(totalSize);
+
+    // Check quota before saving (BigInt-safe comparison)
+    if (settings && (settings.storageUsed ?? 0n) + totalSizeBigInt > (settings.storageQuota ?? 0n)) {
+      return NextResponse.json(
+        { error: 'QUOTA_EXCEEDED', message: 'Storage quota would be exceeded' },
+        { status: 400 }
+      );
+    }
+
+    // Single transaction: create all image records + update album count + update storage
+    const result = await prisma.$transaction(async (tx) => {
+      // Create all gallery image records in bulk
+      const createdImages = await tx.galleryImage.createMany({
+        data: files.map((file) => ({
+          albumId,
+          schoolId,
+          originalUrl: file.url,
+          optimizedUrl: file.url,
+          thumbnailUrl: file.url,
+          fileName: file.fileName,
+          fileSize: file.fileSize || 0,
+          optimizedSize: file.fileSize || 0,
+          mimeType: file.mimeType || 'image/webp',
+          uploadedById,
+          processingStatus: 'COMPLETED',
+          approvalStatus
+        }))
+      });
+
+      // Update album image count
+      await tx.galleryAlbum.update({
+        where: { id: albumId },
+        data: { imageCount: { increment: files.length } }
+      });
+
+      // Update storage quota
+      await tx.gallerySettings.upsert({
+        where: { schoolId },
+        update: { storageUsed: { increment: totalSize } },
+        create: { schoolId, storageUsed: totalSize }
+      });
+
+      return { count: createdImages.count };
+    });
+
+    return NextResponse.json({
+      success: true,
+      savedCount: result.count,
+      totalSize
+    });
+  } catch (error) {
+    console.error('Bulk save error:', error);
+    return NextResponse.json(
+      { error: 'Failed to save images', message: error.message },
+      { status: 500 }
+    );
+  }
+});

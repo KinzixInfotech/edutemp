@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 import { deleteFileByUrl } from '@/lib/r2';
 import { serializeSignatureAsset } from '@/lib/document-signature-library';
+import { withSchoolAccess } from '@/lib/api-auth';
 
 function normalizeSignaturePayload(body = {}) {
     return {
@@ -25,7 +26,7 @@ function normalizeSignaturePayload(body = {}) {
     };
 }
 
-export async function PUT(request, props) {
+export const PUT = withSchoolAccess(async function PUT(request, props) {
     const params = await props.params;
     const { id } = params;
     const body = await request.json();
@@ -88,9 +89,18 @@ export async function PUT(request, props) {
         console.error('[SIGNATURE_API_ERROR]', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-}
+}, {
+    getSchoolId: async ({ params }) => {
+        if (!params?.id) return null;
+        const signature = await prisma.signature.findUnique({
+            where: { id: params.id },
+            select: { schoolId: true },
+        });
+        return signature?.schoolId ?? null;
+    },
+});
 
-export async function DELETE(request, props) {
+export const DELETE = withSchoolAccess(async function DELETE(request, props) {
     const params = await props.params;
     const { id } = params;
     try {
@@ -111,4 +121,13 @@ export async function DELETE(request, props) {
         console.error('[SIGNATURE_API_ERROR]', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-}
+}, {
+    getSchoolId: async ({ params }) => {
+        if (!params?.id) return null;
+        const signature = await prisma.signature.findUnique({
+            where: { id: params.id },
+            select: { schoolId: true },
+        });
+        return signature?.schoolId ?? null;
+    },
+});

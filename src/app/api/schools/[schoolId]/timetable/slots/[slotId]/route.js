@@ -1,95 +1,96 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/timetable/slots/[slotId]
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
-    try {
-        const { slotId } = params;
+  try {
+    const { slotId } = params;
 
-        const slot = await prisma.timeSlot.findUnique({
-            where: { id: slotId },
-            include: {
-                _count: {
-                    select: { entries: true },
-                },
-            },
-        });
-
-        if (!slot) {
-            return NextResponse.json(
-                { error: 'Time slot not found' },
-                { status: 404 }
-            );
+    const slot = await prisma.timeSlot.findUnique({
+      where: { id: slotId },
+      include: {
+        _count: {
+          select: { entries: true }
         }
+      }
+    });
 
-        return NextResponse.json(slot);
-    } catch (error) {
-        console.error('Error fetching time slot:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch time slot' },
-            { status: 500 }
-        );
+    if (!slot) {
+      return NextResponse.json(
+        { error: 'Time slot not found' },
+        { status: 404 }
+      );
     }
-}
+
+    return NextResponse.json(slot);
+  } catch (error) {
+    console.error('Error fetching time slot:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch time slot' },
+      { status: 500 }
+    );
+  }
+});
 
 // PUT /api/schools/[schoolId]/timetable/slots/[slotId]
-export async function PUT(req, props) {
+export const PUT = withSchoolAccess(async function PUT(req, props) {
   const params = await props.params;
-    try {
-        const { slotId } = params;
-        const body = await req.json();
-        const { label, startTime, endTime, isBreak, sequence } = body;
+  try {
+    const { slotId } = params;
+    const body = await req.json();
+    const { label, startTime, endTime, isBreak, sequence } = body;
 
-        const slot = await prisma.timeSlot.update({
-            where: { id: slotId },
-            data: {
-                label: label || undefined,
-                startTime: startTime || undefined,
-                endTime: endTime || undefined,
-                isBreak: isBreak !== undefined ? isBreak : undefined,
-                sequence: sequence != null ? parseInt(sequence) : undefined,
-            },
-        });
+    const slot = await prisma.timeSlot.update({
+      where: { id: slotId },
+      data: {
+        label: label || undefined,
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        isBreak: isBreak !== undefined ? isBreak : undefined,
+        sequence: sequence != null ? parseInt(sequence) : undefined
+      }
+    });
 
-        return NextResponse.json(slot);
-    } catch (error) {
-        console.error('Error updating time slot:', error);
-        return NextResponse.json(
-            { error: 'Failed to update time slot' },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(slot);
+  } catch (error) {
+    console.error('Error updating time slot:', error);
+    return NextResponse.json(
+      { error: 'Failed to update time slot' },
+      { status: 500 }
+    );
+  }
+});
 
 // DELETE /api/schools/[schoolId]/timetable/slots/[slotId]
-export async function DELETE(req, props) {
+export const DELETE = withSchoolAccess(async function DELETE(req, props) {
   const params = await props.params;
-    try {
-        const { slotId } = params;
+  try {
+    const { slotId } = params;
 
-        // Check if slot has any entries
-        const entriesCount = await prisma.timetableEntry.count({
-            where: { timeSlotId: slotId },
-        });
+    // Check if slot has any entries
+    const entriesCount = await prisma.timetableEntry.count({
+      where: { timeSlotId: slotId }
+    });
 
-        if (entriesCount > 0) {
-            return NextResponse.json(
-                { error: `Cannot delete time slot. It has ${entriesCount} timetable entries.` },
-                { status: 400 }
-            );
-        }
-
-        await prisma.timeSlot.delete({
-            where: { id: slotId },
-        });
-
-        return NextResponse.json({ message: 'Time slot deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting time slot:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete time slot' },
-            { status: 500 }
-        );
+    if (entriesCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete time slot. It has ${entriesCount} timetable entries.` },
+        { status: 400 }
+      );
     }
-}
+
+    await prisma.timeSlot.delete({
+      where: { id: slotId }
+    });
+
+    return NextResponse.json({ message: 'Time slot deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting time slot:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete time slot' },
+      { status: 500 }
+    );
+  }
+});

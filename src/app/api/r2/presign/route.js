@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPresignedUploadUrl, generateFileKey, R2_PUBLIC_URL } from '@/lib/r2';
+import { withSchoolAccess } from '@/lib/api-auth';
 
 /**
  * POST /api/r2/presign
@@ -13,7 +14,7 @@ import { getPresignedUploadUrl, generateFileKey, R2_PUBLIC_URL } from '@/lib/r2'
  * 
  * Returns: [{ url: string, key: string, publicUrl: string }]
  */
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const { files, folder = 'uploads', subFolder = '', schoolId = 'global' } = body;
@@ -54,4 +55,4 @@ export async function POST(req) {
             { status: 500 }
         );
     }
-}
+});

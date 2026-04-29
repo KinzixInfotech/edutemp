@@ -3,9 +3,10 @@ import prisma from "@/lib/prisma";
 import { parseUserAgent, getClientIP, generateSessionToken, getGeoLocation } from "@/lib/device-info";
 import redis from "@/lib/redis";
 import { notifyNewDeviceLogin } from "@/lib/notifications/notificationHelper";
+import { withSchoolAccess } from "@/lib/api-auth";
 
 // GET - List user's active sessions
-export async function GET(req) {
+export const GET = withSchoolAccess(async function GET(req) {
     try {
         const userId = req.headers.get("x-user-id"); // Set by auth middleware or context
 
@@ -76,10 +77,10 @@ export async function GET(req) {
             { status: 500 }
         );
     }
-}
+});
 
 // POST - Create new session (called on login)
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const { userId, rememberMe = false, supabaseSessionToken } = body;
@@ -231,7 +232,7 @@ export async function POST(req) {
             { status: 500 }
         );
     }
-}
+});
 
 export async function DELETE(req, { params }) {
     // Handling single revoke here if routing allows methods in same file or separate dynamic route

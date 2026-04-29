@@ -1,28 +1,29 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch submissions for a form
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
-    const { schoolId, formId } = params;
+  const { schoolId, formId } = params;
 
-    try {
-        const submissions = await prisma.application.findMany({
-            where: {
-                schoolId,
-                formId,
-            },
-            orderBy: {
-                submittedAt: "desc",
-            },
-        });
+  try {
+    const submissions = await prisma.application.findMany({
+      where: {
+        schoolId,
+        formId
+      },
+      orderBy: {
+        submittedAt: "desc"
+      }
+    });
 
-        return NextResponse.json(submissions);
-    } catch (error) {
-        console.error("Error fetching submissions:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch submissions" },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(submissions);
+  } catch (error) {
+    console.error("Error fetching submissions:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch submissions" },
+      { status: 500 }
+    );
+  }
+});

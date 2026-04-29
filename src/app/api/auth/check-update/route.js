@@ -1,8 +1,9 @@
  // File: app/api/auth/check-update/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { withSchoolAccess } from "@/lib/api-auth";
 
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const { userId, lastUpdatedAt, } = body;
@@ -46,4 +47,4 @@ export async function POST(req) {
         console.error("[CHECK_UPDATE]", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
-}
+});

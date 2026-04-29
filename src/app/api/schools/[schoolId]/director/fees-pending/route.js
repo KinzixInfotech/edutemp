@@ -1,39 +1,40 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { remember, generateKey } from '@/lib/cache';
 
-export async function GET(req, { params }) {
-    try {
-        const { schoolId } = await params;
+export const GET = withSchoolAccess(async function GET(req, { params }) {
+  try {
+    const { schoolId } = await params;
 
-        if (!schoolId || schoolId === 'null') {
-            return NextResponse.json({ error: 'Invalid schoolId' }, { status: 400 });
-        }
+    if (!schoolId || schoolId === 'null') {
+      return NextResponse.json({ error: 'Invalid schoolId' }, { status: 400 });
+    }
 
-        const { searchParams } = new URL(req.url);
-        const academicYearId = searchParams.get('academicYearId');
+    const { searchParams } = new URL(req.url);
+    const academicYearId = searchParams.get('academicYearId');
 
-        const cacheKey = generateKey('director:fees-pending', { schoolId, academicYearId });
+    const cacheKey = generateKey('director:fees-pending', { schoolId, academicYearId });
 
-        const data = await remember(cacheKey, async () => {
-            // If no academicYearId, get latest one
-            let yearId = academicYearId;
-            if (!yearId) {
-                const latestYear = await prisma.academicYear.findFirst({
-                    where: { schoolId },
-                    orderBy: { startDate: 'desc' }
-                });
-                yearId = latestYear?.id;
-            }
+    const data = await remember(cacheKey, async () => {
+      // If no academicYearId, get latest one
+      let yearId = academicYearId;
+      if (!yearId) {
+        const latestYear = await prisma.academicYear.findFirst({
+          where: { schoolId },
+          orderBy: { startDate: 'desc' }
+        });
+        yearId = latestYear?.id;
+      }
 
-            if (!yearId) {
-                return {
-                    summary: { totalPending: 0, studentCount: 0, overdueCount: 0 },
-                    pendingStudents: []
-                };
-            }
+      if (!yearId) {
+        return {
+          summary: { totalPending: 0, studentCount: 0, overdueCount: 0 },
+          pendingStudents: []
+        };
+      }
 
-            const pendingFees = await prisma.$queryRaw`
+      const pendingFees = await prisma.$queryRaw`
                 SELECT 
                     s."admissionNo",
                     u."name" as "studentName",
@@ -56,7 +57,7 @@ export async function GET(req, { params }) {
                 LIMIT 100
             `;
 
-            const summary = await prisma.$queryRaw`
+      const summary = await prisma.$queryRaw`
                 SELECT 
                     COUNT(DISTINCT sf."studentId") as "studentCount",
                     COALESCE(SUM(sf."balanceAmount"), 0) as "totalPending",
@@ -68,31 +69,31 @@ export async function GET(req, { params }) {
             `;
 
 
-            return {
-                summary: {
-                    totalPending: Number(summary[0]?.totalPending) || 0,
-                    studentCount: Number(summary[0]?.studentCount) || 0,
-                    overdueCount: Number(summary[0]?.overdueCount) || 0
-                },
-                pendingStudents: pendingFees.map(f => ({
-                    admissionNo: f.admissionNo,
-                    studentName: f.studentName,
-                    email: f.email,
-                    totalAmount: Number(f.totalAmount),
-                    paidAmount: Number(f.paidAmount),
-                    pendingAmount: Number(f.pendingAmount),
-                    dueDate: f.dueDate,
-                    isOverdue: f.isOverdue
-                }))
-            };
-        }, 60);
+      return {
+        summary: {
+          totalPending: Number(summary[0]?.totalPending) || 0,
+          studentCount: Number(summary[0]?.studentCount) || 0,
+          overdueCount: Number(summary[0]?.overdueCount) || 0
+        },
+        pendingStudents: pendingFees.map((f) => ({
+          admissionNo: f.admissionNo,
+          studentName: f.studentName,
+          email: f.email,
+          totalAmount: Number(f.totalAmount),
+          paidAmount: Number(f.paidAmount),
+          pendingAmount: Number(f.pendingAmount),
+          dueDate: f.dueDate,
+          isOverdue: f.isOverdue
+        }))
+      };
+    }, 60);
 
-        return NextResponse.json(data);
-    } catch (error) {
-        console.error('[FEES PENDING ERROR]', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch pending fees', details: error.message },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('[FEES PENDING ERROR]', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch pending fees', details: error.message },
+      { status: 500 }
+    );
+  }
+});

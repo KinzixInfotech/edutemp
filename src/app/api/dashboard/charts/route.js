@@ -1,4 +1,4 @@
-// ============================================
+import { withSchoolAccess } from "@/lib/api-auth"; // ============================================
 // API: /api/dashboard/charts/route.js
 // Trending data for dashboard charts
 // Supports range: 7d, 30d, 2m, 6m, 1y
@@ -9,64 +9,64 @@ import prisma from '@/lib/prisma';
 import { remember, generateKey } from '@/lib/cache';
 
 const safeJSON = (obj) =>
-    JSON.parse(
-        JSON.stringify(obj, (_, value) =>
-            typeof value === 'bigint' ? Number(value) : value
-        )
-    );
+JSON.parse(
+  JSON.stringify(obj, (_, value) =>
+  typeof value === 'bigint' ? Number(value) : value
+  )
+);
 
-export async function GET(req) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const schoolId = searchParams.get('schoolId');
-        const academicYearId = searchParams.get('academicYearId');
-        const range = searchParams.get('range') || '30d';
+export const GET = withSchoolAccess(async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('schoolId');
+    const academicYearId = searchParams.get('academicYearId');
+    const range = searchParams.get('range') || '30d';
 
-        if (!schoolId) {
-            return NextResponse.json({ error: 'schoolId required' }, { status: 400 });
-        }
+    if (!schoolId) {
+      return NextResponse.json({ error: 'schoolId required' }, { status: 400 });
+    }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-        let startDate = new Date();
-        let useMonthly = false;
-        switch (range) {
-            case '7d':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case '30d':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-            case '2m':
-                startDate.setMonth(startDate.getMonth() - 2);
-                break;
-            case '6m':
-                startDate.setMonth(startDate.getMonth() - 6);
-                useMonthly = true;
-                break;
-            case '1y':
-                startDate.setFullYear(startDate.getFullYear() - 1);
-                useMonthly = true;
-                break;
-            default:
-                startDate.setDate(startDate.getDate() - 30);
-        }
-        startDate.setHours(0, 0, 0, 0);
+    let startDate = new Date();
+    let useMonthly = false;
+    switch (range) {
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '2m':
+        startDate.setMonth(startDate.getMonth() - 2);
+        break;
+      case '6m':
+        startDate.setMonth(startDate.getMonth() - 6);
+        useMonthly = true;
+        break;
+      case '1y':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        useMonthly = true;
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+    startDate.setHours(0, 0, 0, 0);
 
-        const cacheKey = generateKey('dashboard-charts', {
-            schoolId,
-            academicYearId: academicYearId || 'none',
-            range,
-            date: today.toISOString().split('T')[0]
-        });
+    const cacheKey = generateKey('dashboard-charts', {
+      schoolId,
+      academicYearId: academicYearId || 'none',
+      range,
+      date: today.toISOString().split('T')[0]
+    });
 
-        const data = await remember(cacheKey, async () => {
-            // Prisma can't parameterize DATE_TRUNC identifiers, so we use separate queries
-            const attendanceTrendQuery = useMonthly
-                ? prisma.$queryRaw`
+    const data = await remember(cacheKey, async () => {
+      // Prisma can't parameterize DATE_TRUNC identifiers, so we use separate queries
+      const attendanceTrendQuery = useMonthly ?
+      prisma.$queryRaw`
                     SELECT 
                         DATE_TRUNC('month', a."date") AS period,
                         COUNT(CASE WHEN a."status" = 'PRESENT' THEN 1 END)::int AS present,
@@ -81,8 +81,8 @@ export async function GET(req) {
                         AND r."name" = 'STUDENT'
                     GROUP BY period
                     ORDER BY period ASC
-                `.catch(() => [])
-                : prisma.$queryRaw`
+                `.catch(() => []) :
+      prisma.$queryRaw`
                     SELECT 
                         DATE_TRUNC('day', a."date") AS period,
                         COUNT(CASE WHEN a."status" = 'PRESENT' THEN 1 END)::int AS present,
@@ -99,10 +99,10 @@ export async function GET(req) {
                     ORDER BY period ASC
                 `.catch(() => []);
 
-            const feeCollectionTrendQuery = !academicYearId
-                ? Promise.resolve([])
-                : useMonthly
-                    ? prisma.$queryRaw`
+      const feeCollectionTrendQuery = !academicYearId ?
+      Promise.resolve([]) :
+      useMonthly ?
+      prisma.$queryRaw`
                         SELECT 
                             DATE_TRUNC('month', fp."paymentDate") AS period,
                             SUM(fp."amount")::numeric AS amount,
@@ -115,8 +115,8 @@ export async function GET(req) {
                             AND fp."paymentDate" < ${tomorrow}
                         GROUP BY period
                         ORDER BY period ASC
-                    `.catch(() => [])
-                    : prisma.$queryRaw`
+                    `.catch(() => []) :
+      prisma.$queryRaw`
                         SELECT 
                             DATE_TRUNC('day', fp."paymentDate") AS period,
                             SUM(fp."amount")::numeric AS amount,
@@ -131,13 +131,13 @@ export async function GET(req) {
                         ORDER BY period ASC
                     `.catch(() => []);
 
-            const [attendanceTrend, feeCollectionTrend, attendanceToday, feeBreakdown] = await Promise.all([
-                attendanceTrendQuery,
-                feeCollectionTrendQuery,
+      const [attendanceTrend, feeCollectionTrend, attendanceToday, feeBreakdown] = await Promise.all([
+      attendanceTrendQuery,
+      feeCollectionTrendQuery,
 
-                // ===== TODAY'S ATTENDANCE BREAKDOWN (for bar chart) =====
-                // Filter by academic year to avoid counting students from other years
-                academicYearId ? prisma.$queryRaw`
+      // ===== TODAY'S ATTENDANCE BREAKDOWN (for bar chart) =====
+      // Filter by academic year to avoid counting students from other years
+      academicYearId ? prisma.$queryRaw`
                     SELECT 
                         CASE 
                             WHEN a."status" IS NULL THEN 'ABSENT'
@@ -167,89 +167,89 @@ export async function GET(req) {
                     GROUP BY a."status"
                 `.catch(() => []),
 
-                // ===== FEE BREAKDOWN (for pie chart) =====
-                academicYearId ? prisma.studentFee.aggregate({
-                    where: { schoolId, academicYearId },
-                    _sum: {
-                        originalAmount: true,
-                        paidAmount: true,
-                        discountAmount: true,
-                        balanceAmount: true
-                    }
-                }).catch(() => ({ _sum: {} })) : Promise.resolve({ _sum: {} }),
-            ]);
+      // ===== FEE BREAKDOWN (for pie chart) =====
+      academicYearId ? prisma.studentFee.aggregate({
+        where: { schoolId, academicYearId },
+        _sum: {
+          originalAmount: true,
+          paidAmount: true,
+          discountAmount: true,
+          balanceAmount: true
+        }
+      }).catch(() => ({ _sum: {} })) : Promise.resolve({ _sum: {} })]
+      );
 
-            // Format attendance breakdown for bar chart
-            // Merge rows that map to the same display name (e.g. NULL + ABSENT both → 'Absent')
-            const barMap = new Map(); // name → { value, fill }
-            let totalStudentsForBar = 0;
-            (attendanceToday || []).forEach(row => {
-                totalStudentsForBar += row.count;
-            });
-            (attendanceToday || []).forEach(row => {
-                const status = row.status || 'ABSENT';
-                const name = status === 'PRESENT' ? 'Present' :
-                    status === 'LATE' ? 'Late' : 'Absent';
-                const fill = status === 'PRESENT' ? 'hsl(142, 71%, 45%)' :
-                    status === 'LATE' ? 'hsl(38, 92%, 50%)' : 'hsl(0, 84%, 60%)';
-                if (barMap.has(name)) {
-                    barMap.get(name).value += row.count;
-                } else {
-                    barMap.set(name, { name, value: row.count, fill });
-                }
-            });
-            const attendanceBar = Array.from(barMap.values()).map(item => ({
-                ...item,
-                percentage: totalStudentsForBar > 0
-                    ? ((item.value / totalStudentsForBar) * 100).toFixed(1)
-                    : '0',
-            }));
+      // Format attendance breakdown for bar chart
+      // Merge rows that map to the same display name (e.g. NULL + ABSENT both → 'Absent')
+      const barMap = new Map(); // name → { value, fill }
+      let totalStudentsForBar = 0;
+      (attendanceToday || []).forEach((row) => {
+        totalStudentsForBar += row.count;
+      });
+      (attendanceToday || []).forEach((row) => {
+        const status = row.status || 'ABSENT';
+        const name = status === 'PRESENT' ? 'Present' :
+        status === 'LATE' ? 'Late' : 'Absent';
+        const fill = status === 'PRESENT' ? 'hsl(142, 71%, 45%)' :
+        status === 'LATE' ? 'hsl(38, 92%, 50%)' : 'hsl(0, 84%, 60%)';
+        if (barMap.has(name)) {
+          barMap.get(name).value += row.count;
+        } else {
+          barMap.set(name, { name, value: row.count, fill });
+        }
+      });
+      const attendanceBar = Array.from(barMap.values()).map((item) => ({
+        ...item,
+        percentage: totalStudentsForBar > 0 ?
+        (item.value / totalStudentsForBar * 100).toFixed(1) :
+        '0'
+      }));
 
-            // Format fee breakdown for pie chart
-            const feeSums = feeBreakdown._sum || {};
-            const feePie = [];
-            if (feeSums.paidAmount) {
-                feePie.push({
-                    name: 'Collected',
-                    value: Number(feeSums.paidAmount) || 0,
-                    fill: 'hsl(142, 71%, 45%)'
-                });
-            }
-            if (feeSums.balanceAmount) {
-                feePie.push({
-                    name: 'Outstanding',
-                    value: Number(feeSums.balanceAmount) || 0,
-                    fill: 'hsl(0, 84%, 60%)'
-                });
-            }
-            if (feeSums.discountAmount) {
-                feePie.push({
-                    name: 'Discount',
-                    value: Number(feeSums.discountAmount) || 0,
-                    fill: 'hsl(38, 92%, 50%)'
-                });
-            }
-            const feeTotal = feePie.reduce((s, f) => s + f.value, 0);
-            feePie.forEach(f => {
-                f.percentage = feeTotal > 0 ? ((f.value / feeTotal) * 100).toFixed(1) : '0';
-            });
+      // Format fee breakdown for pie chart
+      const feeSums = feeBreakdown._sum || {};
+      const feePie = [];
+      if (feeSums.paidAmount) {
+        feePie.push({
+          name: 'Collected',
+          value: Number(feeSums.paidAmount) || 0,
+          fill: 'hsl(142, 71%, 45%)'
+        });
+      }
+      if (feeSums.balanceAmount) {
+        feePie.push({
+          name: 'Outstanding',
+          value: Number(feeSums.balanceAmount) || 0,
+          fill: 'hsl(0, 84%, 60%)'
+        });
+      }
+      if (feeSums.discountAmount) {
+        feePie.push({
+          name: 'Discount',
+          value: Number(feeSums.discountAmount) || 0,
+          fill: 'hsl(38, 92%, 50%)'
+        });
+      }
+      const feeTotal = feePie.reduce((s, f) => s + f.value, 0);
+      feePie.forEach((f) => {
+        f.percentage = feeTotal > 0 ? (f.value / feeTotal * 100).toFixed(1) : '0';
+      });
 
-            return {
-                attendanceTrend: attendanceTrend || [],
-                feeCollectionTrend: feeCollectionTrend || [],
-                attendanceBar,
-                feePie,
-                range,
-                groupBy: useMonthly ? 'month' : 'day',
-            };
-        }, 300);
+      return {
+        attendanceTrend: attendanceTrend || [],
+        feeCollectionTrend: feeCollectionTrend || [],
+        attendanceBar,
+        feePie,
+        range,
+        groupBy: useMonthly ? 'month' : 'day'
+      };
+    }, 300);
 
-        return NextResponse.json(safeJSON(data));
-    } catch (error) {
-        console.error('[DASHBOARD CHARTS ERROR]', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch chart data', details: error.message },
-            { status: 500 }
-        );
-    }
-}
+    return NextResponse.json(safeJSON(data));
+  } catch (error) {
+    console.error('[DASHBOARD CHARTS ERROR]', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch chart data', details: error.message },
+      { status: 500 }
+    );
+  }
+});

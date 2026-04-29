@@ -1,3 +1,4 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
@@ -14,8 +15,8 @@ import {
   getDbDateForConfig,
   normalizeExtendedTill,
   requiresApprovalForDate,
-  resolveAttendanceCheckoutDeadline,
-} from '@/lib/attendance/config';
+  resolveAttendanceCheckoutDeadline } from
+'@/lib/attendance/config';
 import { getSchoolTimezone, getZonedNow } from '@/lib/attendance/timezone';
 import { getTeacherShiftAttendanceWindow } from '@/lib/attendance/shifts';
 import { getLocationSecuritySignals } from '@/lib/attendance/security';
@@ -28,13 +29,13 @@ function logAttendanceDebug(stage, payload) {
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
   const a =
-    Math.sin(Δφ / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  Math.sin(Δφ / 2) ** 2 +
+  Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -50,9 +51,9 @@ async function enqueueAttendancePostProcessing(payload) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-internal-key': process.env.INTERNAL_API_KEY || 'edubreezy_internal',
+          'x-internal-key': process.env.INTERNAL_API_KEY || 'edubreezy_internal'
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       }).catch((error) => console.error('[attendance/mark] worker kick failed', error));
       return;
     }
@@ -60,14 +61,12 @@ async function enqueueAttendancePostProcessing(payload) {
     await qstash.publishJSON({
       url: workerUrl,
       body: payload,
-      retries: 3,
+      retries: 3
     });
   } catch (error) {
     console.error('[attendance/mark] failed to enqueue worker', error);
   }
-}
-
-export async function POST(req, props) {
+}export const POST = withSchoolAccess(async function POST(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const body = await req.json();
@@ -79,55 +78,55 @@ export async function POST(req, props) {
     remarks,
     capturedAt,
     submissionMode = 'LIVE',
-    queueId,
+    queueId
   } = body;
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]
-    || req.headers.get('x-real-ip')
-    || 'Unknown';
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ||
+  req.headers.get('x-real-ip') ||
+  'Unknown';
   const enrichedDeviceInfo = {
     ...deviceInfo,
     ipAddress: ip,
     userAgent: req.headers.get('user-agent') || deviceInfo?.userAgent,
     submissionMode,
-    queueId: queueId || null,
+    queueId: queueId || null
   };
 
   if (!userId || !type || !['CHECK_IN', 'CHECK_OUT', 'EXTEND'].includes(type)) {
     return NextResponse.json({
-      error: 'userId and valid type (CHECK_IN/CHECK_OUT/EXTEND) required',
+      error: 'userId and valid type (CHECK_IN/CHECK_OUT/EXTEND) required'
     }, { status: 400 });
   }
 
   try {
     const serverNow = new Date();
     const [config, school, activeAcademicYear, recentAttendance, payrollConfig] = await Promise.all([
-      prisma.attendanceConfig.findUnique({ where: { schoolId } }),
-      prisma.school.findUnique({
-        where: { id: schoolId },
-        select: { id: true, websiteConfig: true },
-      }),
-      prisma.academicYear.findFirst({
-        where: { schoolId, isActive: true },
-        select: { id: true },
-      }),
-      prisma.attendance.findFirst({
-        where: { userId, schoolId },
-        orderBy: [{ date: 'desc' }, { markedAt: 'desc' }],
-        select: {
-          id: true,
-          date: true,
-          deviceInfo: true,
-          checkInLocation: true,
-          checkOutLocation: true,
-        },
-      }),
-      getPayrollConfigForSchool(schoolId),
-    ]);
+    prisma.attendanceConfig.findUnique({ where: { schoolId } }),
+    prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true, websiteConfig: true }
+    }),
+    prisma.academicYear.findFirst({
+      where: { schoolId, isActive: true },
+      select: { id: true }
+    }),
+    prisma.attendance.findFirst({
+      where: { userId, schoolId },
+      orderBy: [{ date: 'desc' }, { markedAt: 'desc' }],
+      select: {
+        id: true,
+        date: true,
+        deviceInfo: true,
+        checkInLocation: true,
+        checkOutLocation: true
+      }
+    }),
+    getPayrollConfigForSchool(schoolId)]
+    );
 
     if (!config) {
       return NextResponse.json({
-        error: 'Attendance config not found. Please set up attendance settings first.',
+        error: 'Attendance config not found. Please set up attendance settings first.'
       }, { status: 404 });
     }
 
@@ -135,37 +134,37 @@ export async function POST(req, props) {
     const configWithTimezone = {
       ...config,
       school,
-      timezone,
+      timezone
     };
 
-    const effectiveEventTime = submissionMode === 'OFFLINE_SYNC' && capturedAt
-      ? new Date(capturedAt)
-      : serverNow;
+    const effectiveEventTime = submissionMode === 'OFFLINE_SYNC' && capturedAt ?
+    new Date(capturedAt) :
+    serverNow;
     const today = getDbDateForConfig(configWithTimezone, effectiveEventTime);
     const dateKey = getDateKeyForConfig(configWithTimezone, effectiveEventTime);
     const shiftWindow = await getTeacherShiftAttendanceWindow({
       schoolId,
       userId,
       targetDate: effectiveEventTime,
-      timezone,
+      timezone
     });
     const windows = computeAttendanceWindows(configWithTimezone, dateKey, shiftWindow || {});
     const configSnapshot = getAttendanceConfigSnapshot(configWithTimezone);
 
     const [calendar, lock] = await Promise.all([
-      prisma.schoolCalendar.findUnique({
-        where: { schoolId_date: { schoolId, date: today } },
-      }),
-      prisma.attendanceLock.findUnique({
-        where: {
-          schoolId_month_year: {
-            schoolId,
-            month: getZonedNow(timezone, effectiveEventTime).month() + 1,
-            year: getZonedNow(timezone, effectiveEventTime).year(),
-          },
-        },
-      }),
-    ]);
+    prisma.schoolCalendar.findUnique({
+      where: { schoolId_date: { schoolId, date: today } }
+    }),
+    prisma.attendanceLock.findUnique({
+      where: {
+        schoolId_month_year: {
+          schoolId,
+          month: getZonedNow(timezone, effectiveEventTime).month() + 1,
+          year: getZonedNow(timezone, effectiveEventTime).year()
+        }
+      }
+    })]
+    );
 
     logAttendanceDebug('loaded-config', {
       schoolId,
@@ -174,7 +173,7 @@ export async function POST(req, props) {
       timezone,
       submissionMode,
       config: configSnapshot,
-      shiftWindow,
+      shiftWindow
     });
     logAttendanceDebug('computed-windows', {
       checkInStart: windows.checkInStart.toISOString(),
@@ -183,7 +182,7 @@ export async function POST(req, props) {
       checkOutDeadline: windows.checkOutDeadline.toISOString(),
       checkOutEnd: windows.checkOutEnd.toISOString(),
       autoCheckoutCutoff: windows.autoCheckoutCutoff.toISOString(),
-      maxExtendedCheckoutEnd: windows.maxExtendedCheckoutEnd.toISOString(),
+      maxExtendedCheckoutEnd: windows.maxExtendedCheckoutEnd.toISOString()
     });
 
     const effectiveDayType = calendar?.dayType || 'WORKING_DAY';
@@ -192,12 +191,12 @@ export async function POST(req, props) {
         userId,
         schoolId,
         action: `${type}_BLOCKED_NON_WORKING_DAY`,
-        payload: { dayType: effectiveDayType, date: dateKey, submissionMode },
+        payload: { dayType: effectiveDayType, date: dateKey, submissionMode }
       });
       return NextResponse.json({
         error: `Selected date is ${effectiveDayType}. No attendance required.`,
         dayType: effectiveDayType,
-        holidayName: calendar?.holidayName,
+        holidayName: calendar?.holidayName
       }, { status: 400 });
     }
 
@@ -206,10 +205,10 @@ export async function POST(req, props) {
         userId,
         schoolId,
         action: `${type}_BLOCKED_LOCKED_PERIOD`,
-        payload: { date: dateKey, month: lock.month, year: lock.year, submissionMode },
+        payload: { date: dateKey, month: lock.month, year: lock.year, submissionMode }
       });
       return NextResponse.json({
-        error: 'Attendance for this period is locked. Contact admin for manual override.',
+        error: 'Attendance for this period is locked. Contact admin for manual override.'
       }, { status: 423 });
     }
 
@@ -220,16 +219,16 @@ export async function POST(req, props) {
           userId,
           schoolId,
           action: `${type}_BLOCKED_NO_LOCATION`,
-          payload: { date: dateKey, submissionMode },
+          payload: { date: dateKey, submissionMode }
         });
         return NextResponse.json({
-          error: 'Location is required for attendance marking.',
+          error: 'Location is required for attendance marking.'
         }, { status: 400 });
       }
 
       if (!configSnapshot.schoolLatitude || !configSnapshot.schoolLongitude) {
         return NextResponse.json({
-          error: 'School location not configured',
+          error: 'School location not configured'
         }, { status: 400 });
       }
 
@@ -245,7 +244,7 @@ export async function POST(req, props) {
         userId,
         type,
         distance: Math.round(distance),
-        allowedRadius: configSnapshot.allowedRadius,
+        allowedRadius: configSnapshot.allowedRadius
       });
 
       if (distance > configSnapshot.allowedRadius) {
@@ -258,13 +257,13 @@ export async function POST(req, props) {
             submissionMode,
             distance: Math.round(distance),
             allowedRadius: configSnapshot.allowedRadius,
-            location,
+            location
           },
-          error: 'OUTSIDE_GEOFENCE',
+          error: 'OUTSIDE_GEOFENCE'
         });
 
         return NextResponse.json({
-          error: `You are ${Math.round(distance)}m away from school. You must be within ${configSnapshot.allowedRadius}m to mark attendance.`,
+          error: `You are ${Math.round(distance)}m away from school. You must be within ${configSnapshot.allowedRadius}m to mark attendance.`
         }, { status: 403 });
       }
     }
@@ -272,7 +271,7 @@ export async function POST(req, props) {
     const securityAssessment = getLocationSecuritySignals({
       currentLocation: {
         ...location,
-        capturedAt: capturedAt || effectiveEventTime.toISOString(),
+        capturedAt: capturedAt || effectiveEventTime.toISOString()
       },
       previousLocation: recentAttendance?.checkOutLocation || recentAttendance?.checkInLocation,
       allowedRadius: configSnapshot.allowedRadius,
@@ -280,7 +279,7 @@ export async function POST(req, props) {
       eventTime: effectiveEventTime,
       serverTime: serverNow,
       priorDeviceId: recentAttendance?.deviceInfo?.installationId || recentAttendance?.deviceInfo?.deviceId,
-      currentDeviceId: enrichedDeviceInfo.installationId || enrichedDeviceInfo.deviceId,
+      currentDeviceId: enrichedDeviceInfo.installationId || enrichedDeviceInfo.deviceId
     });
 
     if (securityAssessment.blockingSignals.length > 0) {
@@ -293,38 +292,38 @@ export async function POST(req, props) {
           submissionMode,
           securityAssessment,
           location,
-          deviceInfo: enrichedDeviceInfo,
+          deviceInfo: enrichedDeviceInfo
         },
-        error: securityAssessment.blockingSignals.join(','),
+        error: securityAssessment.blockingSignals.join(',')
       });
 
-      const primaryReason = securityAssessment.blockingSignals.includes('MOCK_LOCATION')
-        ? 'Mock location detected. Attendance cannot be marked.'
-        : `You are ${Math.round(distance || 0)}m away. Must be within ${configSnapshot.allowedRadius}m of school.`;
+      const primaryReason = securityAssessment.blockingSignals.includes('MOCK_LOCATION') ?
+      'Mock location detected. Attendance cannot be marked.' :
+      `You are ${Math.round(distance || 0)}m away. Must be within ${configSnapshot.allowedRadius}m of school.`;
 
       return NextResponse.json({
         error: primaryReason,
-        securityAssessment,
+        securityAssessment
       }, { status: 400 });
     }
 
     const existing = await prisma.attendance.findUnique({
-      where: { userId_schoolId_date: { userId, schoolId, date: today } },
+      where: { userId_schoolId_date: { userId, schoolId, date: today } }
     });
 
-    const needsApproval = requiresApprovalForDate(today, configSnapshot.approvalAfterDays, serverNow, timezone)
-      || submissionMode === 'OFFLINE_SYNC'
-      || securityAssessment.suspiciousSignals.length > 0;
+    const needsApproval = requiresApprovalForDate(today, configSnapshot.approvalAfterDays, serverNow, timezone) ||
+    submissionMode === 'OFFLINE_SYNC' ||
+    securityAssessment.suspiciousSignals.length > 0;
 
     const baseAttendanceData = {
       remarks,
       deviceInfo: {
         ...enrichedDeviceInfo,
-        securityAssessment,
+        securityAssessment
       },
       requiresApproval: needsApproval,
       approvalStatus: needsApproval ? 'PENDING' : 'NOT_REQUIRED',
-      markedBy: userId,
+      markedBy: userId
     };
 
     if (type === 'CHECK_IN') {
@@ -335,12 +334,12 @@ export async function POST(req, props) {
           attendanceId: existing.id,
           action: 'CHECK_IN_DUPLICATE',
           payload: { date: dateKey, submissionMode, existingCheckInTime: existing.checkInTime },
-          error: 'Already checked in',
+          error: 'Already checked in'
         });
         return NextResponse.json({
           success: false,
           message: 'Already checked in today',
-          attendance: existing,
+          attendance: existing
         });
       }
 
@@ -354,16 +353,16 @@ export async function POST(req, props) {
             submissionMode,
             eventTime: effectiveEventTime.toISOString(),
             start: windows.checkInStart.toISOString(),
-            end: windows.checkInEnd.toISOString(),
+            end: windows.checkInEnd.toISOString()
           },
-          error: 'Outside check-in window',
+          error: 'Outside check-in window'
         });
         return NextResponse.json({
           success: false,
-          message: effectiveEventTime < windows.checkInStart
-            ? `Check-in opens at ${configSnapshot.defaultStartTime}`
-            : `Check-in window closed at ${windows.checkInEnd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-          securityAssessment,
+          message: effectiveEventTime < windows.checkInStart ?
+          `Check-in opens at ${configSnapshot.defaultStartTime}` :
+          `Check-in window closed at ${windows.checkInEnd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+          securityAssessment
         });
       }
 
@@ -371,47 +370,47 @@ export async function POST(req, props) {
       const isLate = status === 'LATE';
       const lateByMinutes = isLate ? Math.floor((effectiveEventTime - windows.lateAfter) / 60000) : null;
 
-      const attendance = existing
-        ? await prisma.attendance.update({
-          where: { id: existing.id },
-          data: {
-            ...baseAttendanceData,
-            status,
-            checkInTime: effectiveEventTime,
-            checkInLocation: location || null,
-            isLateCheckIn: isLate,
-            lateByMinutes,
-            workingHours: 0,
-            overtimeHours: 0,
-            overtimeStatus: 'NOT_REQUIRED',
-            overtimeApprovedBy: null,
-            overtimeApprovedAt: null,
-            overtimeApprovalRemarks: null,
-            checkoutType: 'MANUAL',
-            isExtended: false,
-            extendedTill: null,
-            extensionRequestedAt: null,
-          },
-        })
-        : await prisma.attendance.create({
-          data: {
-            userId,
-            schoolId,
-            date: today,
-            academicYearId: activeAcademicYear?.id || null,
-            ...baseAttendanceData,
-            status,
-            checkInTime: effectiveEventTime,
-            checkInLocation: location || null,
-            isLateCheckIn: isLate,
-            lateByMinutes,
-            workingHours: 0,
-            overtimeHours: 0,
-            overtimeStatus: 'NOT_REQUIRED',
-            checkoutType: 'MANUAL',
-            isExtended: false,
-          },
-        });
+      const attendance = existing ?
+      await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          ...baseAttendanceData,
+          status,
+          checkInTime: effectiveEventTime,
+          checkInLocation: location || null,
+          isLateCheckIn: isLate,
+          lateByMinutes,
+          workingHours: 0,
+          overtimeHours: 0,
+          overtimeStatus: 'NOT_REQUIRED',
+          overtimeApprovedBy: null,
+          overtimeApprovedAt: null,
+          overtimeApprovalRemarks: null,
+          checkoutType: 'MANUAL',
+          isExtended: false,
+          extendedTill: null,
+          extensionRequestedAt: null
+        }
+      }) :
+      await prisma.attendance.create({
+        data: {
+          userId,
+          schoolId,
+          date: today,
+          academicYearId: activeAcademicYear?.id || null,
+          ...baseAttendanceData,
+          status,
+          checkInTime: effectiveEventTime,
+          checkInLocation: location || null,
+          isLateCheckIn: isLate,
+          lateByMinutes,
+          workingHours: 0,
+          overtimeHours: 0,
+          overtimeStatus: 'NOT_REQUIRED',
+          checkoutType: 'MANUAL',
+          isExtended: false
+        }
+      });
 
       await createAttendanceAuditLog({
         userId,
@@ -425,8 +424,8 @@ export async function POST(req, props) {
           location,
           deviceInfo: enrichedDeviceInfo,
           securityAssessment,
-          shiftWindow,
-        },
+          shiftWindow
+        }
       });
 
       await enqueueAttendancePostProcessing({
@@ -434,16 +433,16 @@ export async function POST(req, props) {
         attendanceId: attendance.id,
         userId,
         action: 'CHECK_IN',
-        securityAssessment,
+        securityAssessment
       });
 
       await invalidatePattern(`attendance:${schoolId}*`);
 
       return NextResponse.json({
         success: true,
-        message: isLate
-          ? `Checked in (Late by ${lateByMinutes} min)`
-          : 'Checked in successfully',
+        message: isLate ?
+        `Checked in (Late by ${lateByMinutes} min)` :
+        'Checked in successfully',
         attendance,
         isLate,
         lateByMinutes,
@@ -455,8 +454,8 @@ export async function POST(req, props) {
           deadline: windows.checkOutDeadline.toISOString(),
           autoCutoff: windows.autoCheckoutCutoff.toISOString(),
           end: windows.autoCheckoutCutoff.toISOString(),
-          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString(),
-        },
+          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString()
+        }
       });
     }
 
@@ -466,11 +465,11 @@ export async function POST(req, props) {
         schoolId,
         action: type === 'EXTEND' ? 'EXTEND_WITHOUT_CHECK_IN' : 'CHECK_OUT_WITHOUT_CHECK_IN',
         payload: { date: dateKey, submissionMode },
-        error: 'No check-in record found',
+        error: 'No check-in record found'
       });
       return NextResponse.json({
         success: false,
-        message: 'No check-in record found for selected date',
+        message: 'No check-in record found for selected date'
       });
     }
 
@@ -481,12 +480,12 @@ export async function POST(req, props) {
         attendanceId: existing.id,
         action: type === 'EXTEND' ? 'EXTEND_DUPLICATE' : 'CHECK_OUT_DUPLICATE',
         payload: { date: dateKey, submissionMode, existingCheckOutTime: existing.checkOutTime },
-        error: 'Already checked out',
+        error: 'Already checked out'
       });
       return NextResponse.json({
         success: false,
         message: 'Already checked out today',
-        attendance: existing,
+        attendance: existing
       });
     }
 
@@ -495,14 +494,14 @@ export async function POST(req, props) {
         return NextResponse.json({
           success: false,
           message: 'Extension has already been recorded for today.',
-          attendance: existing,
+          attendance: existing
         }, { status: 400 });
       }
 
       if (!canRequestExtension(effectiveEventTime, windows)) {
         return NextResponse.json({
           success: false,
-          message: 'Extension can only be requested after school end time and before the maximum extension cutoff.',
+          message: 'Extension can only be requested after school end time and before the maximum extension cutoff.'
         }, { status: 400 });
       }
 
@@ -510,7 +509,7 @@ export async function POST(req, props) {
       if (!requestedExtendedTill) {
         return NextResponse.json({
           success: false,
-          message: `Extension time must be after ${configSnapshot.defaultEndTime} and within ${windows.maxExtensionHours} hours of school end.`,
+          message: `Extension time must be after ${configSnapshot.defaultEndTime} and within ${windows.maxExtensionHours} hours of school end.`
         }, { status: 400 });
       }
 
@@ -521,8 +520,8 @@ export async function POST(req, props) {
           isExtended: true,
           extendedTill: requestedExtendedTill,
           extensionRequestedAt: serverNow,
-          remarks: remarks || existing.remarks,
-        },
+          remarks: remarks || existing.remarks
+        }
       });
 
       await createAttendanceAuditLog({
@@ -535,8 +534,8 @@ export async function POST(req, props) {
           submissionMode,
           extendedTill: requestedExtendedTill.toISOString(),
           maxExtendedCheckoutEnd: windows.maxExtendedCheckoutEnd.toISOString(),
-          shiftWindow,
-        },
+          shiftWindow
+        }
       });
 
       await invalidatePattern(`attendance:${schoolId}*`);
@@ -550,15 +549,15 @@ export async function POST(req, props) {
           deadline: windows.checkOutDeadline.toISOString(),
           autoCutoff: windows.autoCheckoutCutoff.toISOString(),
           effectiveCutoff: requestedExtendedTill.toISOString(),
-          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString(),
-        },
+          maxExtendedEnd: windows.maxExtendedCheckoutEnd.toISOString()
+        }
       });
     }
 
     if (effectiveEventTime < new Date(existing.checkInTime)) {
       return NextResponse.json({
         success: false,
-        message: 'Check-out time cannot be earlier than check-in time',
+        message: 'Check-out time cannot be earlier than check-in time'
       }, { status: 400 });
     }
 
@@ -573,13 +572,13 @@ export async function POST(req, props) {
           date: dateKey,
           submissionMode,
           eventTime: effectiveEventTime.toISOString(),
-          effectiveCheckoutDeadline: effectiveCheckoutDeadline.toISOString(),
+          effectiveCheckoutDeadline: effectiveCheckoutDeadline.toISOString()
         },
-        error: 'Outside check-out window',
+        error: 'Outside check-out window'
       });
       return NextResponse.json({
         success: false,
-        message: `Check-out window closed at ${effectiveCheckoutDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`,
+        message: `Check-out window closed at ${effectiveCheckoutDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`
       });
     }
 
@@ -590,7 +589,7 @@ export async function POST(req, props) {
       workingHours,
       standardWorkingHours: payrollConfig.standardWorkingHours,
       overtimeEnabled: payrollConfig.enableOvertime,
-      overtimeRequiresApproval: payrollConfig.overtimeRequiresApproval,
+      overtimeRequiresApproval: payrollConfig.overtimeRequiresApproval
     });
 
     const attendance = await prisma.attendance.update({
@@ -607,8 +606,8 @@ export async function POST(req, props) {
         overtimeApprovedAt: overtimeState.overtimeStatus === 'APPROVED' ? serverNow : null,
         overtimeApprovalRemarks: null,
         checkoutType: 'MANUAL',
-        remarks: remarks || existing.remarks,
-      },
+        remarks: remarks || existing.remarks
+      }
     });
 
     await createAttendanceAuditLog({
@@ -626,8 +625,8 @@ export async function POST(req, props) {
         location,
         deviceInfo: enrichedDeviceInfo,
         securityAssessment,
-        shiftWindow,
-      },
+        shiftWindow
+      }
     });
 
     await enqueueAttendancePostProcessing({
@@ -635,7 +634,7 @@ export async function POST(req, props) {
       attendanceId: attendance.id,
       userId,
       action: 'CHECK_OUT',
-      securityAssessment,
+      securityAssessment
     });
 
     await invalidatePattern(`attendance:${schoolId}*`);
@@ -650,7 +649,7 @@ export async function POST(req, props) {
       attendanceStatus: attendance.status,
       securityAssessment,
       timezone,
-      shiftWindow,
+      shiftWindow
     });
   } catch (error) {
     console.error('Mark attendance error:', error);
@@ -661,18 +660,18 @@ export async function POST(req, props) {
       payload: {
         submissionMode,
         queueId,
-        capturedAt,
+        capturedAt
       },
-      error: error.message,
+      error: error.message
     });
     return NextResponse.json({
       error: 'Server error',
-      details: error.message,
+      details: error.message
     }, { status: 500 });
   }
-}
+});
 
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   const { schoolId } = params;
   const userId = new URL(req.url).searchParams.get('userId');
@@ -683,18 +682,18 @@ export async function GET(req, props) {
 
   try {
     const [config, school, payrollConfig] = await Promise.all([
-      prisma.attendanceConfig.findUnique({ where: { schoolId } }),
-      prisma.school.findUnique({
-        where: { id: schoolId },
-        select: { id: true, websiteConfig: true },
-      }),
-      getPayrollConfigForSchool(schoolId),
-    ]);
+    prisma.attendanceConfig.findUnique({ where: { schoolId } }),
+    prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true, websiteConfig: true }
+    }),
+    getPayrollConfigForSchool(schoolId)]
+    );
 
     if (!config) {
       return NextResponse.json({
         error: 'Attendance config not found. Please set up attendance settings first.',
-        needsSetup: true,
+        needsSetup: true
       }, { status: 404 });
     }
 
@@ -707,7 +706,7 @@ export async function GET(req, props) {
       schoolId,
       userId,
       targetDate: now,
-      timezone,
+      timezone
     });
     const computed = computeAttendanceWindows(configWithTimezone, dateKey, shiftWindow || {});
     const configSnapshot = getAttendanceConfigSnapshot(configWithTimezone);
@@ -716,37 +715,37 @@ export async function GET(req, props) {
     const year = zonedNow.year();
 
     const [attendance, calendar, monthlyStats] = await Promise.all([
-      prisma.attendance.findUnique({
-        where: { userId_schoolId_date: { userId, schoolId, date: today } },
-      }),
-      prisma.schoolCalendar.findUnique({
-        where: { schoolId_date: { schoolId, date: today } },
-      }),
-      getMonthlyStats(userId, schoolId, month, year),
-    ]);
+    prisma.attendance.findUnique({
+      where: { userId_schoolId_date: { userId, schoolId, date: today } }
+    }),
+    prisma.schoolCalendar.findUnique({
+      where: { schoolId_date: { schoolId, date: today } }
+    }),
+    getMonthlyStats(userId, schoolId, month, year)]
+    );
 
     let liveWorkingHours = 0;
     if (attendance?.checkInTime && !attendance?.checkOutTime) {
       liveWorkingHours = calculateWorkingHours(attendance.checkInTime, now);
     }
-    const effectiveCheckoutDeadline = attendance?.checkInTime && !attendance?.checkOutTime
-      ? resolveAttendanceCheckoutDeadline(attendance, computed)
-      : computed.autoCheckoutCutoff;
+    const effectiveCheckoutDeadline = attendance?.checkInTime && !attendance?.checkOutTime ?
+    resolveAttendanceCheckoutDeadline(attendance, computed) :
+    computed.autoCheckoutCutoff;
 
     const isWorkingDay = (calendar?.dayType || 'WORKING_DAY') === 'WORKING_DAY';
 
     return NextResponse.json({
       attendance: {
         ...attendance,
-        workingHours: attendance?.checkOutTime ? (attendance.workingHours ?? 0) : liveWorkingHours,
-        liveWorkingHours: attendance?.checkOutTime ? null : liveWorkingHours,
+        workingHours: attendance?.checkOutTime ? attendance.workingHours ?? 0 : liveWorkingHours,
+        liveWorkingHours: attendance?.checkOutTime ? null : liveWorkingHours
       },
       isWorkingDay,
       dayType: calendar?.dayType || 'WORKING_DAY',
       holidayName: calendar?.holidayName,
       shiftWindow,
       alerts: {
-        attendanceBelowThreshold: monthlyStats.attendancePercentage < (configSnapshot.attendanceThreshold ?? 0),
+        attendanceBelowThreshold: monthlyStats.attendancePercentage < (configSnapshot.attendanceThreshold ?? 0)
       },
       config: {
         startTime: computed.defaultStartTime,
@@ -775,14 +774,14 @@ export async function GET(req, props) {
         autoApproveLeaves: configSnapshot.autoApproveLeaves,
         attendanceThreshold: configSnapshot.attendanceThreshold,
         minAttendancePercent: configSnapshot.attendanceThreshold,
-        standardWorkingHours: payrollConfig.standardWorkingHours,
+        standardWorkingHours: payrollConfig.standardWorkingHours
       },
       windows: {
         checkIn: {
           start: computed.checkInStart.toISOString(),
           end: computed.checkInEnd.toISOString(),
           lateAfter: computed.lateAfter.toISOString(),
-          isOpen: now >= computed.checkInStart && now <= computed.checkInEnd,
+          isOpen: now >= computed.checkInStart && now <= computed.checkInEnd
         },
         checkOut: {
           start: computed.checkOutStart.toISOString(),
@@ -791,23 +790,23 @@ export async function GET(req, props) {
           autoCutoff: computed.autoCheckoutCutoff.toISOString(),
           maxExtendedEnd: computed.maxExtendedCheckoutEnd.toISOString(),
           effectiveCutoff: effectiveCheckoutDeadline.toISOString(),
-          isOpen: !!attendance?.checkInTime && !attendance?.checkOutTime && now <= effectiveCheckoutDeadline,
-        },
+          isOpen: !!attendance?.checkInTime && !attendance?.checkOutTime && now <= effectiveCheckoutDeadline
+        }
       },
-      monthlyStats,
+      monthlyStats
     });
   } catch (e) {
     console.error('GET error:', e);
     return NextResponse.json({
       error: 'Failed to fetch',
-      details: e.message,
+      details: e.message
     }, { status: 500 });
   }
-}
+});
 
 async function getMonthlyStats(userId, schoolId, month, year) {
   let stats = await prisma.attendanceStats.findFirst({
-    where: { userId, schoolId, month, year },
+    where: { userId, schoolId, month, year }
   });
 
   if (!stats) {
@@ -815,17 +814,17 @@ async function getMonthlyStats(userId, schoolId, month, year) {
     const endDate = new Date(Date.UTC(year, month, 0));
 
     const [records, workingDays] = await Promise.all([
-      prisma.attendance.findMany({
-        where: { userId, schoolId, date: { gte: startDate, lte: endDate } },
-      }),
-      prisma.schoolCalendar.count({
-        where: {
-          schoolId,
-          date: { gte: startDate, lte: endDate },
-          dayType: 'WORKING_DAY',
-        },
-      }),
-    ]);
+    prisma.attendance.findMany({
+      where: { userId, schoolId, date: { gte: startDate, lte: endDate } }
+    }),
+    prisma.schoolCalendar.count({
+      where: {
+        schoolId,
+        date: { gte: startDate, lte: endDate },
+        dayType: 'WORKING_DAY'
+      }
+    })]
+    );
 
     const present = records.filter((r) => ['PRESENT', 'LATE'].includes(r.status)).length;
     const absent = records.filter((r) => r.status === 'ABSENT').length;
@@ -833,7 +832,7 @@ async function getMonthlyStats(userId, schoolId, month, year) {
     const leaves = records.filter((r) => r.status === 'ON_LEAVE').length;
 
     const totalWorking = workingDays || records.length;
-    const percentage = totalWorking > 0 ? ((present / totalWorking) * 100).toFixed(1) : 0;
+    const percentage = totalWorking > 0 ? (present / totalWorking * 100).toFixed(1) : 0;
 
     stats = {
       totalWorkingDays: totalWorking,
@@ -841,7 +840,7 @@ async function getMonthlyStats(userId, schoolId, month, year) {
       totalAbsent: absent,
       totalLate: late,
       totalLeaves: leaves,
-      attendancePercentage: parseFloat(percentage),
+      attendancePercentage: parseFloat(percentage)
     };
   }
 
@@ -851,6 +850,6 @@ async function getMonthlyStats(userId, schoolId, month, year) {
     absentDays: stats.totalAbsent,
     lateDays: stats.totalLate,
     leaveDays: stats.totalLeaves,
-    attendancePercentage: stats.attendancePercentage,
+    attendancePercentage: stats.attendancePercentage
   };
 }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { notifyFormSubmission } from "@/lib/notifications/notificationHelper";
+import { withSchoolAccess } from "@/lib/api-auth";
 
 // POST: Submit a form
-export async function POST(req, props) {
+export const POST = withSchoolAccess(async function POST(req, props) {
     const params = await props.params;
     const { formId } = params;
 
@@ -104,10 +105,10 @@ export async function POST(req, props) {
             { status: 500 }
         );
     }
-}
+});
 
 // GET: Fetch public form details
-export async function GET(req, props) {
+export const GET = withSchoolAccess(async function GET(req, props) {
     const params = await props.params;
     const { formId } = params;
 
@@ -161,4 +162,4 @@ export async function GET(req, props) {
         console.error("Error fetching form:", error);
         return NextResponse.json({ error: "Failed to fetch form" }, { status: 500 });
     }
-}
+});

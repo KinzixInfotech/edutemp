@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs'; // Assuming bcryptjs is used for password hashing
+import { withSchoolAccess } from '@/lib/api-auth';
 
 // POST /api/exam/auth
 // Body: { examId, email, password }
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const { examId, email, password } = body;
@@ -170,4 +171,4 @@ export async function POST(req) {
             { status: 500 }
         );
     }
-}
+});

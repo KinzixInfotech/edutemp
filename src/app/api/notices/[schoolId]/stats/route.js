@@ -1,50 +1,49 @@
-// File: app/api/notices/[schoolId]/stats/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // File: app/api/notices/[schoolId]/stats/route.js
 // GET - Get notice statistics for dashboard
+export const GET = withSchoolAccess(async function GET(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId } = params;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
 
-export async function GET(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId } = params;
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
+    const stats = {
+      total: await prisma.notice.count({ where: { schoolId } }),
+      published: await prisma.notice.count({
+        where: { schoolId, status: 'PUBLISHED' }
+      }),
+      draft: await prisma.notice.count({
+        where: { schoolId, status: 'DRAFT' }
+      }),
+      urgent: await prisma.notice.count({
+        where: { schoolId, priority: 'URGENT', status: 'PUBLISHED' }
+      })
+    };
 
-        const stats = {
-            total: await prisma.notice.count({ where: { schoolId } }),
-            published: await prisma.notice.count({
-                where: { schoolId, status: 'PUBLISHED' }
-            }),
-            draft: await prisma.notice.count({
-                where: { schoolId, status: 'DRAFT' }
-            }),
-            urgent: await prisma.notice.count({
-                where: { schoolId, priority: 'URGENT', status: 'PUBLISHED' }
-            }),
-        };
-
-        if (userId) {
-            // Get unread count for user
-            const unreadCount = await prisma.notice.count({
-                where: {
-                    schoolId,
-                    status: 'PUBLISHED',
-                    NOT: {
-                        NoticeReads: {
-                            some: { userId }
-                        }
-                    }
-                }
-            });
-
-            stats.unread = unreadCount;
+    if (userId) {
+      // Get unread count for user
+      const unreadCount = await prisma.notice.count({
+        where: {
+          schoolId,
+          status: 'PUBLISHED',
+          NOT: {
+            NoticeReads: {
+              some: { userId }
+            }
+          }
         }
+      });
 
-        return NextResponse.json(stats);
-
-    } catch (error) {
-        console.error('Error fetching notice stats:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch stats', message: error.message },
-            { status: 500 }
-        );
+      stats.unread = unreadCount;
     }
-}
+
+    return NextResponse.json(stats);
+
+  } catch (error) {
+    console.error('Error fetching notice stats:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch stats', message: error.message },
+      { status: 500 }
+    );
+  }
+});

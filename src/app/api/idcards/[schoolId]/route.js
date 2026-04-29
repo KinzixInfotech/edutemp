@@ -1,11 +1,10 @@
-// app/api/idcards/[schoolId]/route.js
+import { withSchoolAccess } from "@/lib/api-auth"; // app/api/idcards/[schoolId]/route.js
 import { NextResponse } from 'next/server';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import prisma from '@/lib/prisma';
 
-
-export async function POST(request, props) {
+export const POST = withSchoolAccess(async function POST(request, props) {
   const params = await props.params;
   const schoolId = params.schoolId;
   const body = await request.json(); // { studentId, academicYearId? }
@@ -17,7 +16,7 @@ export async function POST(request, props) {
 
     const student = await prisma.student.findUnique({
       where: { userId: body.studentId },
-      include: { user: true, class: true, school: true, academicYear: true },
+      include: { user: true, class: true, school: true, academicYear: true }
     });
 
     if (!student) {
@@ -45,9 +44,9 @@ export async function POST(request, props) {
         schoolId,
         academicYearId: body.academicYearId,
         qrCodeUrl,
-        layoutConfig: { /* default */ },
+        layoutConfig: {/* default */}
       },
-      include: { student: true, school: true },
+      include: { student: true, school: true }
     });
 
     return NextResponse.json({ ...idCard, fileUrl });
@@ -55,4 +54,4 @@ export async function POST(request, props) {
     console.error('Error generating ID card:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

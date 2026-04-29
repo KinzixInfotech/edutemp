@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { delCache } from "@/lib/cache";
+import { withSchoolAccess } from "@/lib/api-auth";
 
 
 const createUserSchema = z.object({
@@ -26,7 +27,7 @@ function generatePassword() {
     return password;
 }
 
-export async function POST(req) {
+export const POST = withSchoolAccess(async function POST(req) {
     try {
         const body = await req.json();
         const data = createUserSchema.parse(body);
@@ -141,4 +142,4 @@ export async function POST(req) {
             { status: 500 }
         );
     }
-}
+});

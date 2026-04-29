@@ -4,6 +4,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { enforceSchoolStateAccess } from '@/lib/school-account-state';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -64,6 +65,14 @@ export async function POST(req) {
 
         if (!user.transportStaff.isActive) {
             return NextResponse.json({ error: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+        }
+
+        const schoolAccess = await enforceSchoolStateAccess({
+            schoolId: user.transportStaff.schoolId,
+            method: req.method,
+        });
+        if (!schoolAccess.ok) {
+            return schoolAccess.response;
         }
 
         // Update FCM token if provided

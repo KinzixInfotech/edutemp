@@ -1,220 +1,220 @@
+import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { invalidatePattern } from '@/lib/cache';
 
-export async function GET(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, noticeId } = params;
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
+export const GET = withSchoolAccess(async function GET(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, noticeId } = params;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
 
-        const notice = await prisma.notice.findFirst({
-            where: {
-                id: noticeId,
-                schoolId,
-            },
-            include: {
-                Author: {
-                    select: {
-                        name: true,
-                        email: true,
-                    }
-                },
-                NoticeTarget: {
-                    include: {
-                        Class: { select: { className: true } },
-                        Section: { select: { name: true } },
-                    }
-                },
-                NoticeReads: userId ? {
-                    where: { userId },
-                    select: { readAt: true }
-                } : false,
-                _count: {
-                    select: { NoticeReads: true }
-                }
-            }
-        });
-
-        if (!notice) {
-            return NextResponse.json({ error: 'Notice not found' }, { status: 404 });
+    const notice = await prisma.notice.findFirst({
+      where: {
+        id: noticeId,
+        schoolId
+      },
+      include: {
+        Author: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        NoticeTarget: {
+          include: {
+            Class: { select: { className: true } },
+            Section: { select: { name: true } }
+          }
+        },
+        NoticeReads: userId ? {
+          where: { userId },
+          select: { readAt: true }
+        } : false,
+        _count: {
+          select: { NoticeReads: true }
         }
+      }
+    });
 
-        return NextResponse.json(notice);
-
-    } catch (error) {
-        console.error('Error fetching notice:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch notice', message: error.message },
-            { status: 500 }
-        );
+    if (!notice) {
+      return NextResponse.json({ error: 'Notice not found' }, { status: 404 });
     }
-}
 
-export async function PUT(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, noticeId } = params;
-        const body = await request.json();
+    return NextResponse.json(notice);
 
-        const {
-            title,
-            description,
-            subtitle,
-            category,
-            audience,
-            priority,
-            status,
-            fileUrl,
-            attachments,
-            issuedBy,
-            issuerRole,
-            importantDates,
-            publishedAt,
-            expiryDate,
-            targets,
-        } = body;
+  } catch (error) {
+    console.error('Error fetching notice:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch notice', message: error.message },
+      { status: 500 }
+    );
+  }
+});
 
-        // Update notice
-        const notice = await prisma.notice.update({
-            where: { id: noticeId },
-            data: {
-                title,
-                description,
-                subtitle,
-                category,
-                audience,
-                priority,
-                status,
-                fileUrl,
-                attachments,
-                issuedBy,
-                issuerRole,
-                importantDates,
-                publishedAt: publishedAt ? new Date(publishedAt) : undefined,
-                expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-            },
-            include: {
-                Author: {
-                    select: {
-                        name: true,
-                        email: true,
-                    }
-                },
-                NoticeTarget: true,
-            }
-        });
+export const PUT = withSchoolAccess(async function PUT(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, noticeId } = params;
+    const body = await request.json();
 
-        // Update targets if provided
-        if (targets) {
-            // Delete existing targets
-            await prisma.noticeTarget.deleteMany({
-                where: { noticeId }
-            });
+    const {
+      title,
+      description,
+      subtitle,
+      category,
+      audience,
+      priority,
+      status,
+      fileUrl,
+      attachments,
+      issuedBy,
+      issuerRole,
+      importantDates,
+      publishedAt,
+      expiryDate,
+      targets
+    } = body;
 
-            // Create new targets
-            await prisma.noticeTarget.createMany({
-                data: targets.map(target => ({
-                    noticeId,
-                    classId: target.classId,
-                    sectionId: target.sectionId,
-                    roleId: target.roleId,
-                    userId: target.userId,
-                }))
-            });
-        }
+    // Update notice
+    const notice = await prisma.notice.update({
+      where: { id: noticeId },
+      data: {
+        title,
+        description,
+        subtitle,
+        category,
+        audience,
+        priority,
+        status,
+        fileUrl,
+        attachments,
+        issuedBy,
+        issuerRole,
+        importantDates,
+        publishedAt: publishedAt ? new Date(publishedAt) : undefined,
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined
+      },
+      include: {
+        Author: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        NoticeTarget: true
+      }
+    });
 
-        // Invalidate Redis cache for notices list
-        await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
+    // Update targets if provided
+    if (targets) {
+      // Delete existing targets
+      await prisma.noticeTarget.deleteMany({
+        where: { noticeId }
+      });
 
-        return NextResponse.json(notice);
-
-    } catch (error) {
-        console.error('Error updating notice:', error);
-        return NextResponse.json(
-            { error: 'Failed to update notice', message: error.message },
-            { status: 500 }
-        );
+      // Create new targets
+      await prisma.noticeTarget.createMany({
+        data: targets.map((target) => ({
+          noticeId,
+          classId: target.classId,
+          sectionId: target.sectionId,
+          roleId: target.roleId,
+          userId: target.userId
+        }))
+      });
     }
-}
 
-export async function DELETE(request, props) {
-    const params = await props.params;
-    try {
-        const { schoolId, noticeId } = params;
+    // Invalidate Redis cache for notices list
+    await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
 
-        await prisma.notice.delete({
-            where: { id: noticeId }
-        });
+    return NextResponse.json(notice);
 
-        // Invalidate Redis cache for notices list
-        await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
+  } catch (error) {
+    console.error('Error updating notice:', error);
+    return NextResponse.json(
+      { error: 'Failed to update notice', message: error.message },
+      { status: 500 }
+    );
+  }
+});
 
-        return NextResponse.json({ message: 'Notice deleted successfully' });
+export const DELETE = withSchoolAccess(async function DELETE(request, props) {
+  const params = await props.params;
+  try {
+    const { schoolId, noticeId } = params;
 
-    } catch (error) {
-        console.error('Error deleting notice:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete notice', message: error.message },
-            { status: 500 }
-        );
-    }
-}
+    await prisma.notice.delete({
+      where: { id: noticeId }
+    });
+
+    // Invalidate Redis cache for notices list
+    await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
+
+    return NextResponse.json({ message: 'Notice deleted successfully' });
+
+  } catch (error) {
+    console.error('Error deleting notice:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete notice', message: error.message },
+      { status: 500 }
+    );
+  }
+});
 
 // File: app/api/notices/[schoolId]/[noticeId]/mark-read/route.js
 // POST - Mark notice as read
+export const POST = withSchoolAccess(async function POST(request, props) {
+  const params = await props.params;
+  try {
+    const { noticeId } = params;
+    const body = await request.json();
+    const { userId } = body;
 
-export async function POST(request, props) {
-    const params = await props.params;
-    try {
-        const { noticeId } = params;
-        const body = await request.json();
-        const { userId } = body;
-
-        if (!userId) {
-            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-        }
-
-        // Check if already read
-        const existing = await prisma.noticeRead.findUnique({
-            where: {
-                noticeId_userId: {
-                    noticeId,
-                    userId,
-                }
-            }
-        });
-
-        if (existing) {
-            return NextResponse.json({ message: 'Already marked as read' });
-        }
-
-        // Mark as read
-        const noticeRead = await prisma.noticeRead.create({
-            data: {
-                noticeId,
-                userId,
-            }
-        });
-
-        // Increment view count
-        await prisma.notice.update({
-            where: { id: noticeId },
-            data: {
-                viewCount: {
-                    increment: 1
-                }
-            }
-        });
-
-        return NextResponse.json(noticeRead, { status: 201 });
-
-    } catch (error) {
-        console.error('Error marking notice as read:', error);
-        return NextResponse.json(
-            { error: 'Failed to mark notice as read', message: error.message },
-            { status: 500 }
-        );
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
-}
+
+    // Check if already read
+    const existing = await prisma.noticeRead.findUnique({
+      where: {
+        noticeId_userId: {
+          noticeId,
+          userId
+        }
+      }
+    });
+
+    if (existing) {
+      return NextResponse.json({ message: 'Already marked as read' });
+    }
+
+    // Mark as read
+    const noticeRead = await prisma.noticeRead.create({
+      data: {
+        noticeId,
+        userId
+      }
+    });
+
+    // Increment view count
+    await prisma.notice.update({
+      where: { id: noticeId },
+      data: {
+        viewCount: {
+          increment: 1
+        }
+      }
+    });
+
+    return NextResponse.json(noticeRead, { status: 201 });
+
+  } catch (error) {
+    console.error('Error marking notice as read:', error);
+    return NextResponse.json(
+      { error: 'Failed to mark notice as read', message: error.message },
+      { status: 500 }
+    );
+  }
+});
