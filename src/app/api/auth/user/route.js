@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
+import { resolveSchoolIdForUser } from '@/lib/school-account-state';
 
 // Helper: get current user from Supabase session
 async function getAuthenticatedUser(req) {
@@ -59,14 +59,6 @@ export async function GET(req) {
         }
 
         const resolvedSchoolId = await resolveSchoolIdForUser(user);
-        const schoolAccess = await enforceSchoolStateAccess({
-            schoolId: resolvedSchoolId,
-            method: req.method,
-            bypass: user.role?.name === 'SUPER_ADMIN',
-        });
-        if (!schoolAccess.ok) {
-            return schoolAccess.response;
-        }
 
         console.log(`✅ [API] User found: ${user.email} | Role: ${user.role?.name}`);
 

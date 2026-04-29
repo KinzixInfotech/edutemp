@@ -1,6 +1,7 @@
 // middleware.js
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { isSchoolTenantHost } from '@/lib/tenant-host';
 
 // In-memory storage for API metrics
 const apiMetrics = new Map();
@@ -37,6 +38,7 @@ export async function middleware(request) {
     // Check if request is for teacher subdomain
     const isTeacherDomain = hostname.includes('teacher.edubreezy.com') ||
         hostname.includes('teacher.localhost');
+    const isSchoolTenantDomain = isSchoolTenantHost(hostname);
 
     // Skip domain routing for static files and API routes
     const skipDomainRouting = pathname.startsWith('/_next') ||
@@ -44,6 +46,16 @@ export async function middleware(request) {
         pathname === '/favicon.ico';
 
     if (!skipDomainRouting) {
+        if (isSchoolTenantDomain) {
+            if (pathname === '/') {
+                return NextResponse.redirect(new URL('/login', request.url));
+            }
+
+            if (pathname === '/schoollogin' || pathname === '/school-login') {
+                return NextResponse.redirect(new URL('/login', request.url));
+            }
+        }
+
         // Handle atlas.edubreezy.com subdomain
         if (isAtlasDomain) {
             // For root path, REWRITE to /explore (not redirect) - prevents redirect loop for SEO
@@ -299,6 +311,8 @@ export const config = {
         '/dashboard/:path*',
         '/login',
         '/signup',
+        '/schoollogin',
+        '/school-login',
         '/api/auth/:path*',
         '/explore/:path*',   // For school subdomain routing
         '/pay/:path*',       // For pay subdomain routing

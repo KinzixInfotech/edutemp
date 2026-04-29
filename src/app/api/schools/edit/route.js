@@ -31,7 +31,7 @@ export const PUT = withSchoolAccess(async function PUT(req) {
 
     const resolvedDomain =
     parsed.domainMode === "tenant" ?
-    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com` :
+    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.erp.edubreezy.com` :
     parsed.customDomain;
 
     const updatedSchool = await prisma.school.update({

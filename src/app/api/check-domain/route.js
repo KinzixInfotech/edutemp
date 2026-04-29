@@ -5,7 +5,7 @@ import { NextResponse } from "next/server"
 export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const subdomain = searchParams.get("subdomain")
-    const domain = `${subdomain}.edubreezy.com`
+    const domain = `${subdomain}.erp.edubreezy.com`
 
     if (!subdomain) return NextResponse.json({ exists: false })
 

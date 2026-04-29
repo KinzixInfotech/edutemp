@@ -5,9 +5,23 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { CheckCircle2, School, Globe, User, UserCog, GraduationCap, Mail, Phone, MapPin, Lock, Link2, Code, Users, IndianRupee, Calendar, Sparkles, Building2, Flag } from 'lucide-react';
 
+function InfoItem({ icon: Icon, label, value, valueClass = '' }) {
+    return (
+        <div className="flex items-start gap-3 py-2">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <Icon className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+                <p className={`font-medium text-sm truncate ${valueClass}`}>{value || '-'}</p>
+            </div>
+        </div>
+    );
+}
+
 export default function Step6Review({ data }) {
     const domain = data.domainMode === 'tenant'
-        ? `${data.tenantName}.edubreezy.com`
+        ? `${data.tenantName}.erp.edubreezy.com`
         : data.customDomain;
 
     const subscriptionLabels = {
@@ -20,18 +34,6 @@ export default function Step6Review({ data }) {
         'en': 'English',
         'hi': 'Hindi'
     };
-
-    const InfoItem = ({ icon: Icon, label, value, valueClass = '' }) => (
-        <div className="flex items-start gap-3 py-2">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                <Icon className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-                <p className={`font-medium text-sm truncate ${valueClass}`}>{value || '-'}</p>
-            </div>
-        </div>
-    );
 
     return (
         <div className="space-y-6">
@@ -231,7 +233,7 @@ export default function Step6Review({ data }) {
             {/* Footer Note */}
             <div className="text-center pt-4">
                 <p className="text-sm text-muted-foreground">
-                    Click <span className="font-semibold text-primary">"Create School"</span> below to finalize the school creation.
+                    Click <span className="font-semibold text-primary">&ldquo;Create School&rdquo;</span> below to finalize the school creation.
                 </p>
             </div>
         </div>

@@ -83,14 +83,12 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
 
     useEffect(() => {
         if (!subdomain || subdomain.trim() === '') {
-            setAvailable(null);
-            form.clearErrors('tenantName');
             return;
         }
 
         checkDomain(subdomain);
         return () => checkDomain.cancel();
-    }, [subdomain]);
+    }, [subdomain, checkDomain]);
 
     const generateSchoolCode = async () => {
         setLoading(true);
@@ -163,9 +161,16 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
                                             <Input
                                                 placeholder="e.g. sunshine"
                                                 {...field}
+                                                onChange={(event) => {
+                                                    field.onChange(event);
+                                                    if (!event.target.value.trim()) {
+                                                        setAvailable(null);
+                                                        form.clearErrors('tenantName');
+                                                    }
+                                                }}
                                                 className={form.formState.errors.tenantName ? 'border-red-500' : ''}
                                             />
-                                            <span className="text-muted-foreground text-sm">.edubreezy.com</span>
+                                            <span className="text-muted-foreground text-sm">.erp.edubreezy.com</span>
                                             {available === true && (
                                                 <CheckCircle className="text-green-500 h-5 w-5" />
                                             )}

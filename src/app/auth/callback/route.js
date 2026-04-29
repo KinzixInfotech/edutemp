@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { resolveSchoolIdForUser } from '@/lib/school-account-state';
+import { getSchoolTenantByHost } from '@/lib/school-tenant-server';
 
 export async function GET(request) {
     const requestUrl = new URL(request.url);
@@ -88,6 +90,28 @@ export async function GET(request) {
                     loginUrl.searchParams.set('error', 'account_not_found');
                     loginUrl.searchParams.set('message', 'No account found for this email. Please contact your school administrator.');
                     return NextResponse.redirect(loginUrl);
+                }
+
+                const tenantSchool = await getSchoolTenantByHost(requestUrl.host);
+                if (tenantSchool) {
+                    const userWithRole = await prisma.user.findFirst({
+                        where: {
+                            OR: [
+                                { id: user.id },
+                                ...(user.email ? [{ email: user.email }] : []),
+                            ],
+                        },
+                        include: { role: true },
+                    });
+
+                    const userSchoolId = await resolveSchoolIdForUser(userWithRole);
+                    if (!userSchoolId || userSchoolId !== tenantSchool.id) {
+                        await supabase.auth.signOut();
+                        const loginUrl = new URL('/login', requestUrl.origin);
+                        loginUrl.searchParams.set('error', 'account_not_found');
+                        loginUrl.searchParams.set('message', 'No account found for this school.');
+                        return NextResponse.redirect(loginUrl);
+                    }
                 }
             }
         }

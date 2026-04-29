@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -14,14 +14,36 @@ import Link from "next/link"
 import Image from "next/image"
 import Turnstile from 'react-turnstile';
 
-export default function LoginPhoto() {
+function readCachedSchool(schoolCode) {
+    if (typeof window === 'undefined' || !schoolCode) {
+        return null;
+    }
+
+    const cachedSchool = sessionStorage.getItem('loginSchool');
+    if (!cachedSchool) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(cachedSchool);
+        return parsed.schoolCode === schoolCode ? parsed : null;
+    } catch (error) {
+        console.error('Error parsing cached school:', error);
+        return null;
+    }
+}
+
+export default function LoginPhoto({ initialSchool = null, tenantHostDetected = false }) {
     const router = useRouter()
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [loadingl, setLoadingl] = useState(true)
+    const searchParams = useSearchParams()
+    const schoolCode = searchParams.get("schoolCode")
+    const cachedSchool = readCachedSchool(schoolCode)
+    const [loadingl, setLoadingl] = useState(!(initialSchool || tenantHostDetected || cachedSchool))
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState('');
 
@@ -36,11 +58,33 @@ export default function LoginPhoto() {
     const twoFAInputRef = useRef(null);
 
     // School data state
-    const searchParams = useSearchParams()
-    const schoolCode = searchParams.get("schoolCode")
-    const [school, setSchool] = useState(null)
-    const [schoolError, setSchoolError] = useState(false)
+    const [school, setSchool] = useState(initialSchool || cachedSchool)
+    const [schoolError, setSchoolError] = useState(tenantHostDetected && !initialSchool)
     const isOauth = searchParams.get("oauth") === "true"
+    const isTenantLogin = tenantHostDetected || Boolean(initialSchool?.id)
+
+    const finalizeLogin = useCallback((result, session) => {
+        axios.post('/api/auth/record-attempt', {
+            email,
+            success: true,
+            schoolCode: school?.schoolCode
+        }).catch(err => console.error(err));
+
+        localStorage.setItem("user", JSON.stringify(result));
+
+        fetch('/api/auth/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: result.id,
+                rememberMe,
+                supabaseSessionToken: session?.access_token
+            })
+        }).catch(err => console.error("Session record failed", err));
+
+        toast.success("Welcome back, " + result?.name || "User");
+        router.push("/dashboard");
+    }, [email, rememberMe, router, school?.schoolCode]);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data }) => {
@@ -50,7 +94,7 @@ export default function LoginPhoto() {
                 router.push("/dashboard")
             }
         })
-    }, [isOauth])
+    }, [isOauth, router])
 
     // Handle Google OAuth callback after redirect from /auth/callback
     useEffect(() => {
@@ -105,7 +149,7 @@ export default function LoginPhoto() {
                 // School membership check
                 if (school && userData.schoolId !== school.id) {
                     await supabase.auth.signOut();
-                    toast.error('Access Denied', { description: `This account does not belong to ${school.name}` });
+                    toast.error('Login Failed', { description: 'No account found for this school.' });
                     setGoogleLoading(false);
                     return;
                 }
@@ -120,7 +164,7 @@ export default function LoginPhoto() {
                     return;
                 }
 
-                completeLogin(userData, session);
+                finalizeLogin(userData, session);
             } catch (err) {
                 console.error('Google OAuth callback error:', err);
                 toast.error('An error occurred during Google sign-in.');
@@ -132,49 +176,36 @@ export default function LoginPhoto() {
         if (isOauth) {
             handleOAuthCallback();
         }
-    }, [school, schoolError, isOauth]);
+    }, [finalizeLogin, school, schoolError, isOauth, router]);
 
     useEffect(() => {
+        if (initialSchool || tenantHostDetected || school) {
+            return;
+        }
+
         if (!schoolCode) {
             router.push('/schoollogin');
         } else {
-            // Check if school data is already cached from Hero page
-            const cachedSchool = sessionStorage.getItem('loginSchool');
-            if (cachedSchool) {
+            const run = async () => {
                 try {
-                    const parsed = JSON.parse(cachedSchool);
-                    // Verify the cached school matches the schoolCode in URL
-                    if (parsed.schoolCode === schoolCode) {
-                        setSchool(parsed);
-                        setLoadingl(false);
-                        return;
+                    const res = await fetch(`/api/schools/by-code?schoolcode=${schoolCode}`);
+                    const data = await res.json();
+                    if (res.ok) {
+                        setSchool(data.school);
+                        sessionStorage.setItem('loginSchool', JSON.stringify(data.school));
+                    } else {
+                        setSchoolError(true);
                     }
-                } catch (e) {
-                    console.error('Error parsing cached school:', e);
+                } catch (err) {
+                    setSchoolError(true);
+                } finally {
+                    setLoadingl(false);
                 }
-            }
-            // If no cache or cache mismatch, fetch from API
-            fetchSchool();
-        }
-    }, [schoolCode]);
+            };
 
-    const fetchSchool = async () => {
-        try {
-            const res = await fetch(`/api/schools/by-code?schoolcode=${schoolCode}`);
-            const data = await res.json();
-            if (res.ok) {
-                setSchool(data.school);
-                // Cache for potential page refresh
-                sessionStorage.setItem('loginSchool', JSON.stringify(data.school));
-            } else {
-                setSchoolError(true);
-            }
-        } catch (err) {
-            setSchoolError(true);
-        } finally {
-            setLoadingl(false);
+            run();
         }
-    }
+    }, [initialSchool, school, schoolCode, router, tenantHostDetected]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -254,7 +285,7 @@ export default function LoginPhoto() {
                     schoolCode: school.schoolCode
                 }).catch(err => console.error(err));
 
-                toast.error("Access Denied", { description: `This account does not belong to ${school.name}` });
+                toast.error("Login Failed", { description: "No account found for this school." });
                 setLoading(false);
                 return;
             }
@@ -270,36 +301,12 @@ export default function LoginPhoto() {
             }
 
             // No 2FA — proceed to dashboard
-            completeLogin(result, data.session);
+            finalizeLogin(result, data.session);
 
         } catch (err) {
             toast.error("Login Error", { description: err.message });
             setLoading(false);
         }
-    };
-
-    // ─── Complete Login (after password + optional 2FA) ──────
-    const completeLogin = (result, session) => {
-        axios.post('/api/auth/record-attempt', {
-            email,
-            success: true,
-            schoolCode: school?.schoolCode
-        }).catch(err => console.error(err));
-
-        localStorage.setItem("user", JSON.stringify(result));
-
-        fetch('/api/auth/sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: result.id,
-                rememberMe,
-                supabaseSessionToken: session?.access_token
-            })
-        }).catch(err => console.error("Session record failed", err));
-
-        toast.success("Welcome back, " + result?.name || "User");
-        router.push("/dashboard");
     };
 
     const handleGoogleLogin = async () => {
@@ -342,7 +349,7 @@ export default function LoginPhoto() {
                 if (data.backupCodeUsed) {
                     toast.info(`Backup code used. ${data.remainingBackupCodes} remaining.`);
                 }
-                completeLogin(pendingUser, pendingSession);
+                finalizeLogin(pendingUser, pendingSession);
             } else {
                 toast.error("Verification Failed", { description: data.error });
                 setTwoFACode('');
@@ -372,11 +379,13 @@ export default function LoginPhoto() {
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900">School Not Found</h2>
-                        <p className="text-gray-500 mt-2">The school code you entered is invalid.</p>
+                        <p className="text-gray-500 mt-2">{isTenantLogin ? 'This school portal is not configured yet for the current domain.' : 'The school code you entered is invalid.'}</p>
                     </div>
-                    <Link href="/schoollogin">
-                        <Button className="w-full">Try Another Code</Button>
-                    </Link>
+                    {!isTenantLogin && (
+                        <Link href="/schoollogin">
+                            <Button className="w-full">Try Another Code</Button>
+                        </Link>
+                    )}
                 </div>
             </div>
         );
@@ -387,10 +396,12 @@ export default function LoginPhoto() {
             <div className="w-full max-w-[1100px] h-[650px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 overflow-hidden flex relative">
 
                 {/* Back Button (Absolute) */}
-                <Link href="/schoollogin" className="absolute top-8 left-8 z-20 flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-black/10 hover:bg-black/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-medium">
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Change School</span>
-                </Link>
+                {!isTenantLogin && (
+                    <Link href="/schoollogin" className="absolute top-8 left-8 z-20 flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-black/10 hover:bg-black/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-medium">
+                        <ArrowLeft className="w-4 h-4" />
+                        <span>Change School</span>
+                    </Link>
+                )}
 
                 {/* Left Side - Visual */}
                 <div className="w-[55%] relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-blue-600">
@@ -418,6 +429,7 @@ export default function LoginPhoto() {
                         <div className="pt-16">
                             {/* Optional: Brand Logo if separates from Name */}
                             {school?.logo && (
+                                /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                     src={school.logo}
                                     alt="Logo"
@@ -429,7 +441,7 @@ export default function LoginPhoto() {
                             </h1>
                             {school?.publicProfile?.tagline && (
                                 <p className="text-blue-100 text-lg italic max-w-md border-l-4 border-white/30 pl-4 py-1">
-                                    "{school.publicProfile.tagline}"
+                                    &ldquo;{school.publicProfile.tagline}&rdquo;
                                 </p>
                             )}
                         </div>

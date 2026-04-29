@@ -36,6 +36,7 @@ import { apiLoader } from "@/lib/api-loader";
 import { BulkUploadProvider } from "@/context/BulkUploadContext";
 import BulkUploadToast from "@/components/gallery/BulkUploadToast";
 import { AcademicYearProvider } from "@/context/AcademicYearContext";
+import { SchoolAccountStatusBanner } from "@/components/school-account-status-banner";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -295,6 +296,7 @@ export default function ClientLayout({ children }) {
                                         {!hideUI && <SiteHeader fullUser={fullUser} />}
 
                                         {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
+                                        {!hideUI && <SchoolAccountStatusBanner />}
 
                                         <main className="w-full h-full relative">
                                             {/* Modern Navigation Loading Overlay */}

@@ -108,7 +108,7 @@ export const POST = withSchoolAccess(async function POST(req) {
     const parsed = schoolSchema.parse(body);
 
     const resolvedDomain = parsed.domainMode === "tenant" ?
-    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com` :
+    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.erp.edubreezy.com` :
     parsed.customDomain || "";
 
     // Calculate ERP capacity values

@@ -13,7 +13,6 @@ import { Profile } from '@/components/profile';
 import { CommandMenuProvider } from '@/components/CommandMenuContext';
 
 import { SecurityAlertBanner } from '@/components/security-alert-banner';
-import { SchoolAccountStatusBanner } from '@/components/school-account-status-banner';
 export default async function RootLayout({ children }) {
 
     return (
@@ -35,7 +34,6 @@ export default async function RootLayout({ children }) {
 
                                     />
                                     <SecurityAlertBanner />
-                                    <SchoolAccountStatusBanner />
                                     {/* CommandMenu is rendered inside CommandMenuProvider */}
                                 </ThemeProvider>
                             </LoaderProvider>

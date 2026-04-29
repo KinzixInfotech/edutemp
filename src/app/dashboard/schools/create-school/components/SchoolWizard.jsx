@@ -83,7 +83,7 @@ export default function SchoolWizard() {
         mutationFn: async (data) => {
             const domain =
                 data.domainMode === 'tenant'
-                    ? `${data.tenantName?.toLowerCase().replace(/\s+/g, '')}.edubreezy.com`
+                    ? `${data.tenantName?.toLowerCase().replace(/\s+/g, '')}.erp.edubreezy.com`
                     : data.customDomain;
 
             const payload = {

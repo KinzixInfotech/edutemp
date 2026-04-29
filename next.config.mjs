@@ -77,6 +77,11 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  allowedDevOrigins: [
+    'http://localhost:3000',
+    'http://erp.localhost:3000',
+    'http://brightfutureschool.erp.localhost:3000',
+  ],
 
   // 🔥 Remove console logs in production
   compiler: {

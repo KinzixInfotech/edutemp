@@ -4,6 +4,9 @@
 
 import prisma from '@/lib/prisma';
 import { createClient } from '@sanity/client';
+import { headers } from 'next/headers';
+import { getCanonicalOriginForHost, isSchoolTenantHost, normalizeHost } from '@/lib/tenant-host';
+import { getSchoolTenantByHost } from '@/lib/school-tenant-server';
 
 // Force dynamic rendering to avoid build-time database queries
 export const dynamic = 'force-dynamic';
@@ -21,6 +24,22 @@ const sanityClient = createClient({
 // This implementation handles up to ~50,000 URLs which is Google's limit per sitemap
 
 export default async function sitemap() {
+    const headerStore = await headers();
+    const currentHost = normalizeHost(headerStore.get('host') || '');
+    const tenantSchool = await getSchoolTenantByHost(currentHost);
+
+    if (tenantSchool && isSchoolTenantHost(currentHost)) {
+        const tenantOrigin = getCanonicalOriginForHost(tenantSchool.domain || currentHost);
+        return [
+            {
+                url: `${tenantOrigin}/login`,
+                lastModified: new Date(),
+                changeFrequency: 'weekly',
+                priority: 1.0,
+            },
+        ];
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
     const schoolBaseUrl = process.env.NODE_ENV === 'development'
         ? 'http://atlas.localhost:3000'
@@ -169,6 +188,35 @@ export default async function sitemap() {
         console.error('Sitemap: Error fetching schools:', error);
     }
 
+    let tenantLoginPages = [];
+    try {
+        const tenantSchools = await prisma.school.findMany({
+            where: {
+                deletedAt: null,
+                status: {
+                    not: 'TERMINATED',
+                },
+            },
+            select: {
+                id: true,
+                domain: true,
+                updatedAt: true,
+            },
+            take: 10000,
+        });
+
+        tenantLoginPages = tenantSchools
+            .filter((school) => school.domain)
+            .map((school) => ({
+                url: `${getCanonicalOriginForHost(school.domain)}/login`,
+                lastModified: school.updatedAt || new Date(),
+                changeFrequency: 'weekly',
+                priority: 0.7,
+            }));
+    } catch (error) {
+        console.error('Sitemap: Error fetching tenant login pages:', error);
+    }
+
     // Dynamic docs pages from Sanity CMS
     let docsPages = [];
     try {
@@ -191,5 +239,5 @@ export default async function sitemap() {
         console.error('Sitemap: Error fetching docs from Sanity:', error);
     }
 
-    return [...staticPages, ...explorerPages, ...payPages, ...schoolPages, ...docsPages];
+    return [...staticPages, ...explorerPages, ...payPages, ...schoolPages, ...tenantLoginPages, ...docsPages];
 }
