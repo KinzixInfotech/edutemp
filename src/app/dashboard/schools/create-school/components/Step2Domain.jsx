@@ -19,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { CheckCircle, XCircle, RefreshCcw, Copy, Check } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { TENANT_BASE_DOMAIN } from '@/lib/school-domain';
 
 const step2Schema = z.object({
     domainMode: z.enum(['tenant', 'custom']),
@@ -170,7 +171,7 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
                                                 }}
                                                 className={form.formState.errors.tenantName ? 'border-red-500' : ''}
                                             />
-                                            <span className="text-muted-foreground text-sm">.erp.edubreezy.com</span>
+                                            <span className="text-muted-foreground text-sm">.{TENANT_BASE_DOMAIN}</span>
                                             {available === true && (
                                                 <CheckCircle className="text-green-500 h-5 w-5" />
                                             )}

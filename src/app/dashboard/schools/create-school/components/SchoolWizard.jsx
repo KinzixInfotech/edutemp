@@ -10,6 +10,7 @@ import { Check, Loader2, ArrowLeft, School } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
+import { buildTenantDomain, normalizeSchoolDomain } from '@/lib/school-domain';
 
 // Step Components
 import Step1BasicInfo from './Step1BasicInfo';
@@ -83,8 +84,8 @@ export default function SchoolWizard() {
         mutationFn: async (data) => {
             const domain =
                 data.domainMode === 'tenant'
-                    ? `${data.tenantName?.toLowerCase().replace(/\s+/g, '')}.erp.edubreezy.com`
-                    : data.customDomain;
+                    ? buildTenantDomain(data.tenantName)
+                    : normalizeSchoolDomain(data.customDomain);
 
             const payload = {
                 ...data,

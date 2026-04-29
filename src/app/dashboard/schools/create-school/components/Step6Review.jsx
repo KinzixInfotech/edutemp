@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { CheckCircle2, School, Globe, User, UserCog, GraduationCap, Mail, Phone, MapPin, Lock, Link2, Code, Users, IndianRupee, Calendar, Sparkles, Building2, Flag } from 'lucide-react';
+import { buildTenantDomain, normalizeSchoolDomain } from '@/lib/school-domain';
 
 function InfoItem({ icon: Icon, label, value, valueClass = '' }) {
     return (
@@ -21,8 +22,8 @@ function InfoItem({ icon: Icon, label, value, valueClass = '' }) {
 
 export default function Step6Review({ data }) {
     const domain = data.domainMode === 'tenant'
-        ? `${data.tenantName}.erp.edubreezy.com`
-        : data.customDomain;
+        ? buildTenantDomain(data.tenantName)
+        : normalizeSchoolDomain(data.customDomain);
 
     const subscriptionLabels = {
         'A': 'Per Student',

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { invalidatePattern } from "@/lib/cache";
+import { buildTenantDomain, normalizeSchoolDomain } from "@/lib/school-domain";
 
 const updateSchema = z.object({
   name: z.string().optional(),
@@ -31,8 +32,8 @@ export const PUT = withSchoolAccess(async function PUT(req) {
 
     const resolvedDomain =
     parsed.domainMode === "tenant" ?
-    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.erp.edubreezy.com` :
-    parsed.customDomain;
+    buildTenantDomain(parsed.tenantName) :
+    normalizeSchoolDomain(parsed.customDomain);
 
     const updatedSchool = await prisma.school.update({
       where: { id },
@@ -44,8 +45,7 @@ export const PUT = withSchoolAccess(async function PUT(req) {
         subscriptionType: parsed.subscriptionType,
         timezone: parsed.timezone,
         language: parsed.language,
-        currentDomain: resolvedDomain,
-        customDomain: parsed.domainMode === "custom" ? parsed.customDomain : ""
+        domain: resolvedDomain
       }
     });
 

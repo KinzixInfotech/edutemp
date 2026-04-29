@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
 import { invalidatePattern, invalidateSchoolMarketplaceCache } from "@/lib/cache";
 import { generateSchoolSlug, generateUniqueSlug } from "@/lib/slug-generator";
+import { buildTenantDomain, normalizeSchoolDomain } from "@/lib/school-domain";
 // Schema validation
 const schoolSchema = z.object({
   name: z.string(),
@@ -108,8 +109,8 @@ export const POST = withSchoolAccess(async function POST(req) {
     const parsed = schoolSchema.parse(body);
 
     const resolvedDomain = parsed.domainMode === "tenant" ?
-    `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.erp.edubreezy.com` :
-    parsed.customDomain || "";
+    buildTenantDomain(parsed.tenantName) :
+    normalizeSchoolDomain(parsed.customDomain || "");
 
     // Calculate ERP capacity values
     const expectedStudents = parsed.expectedStudents || 100;

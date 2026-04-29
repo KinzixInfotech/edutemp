@@ -1,6 +1,7 @@
 // app/api/partners/leads/route.js
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { buildTenantDomain, normalizeTenantName } from "@/lib/school-domain";
 
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
@@ -209,7 +210,8 @@ export async function PATCH(req) {
             if (status === 'CONVERTED' && currentLead.status !== 'CONVERTED') {
                 // 1. Create School
                 const schoolCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                const domain = `${currentLead.schoolName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${schoolCode.toLowerCase()}.edutemp.com`;
+                const tenantName = normalizeTenantName(`${currentLead.schoolName}-${schoolCode}`);
+                const domain = buildTenantDomain(tenantName);
 
                 const newSchool = await tx.school.create({
                     data: {
