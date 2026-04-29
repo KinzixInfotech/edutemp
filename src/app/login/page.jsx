@@ -82,7 +82,7 @@ export default async function LoginPage() {
 
     return (
         <Suspense fallback={<div className="flex items-center justify-center w-full h-full flex-col gap-4">
-            <Loader2 size={30} color="black"/>
+            <Loader2 size={30} color="black" />
             Loading...</div>}>
             <LoginPhoto initialSchool={school} tenantHostDetected={tenantHostDetected} />
         </Suspense>

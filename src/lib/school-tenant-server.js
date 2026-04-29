@@ -21,12 +21,12 @@ const schoolTenantSelect = {
 
 export async function getSchoolTenantByHost(host) {
     const normalizedHost = normalizeHost(host);
-
     if (!normalizedHost || !isSchoolTenantHost(normalizedHost)) {
         return null;
     }
 
     const candidates = getTenantDomainCandidates(normalizedHost);
+
     if (!candidates.length) {
         return null;
     }
