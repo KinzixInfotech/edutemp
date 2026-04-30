@@ -17,6 +17,7 @@ import { CircleUserRound } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useSettingsDialog } from "@/context/Settingsdialog-context"
 import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
+import { filterSidebarSectionsByFeatures } from "@/lib/school-feature-config"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,6 +33,16 @@ export default function CommandMenu({ open, setOpen }) {
     const { setOpen: setProfileOpen } = useSettingsDialog()
     const router = useRouter()
     const { unseenRequestsCount } = useLibraryNotifications()
+    const featureScopedSections = React.useMemo(() => {
+        if (fullUser?.role?.name === "SUPER_ADMIN") {
+            return SidebarData
+        }
+
+        return filterSidebarSectionsByFeatures(
+            SidebarData,
+            fullUser?.schoolFeatureAccess || null,
+        )
+    }, [fullUser])
 
     useEffect(() => {
         const down = (e) => {
@@ -92,7 +103,7 @@ export default function CommandMenu({ open, setOpen }) {
                         </DropdownMenu>
                     </CommandItem>
                 </CommandGroup> */}
-                {SidebarData.map((section, sectionIndex) => {
+                {featureScopedSections.map((section, sectionIndex) => {
                     const visibleItems =
                         section.items?.filter(
                             (item) => !item.roles || item.roles.includes(userRole)

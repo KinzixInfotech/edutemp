@@ -192,25 +192,6 @@ export default function ClientLayout({ children }) {
                     }
                 }
 
-                if (response.status === 403) {
-                    try {
-                        const payload = await clone.json();
-                        if (payload?.code === 'SCHOOL_FEATURE_DISABLED') {
-                            const nextMessage = `FEATURE:${payload?.featureKey || 'unknown'}`;
-                            if (lastSchoolAccessToast.current !== nextMessage) {
-                                lastSchoolAccessToast.current = nextMessage;
-                                toast.error(payload?.error || 'This module is not enabled for the current school.', {
-                                    description: payload?.plan
-                                        ? `Current plan: ${payload.plan}. Upgrade the plan or enable the module for this school.`
-                                        : 'Upgrade the plan or enable the module for this school.',
-                                });
-                            }
-                        }
-                    } catch (error) {
-                        // Ignore non-JSON forbidden responses
-                    }
-                }
-
                 if (response.status === 500 || response.status === 503) {
                     try {
                         const text = await clone.text();

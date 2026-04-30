@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage, } from "@/components/ui/avatar"
@@ -20,11 +21,12 @@ import { SchoolDetailPopup } from "./school-detail-popup"
 import { RequestsDropdown } from "./requests-dropdown"
 import { AdminTodoWidget } from "./admin-todo-widget"
 export function SiteHeader({ fullUser }) {
-    console.log(fullUser)
     const { setOpen } = useCommandMenu()
     const [open, setOpenPopover] = useState(false)
     const [date, setDate] = useState(undefined)
     const pathname = usePathname()
+    const currentPlan = fullUser?.schoolFeatureAccess?.plan
+    const isProPlan = currentPlan === "PRO"
 
     // Define your route → name mapping here
     const pageTitles = [
@@ -52,8 +54,8 @@ export function SiteHeader({ fullUser }) {
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
                 <SchoolDetailPopup school={fullUser?.school}>
-                    <div className="text-sm border gap-1 inline-flex items-center font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center max-w-[120px] sm:max-w-[200px] cursor-pointer hover:bg-muted/80 transition-colors">
-                        <div className="flex items-center justify-center gap-1.5 truncate">
+                    <div className="text-sm border gap-2 inline-flex items-center font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center max-w-[280px] cursor-pointer hover:bg-muted/80 transition-colors">
+                        <div className="flex items-center justify-center gap-1.5 truncate min-w-0">
                             {fullUser?.school?.profilePicture && (
                                 <Avatar className="w-5 h-5 flex-shrink-0">
                                     <AvatarImage src={fullUser?.school?.profilePicture} alt={fullUser?.school?.name || "User"} className="w-5 h-5 object-cover" />
@@ -61,6 +63,16 @@ export function SiteHeader({ fullUser }) {
                             )}
                             <span className="truncate">{fullUser?.school?.name || 'Dashboard'}</span>
                         </div>
+                        {currentPlan && (
+                            <Badge
+                                variant="outline"
+                                className={isProPlan
+                                    ? "hidden sm:inline-flex border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "hidden sm:inline-flex border-blue-200 bg-blue-50 text-blue-700"}
+                            >
+                                {currentPlan} Plan
+                            </Badge>
+                        )}
                     </div>
                 </SchoolDetailPopup>
 
