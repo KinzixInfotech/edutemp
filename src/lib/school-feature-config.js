@@ -579,9 +579,20 @@ export function getFeatureAccessForPath(pathname, stateOrConfig) {
         return null;
     }
 
-    const state = Array.isArray(stateOrConfig?.features)
+    const hasUsableMatchers = Array.isArray(stateOrConfig?.features) &&
+        stateOrConfig.features.every((feature) =>
+            ["dashboardMatchers", "apiMatchers"].every((channel) =>
+                Array.isArray(feature?.[channel]) &&
+                feature[channel].every((matcher) => typeof matcher?.test === "function")
+            )
+        );
+
+    const state = hasUsableMatchers
         ? stateOrConfig
-        : resolveFeatureState(stateOrConfig);
+        : resolveFeatureState({
+            plan: stateOrConfig?.plan,
+            overrides: stateOrConfig?.overrides,
+        });
 
     const normalizedPathname = pathname.replace(/\/$/, "") || "/";
     const channel = normalizedPathname.startsWith("/api") ? "apiMatchers" : "dashboardMatchers";

@@ -266,30 +266,36 @@ export default function SchoolFeatureControlsCard({ schoolId }) {
                             </div>
                             <Badge variant="outline">{category}</Badge>
                         </div>
-                        <div className="grid gap-3 md:grid-cols-2">
+                        <div className="overflow-hidden rounded-xl border">
                             {features.map((feature) => (
-                                <div key={feature.key} className="rounded-xl border p-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="space-y-2">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-medium">{feature.label}</p>
-                                                <Badge variant={feature.enabled ? "default" : "secondary"}>
-                                                    {feature.enabled ? "Enabled" : "Disabled"}
-                                                </Badge>
-                                                {feature.source === "override_enabled" && (
-                                                    <Badge variant="outline">Override On</Badge>
-                                                )}
-                                                {feature.source === "override_disabled" && (
-                                                    <Badge variant="outline">Override Off</Badge>
-                                                )}
-                                            </div>
-                                            <p className="text-sm text-muted-foreground">{feature.description}</p>
-                                            {feature.dependencies.length > 0 && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    Depends on: {feature.dependencies.join(", ")}
-                                                </p>
+                                <div
+                                    key={feature.key}
+                                    className="flex flex-col gap-4 border-b bg-background px-4 py-4 last:border-b-0 md:flex-row md:items-center md:justify-between"
+                                >
+                                    <div className="min-w-0 space-y-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="font-medium">{feature.label}</p>
+                                            <Badge variant={feature.enabled ? "default" : "secondary"}>
+                                                {feature.enabled ? "Enabled" : "Disabled"}
+                                            </Badge>
+                                            {feature.source === "override_enabled" && (
+                                                <Badge variant="outline">Override On</Badge>
+                                            )}
+                                            {feature.source === "override_disabled" && (
+                                                <Badge variant="outline">Override Off</Badge>
                                             )}
                                         </div>
+                                        <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                        {feature.dependencies.length > 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Depends on: {feature.dependencies.join(", ")}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 md:min-w-[170px] md:justify-end">
+                                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                                            Feature Flag
+                                        </span>
                                         <Switch
                                             checked={feature.enabled}
                                             onCheckedChange={(checked) => handleFeatureToggle(feature.key, checked)}
