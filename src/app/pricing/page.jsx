@@ -1,362 +1,210 @@
 'use client';
-import React, { useState } from 'react';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
-    Calculator, Users, ArrowRight, CheckCircle,
-    IndianRupee, Calendar, Zap, Building2, Phone,
-    Minus, Plus
+    ArrowRight,
+    CheckCircle2,
+    Crown,
+    IndianRupee,
+    Layers3,
+    ShieldCheck,
+    Sparkles,
+    Users,
+    Zap,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
+import {
+    PLAN_BILLING,
+    SCHOOL_FEATURE_PLAN,
+    getFeatureDefinition,
+    getPlanFeatureKeys,
+} from '@/lib/school-feature-config';
 
+gsap.registerPlugin(ScrollTrigger);
+
+const PLAN_COPY = {
+    [SCHOOL_FEATURE_PLAN.BASE]: {
+        eyebrow: 'Base Plan',
+        title: 'Run the entire school without the clutter.',
+        description: 'Built for schools that need admissions, students, attendance, academics, exams, documents, and day-to-day operations in one reliable system.',
+        accent: 'from-[#0b6bff] to-[#5ea2ff]',
+        cardTone: 'border-[#d7e7ff] bg-white',
+        icon: ShieldCheck,
+    },
+    [SCHOOL_FEATURE_PLAN.PRO]: {
+        eyebrow: 'Pro Plan',
+        title: 'Unlock growth, finance, automation, and premium workflows.',
+        description: 'Adds fees, payroll, transport, library, SMS, school app experiences, explorer growth tools, HPC, alumni, and other monetization-grade modules.',
+        accent: 'from-[#0d122b] to-[#0569ff]',
+        cardTone: 'border-[#dbe3ff] bg-[#f7faff]',
+        icon: Crown,
+    },
+};
+
+function formatCurrency(amount) {
+    return amount.toLocaleString('en-IN');
+}
+
+function buildFeatureLabels(plan) {
+    return getPlanFeatureKeys(plan)
+        .map((key) => getFeatureDefinition(key))
+        .filter(Boolean)
+        .map((feature) => feature.label);
+}
 
 export default function PricingCalculatorPage() {
-    const [students, setStudents] = useState(100);
-    const [inputValue, setInputValue] = useState('100');
+    const rootRef = useRef(null);
+    const [students, setStudents] = useState(800);
+    const [selectedPlan, setSelectedPlan] = useState(SCHOOL_FEATURE_PLAN.BASE);
 
-    // Pricing calculation - exact per-student pricing
-    const perStudentYearly = 120;
-    const perStudentMonthly = 10;
-    const yearlyPrice = students * perStudentYearly;
-    const monthlyEquivalent = students * perStudentMonthly;
+    const baseFeatures = useMemo(() => buildFeatureLabels(SCHOOL_FEATURE_PLAN.BASE), []);
+    const proFeatures = useMemo(() => buildFeatureLabels(SCHOOL_FEATURE_PLAN.PRO), []);
 
-    // Handle input change - max 100,000 students (realistic limit)
-    const MAX_STUDENTS = 100000;
+    const baseYearly = students * PLAN_BILLING[SCHOOL_FEATURE_PLAN.BASE].pricePerStudent;
+    const proYearly = students * PLAN_BILLING[SCHOOL_FEATURE_PLAN.PRO].pricePerStudent;
+    const activeYearly = selectedPlan === SCHOOL_FEATURE_PLAN.BASE ? baseYearly : proYearly;
+    const monthlyEquivalent = Math.round(activeYearly / 12);
+    const planCopy = PLAN_COPY[selectedPlan];
+    const ActiveIcon = planCopy.icon;
 
-    const handleInputChange = (e) => {
-        const value = e.target.value;
-        setInputValue(value);
+    useEffect(() => {
+        const context = gsap.context(() => {
+            gsap.from('[data-pricing-hero]', {
+                opacity: 0,
+                y: 36,
+                duration: 0.9,
+                ease: 'power3.out',
+                stagger: 0.12,
+            });
 
-        // Parse and update students only if valid number
-        const parsed = parseInt(value);
-        if (!isNaN(parsed) && parsed >= 1 && parsed <= MAX_STUDENTS) {
-            setStudents(parsed);
-        } else if (!isNaN(parsed) && parsed > MAX_STUDENTS) {
-            setStudents(MAX_STUDENTS);
-        } else if (value === '') {
-            setStudents(1);
-        }
-    };
+            gsap.utils.toArray('[data-pricing-reveal]').forEach((item, index) => {
+                gsap.from(item, {
+                    scrollTrigger: {
+                        trigger: item,
+                        start: 'top 82%',
+                    },
+                    opacity: 0,
+                    y: 48,
+                    scale: 0.98,
+                    duration: 0.9,
+                    delay: index * 0.04,
+                    ease: 'power3.out',
+                });
+            });
 
-    // Handle input blur to validate
-    const handleInputBlur = () => {
-        const parsed = parseInt(inputValue);
-        if (isNaN(parsed) || parsed < 1) {
-            setStudents(1);
-            setInputValue('1');
-        } else if (parsed > MAX_STUDENTS) {
-            setStudents(MAX_STUDENTS);
-            setInputValue(String(MAX_STUDENTS));
-        } else {
-            setStudents(parsed);
-            setInputValue(String(parsed));
-        }
-    };
+            gsap.from('[data-plan-card]', {
+                scrollTrigger: {
+                    trigger: '[data-plan-grid]',
+                    start: 'top 78%',
+                },
+                opacity: 0,
+                y: 56,
+                duration: 1,
+                stagger: 0.18,
+                ease: 'power3.out',
+            });
 
-    // Handle slider change
-    const handleSliderChange = (e) => {
-        const value = parseInt(e.target.value);
-        setStudents(value);
-        setInputValue(String(value));
-    };
+            gsap.to('[data-parallax-orb]', {
+                yPercent: -18,
+                ease: 'none',
+                scrollTrigger: {
+                    trigger: rootRef.current,
+                    start: 'top top',
+                    end: 'bottom bottom',
+                    scrub: true,
+                },
+            });
+        }, rootRef);
 
-    // Increment/Decrement buttons
-    const incrementStudents = (amount) => {
-        const newValue = Math.min(MAX_STUDENTS, Math.max(1, students + amount));
-        setStudents(newValue);
-        setInputValue(String(newValue));
-    };
+        return () => context.revert();
+    }, []);
 
-    // Get slider value - clamp to slider range for display only
-    const getSliderValue = () => {
-        return Math.min(5000, Math.max(50, students));
-    };
+    const sliderStudentCount = Math.min(5000, Math.max(100, students));
 
     return (
-        <div className="min-h-screen bg-white">
+        <div ref={rootRef} className="min-h-screen overflow-x-hidden bg-[#fbfdff] text-[#111827]">
             <Header />
-            <main className="pt-24 pb-20">
-                {/* Hero Section */}
-                <section className="relative overflow-hidden px-5 py-16">
-                    {/* Background Pattern */}
+
+            <main className="pt-24">
+                <section className="relative overflow-hidden px-5 pb-20 pt-14 md:pt-20">
                     <InteractiveGridPattern
-                        className="absolute opacity-50 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
-                        squares={[60, 60]}
+                        className="absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_65%_58%_at_50%_40%,white_40%,transparent_78%)]"
+                        squares={[62, 62]}
                     />
+                    <div data-parallax-orb className="absolute -right-20 top-10 h-72 w-72 rounded-full bg-[#0569ff]/12 blur-3xl" />
+                    <div data-parallax-orb className="absolute -left-16 bottom-0 h-64 w-64 rounded-full bg-[#0f172a]/8 blur-3xl" />
 
-                    <div className="max-w-4xl mx-auto text-center relative z-10">
-                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                            <Calculator className="w-4 h-4" />
-                            PRICING CALCULATOR
-                        </span>
-                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
-                            Calculate Your School's{' '}
-                            <span className="text-[#0569ff]">Exact Price</span>
-                        </h1>
-                        <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto">
-                            Enter your student count and see your yearly cost instantly.
-                            No hidden fees, no surprises.
-                        </p>
-                    </div>
-                </section>
-
-                {/* Calculator Section */}
-                <section className="px-5 -mt-8">
-                    <div className="max-w-5xl mx-auto">
-                        <div className="bg-white rounded-[2rem] p-4 md:p-10 border border-slate-200 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]">
-
-                            {/* Grid Layout for Calculator */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-
-                                {/* Left Side - Input Section */}
-                                <div className="space-y-6">
-                                    <div>
-                                        <label className="block text-lg font-semibold text-[#1a1a2e] mb-2">
-                                            How many students does your school have?
-                                        </label>
-                                        <p className="text-sm text-slate-500 mb-6">
-                                            Enter any number up to 1,00,000 students
-                                        </p>
-                                    </div>
-
-                                    {/* Number Input with +/- Buttons */}
-                                    <div className="bg-[#f8fafc] rounded-2xl p-4 md:p-6 border border-slate-100">
-                                        <div className="flex items-center justify-center gap-2 md:gap-4 mb-6">
-                                            <button
-                                                onClick={() => incrementStudents(-50)}
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95 flex-shrink-0"
-                                            >
-                                                <Minus className="w-5 h-5" />
-                                            </button>
-
-                                            <div className="relative flex-1 max-w-[200px]">
-                                                <Users className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" />
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    pattern="[0-9]*"
-                                                    value={inputValue}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    className="w-full pl-10 pr-2 md:pl-12 md:pr-4 py-3 md:py-4 text-xl md:text-2xl font-bold text-center border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0569ff] focus:border-[#0569ff] transition-all bg-white"
-                                                    min="1"
-                                                    max="10000"
-                                                />
-                                            </div>
-
-                                            <button
-                                                onClick={() => incrementStudents(50)}
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95 flex-shrink-0"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                            </button>
-                                        </div>
-
-                                        <p className="text-center text-slate-500 font-medium mb-4">students</p>
-
-                                        {/* Slider - visual helper, clamped to 50-5000 range */}
-                                        <div className="px-2">
-                                            <input
-                                                type="range"
-                                                value={getSliderValue()}
-                                                onChange={handleSliderChange}
-                                                min="50"
-                                                max="5000"
-                                                step="50"
-                                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0569ff]"
-                                            />
-                                            <div className="flex justify-between text-xs text-slate-400 mt-2">
-                                                <span>50</span>
-                                                <span>1000</span>
-                                                <span>2000</span>
-                                                <span>3000</span>
-                                                <span>5000</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Quick Select Buttons */}
-                                    <div>
-                                        <p className="text-sm text-slate-500 mb-3">Quick select:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {[100, 250, 500, 1000, 2000, 5000].map((num) => (
-                                                <button
-                                                    key={num}
-                                                    onClick={() => {
-                                                        setStudents(num);
-                                                        setInputValue(String(num));
-                                                    }}
-                                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${students === num
-                                                        ? 'bg-[#0569ff] text-white'
-                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                                        }`}
-                                                >
-                                                    {num.toLocaleString()}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Fun Comparison */}
-                                    <div className="bg-gradient-to-br lg:block hidden from-amber-50 to-orange-50 rounded-xl p-5 border border-amber-200">
-                                        <p className="text-center text-slate-700 font-medium mb-3">
-                                            💡 ₹10/month per child is...
-                                        </p>
-                                        <div className="flex flex-wrap justify-center gap-2">
-                                            {[
-                                                { emoji: '📓', text: 'Less than a notebook' },
-                                                { emoji: '🍦', text: 'An ice cream' },
-                                                { emoji: '☕', text: 'Half a chai' },
-                                            ].map((item, i) => (
-                                                <span key={i} className="inline-flex items-center gap-2 bg-white/80 px-3 py-1.5 rounded-full text-xs text-slate-600">
-                                                    <span>{item.emoji}</span>
-                                                    {item.text}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Trust Indicators */}
-                                    {/* <div className="bg-white lg:block hidden rounded-xl p-5 border border-slate-100">
-                                        <h4 className="font-semibold text-[#1a1a2e] mb-4 flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
-                                            Why Schools Love Us
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {[
-                                                { icon: '🚀', text: 'Go Live in 24hrs' },
-                                                { icon: '📱', text: 'Free Mobile Apps' },
-                                                { icon: '🎓', text: 'Free Training' },
-                                                { icon: '🔒', text: '100% Data Secure' },
-                                                { icon: '💬', text: '24/7 Support' },
-                                                { icon: '♾️', text: 'Unlimited Users' },
-                                            ].map((item, i) => (
-                                                <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <span>{item.icon}</span>
-                                                    <span>{item.text}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div> */}
-
-                                    {/* Need Help Card */}
-                                    <div className="bg-gradient-to-br from-[#0569ff]/10 to-indigo-100/50 rounded-xl p-5 border border-[#0569ff]/20">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 bg-[#0569ff] rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <Phone className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold text-[#1a1a2e] mb-1">Need Help?</h4>
-                                                <p className="text-sm text-slate-600 mb-2">Talk to our sales team for custom pricing</p>
-                                                <a href="tel:+919470556016" className="text-[#0569ff] font-semibold text-sm hover:underline">
-                                                    +91 94705 56016
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div className="relative mx-auto max-w-7xl">
+                        <div className="grid items-end gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+                            <div className="space-y-6">
+                                <span data-pricing-hero className="inline-flex items-center gap-2 rounded-full border border-[#cfe0ff] bg-white px-4 py-2 text-sm font-semibold text-[#0569ff] shadow-sm">
+                                    <Sparkles className="h-4 w-4" />
+                                    BASE + PRO ERP Pricing
+                                </span>
+                                <h1 data-pricing-hero className="max-w-4xl text-[clamp(2.6rem,6vw,5.8rem)] font-black leading-[0.96] tracking-tight text-[#0f172a]">
+                                    Pricing that scales with
+                                    <span className="block bg-gradient-to-r from-[#0569ff] via-[#3f89ff] to-[#0f172a] bg-clip-text text-transparent">
+                                        real student count.
+                                    </span>
+                                </h1>
+                                <p data-pricing-hero className="max-w-2xl text-lg leading-8 text-slate-600 md:text-xl">
+                                    Choose the operating depth your school needs. Start with BASE for core school workflows or move to PRO for finance, automation, growth, and premium operations.
+                                </p>
+                                <div data-pricing-hero className="flex flex-wrap gap-3">
+                                    <Link href="/contact" className="inline-flex items-center gap-2 rounded-full bg-[#0569ff] px-7 py-4 font-bold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#0459db]">
+                                        Book a Demo
+                                        <ArrowRight className="h-5 w-5" />
+                                    </Link>
+                                    <a href="#plan-calculator" className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-7 py-4 font-bold text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#0569ff] hover:text-[#0569ff]">
+                                        Calculate Your Cost
+                                    </a>
                                 </div>
+                            </div>
 
-                                {/* Right Side - Results Section */}
-                                <div className="bg-gradient-to-br from-[#0569ff]/5 to-indigo-50/50 rounded-2xl p-6 md:p-8 border border-[#0569ff]/10">
-                                    <h3 className="text-lg font-bold text-[#1a1a2e] mb-6 flex items-center gap-2">
-                                        <Zap className="w-5 h-5 text-[#0569ff]" />
-                                        Your Pricing
-                                    </h3>
-
-                                    {/* Main Stats Grid */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                        {/* Total Yearly - Full Width */}
-                                        <div className="sm:col-span-2 bg-white rounded-xl p-5 border border-slate-100">
-                                            <div className="flex items-center gap-2 text-slate-500 text-sm mb-2">
-                                                <Calendar className="w-4 h-4" />
-                                                Total Yearly Cost
-                                            </div>
-                                            <div className="flex items-baseline gap-1">
-                                                <IndianRupee className="w-6 h-6 text-[#1a1a2e]" />
-                                                <span className="text-3xl md:text-4xl font-black text-[#1a1a2e]">
-                                                    {yearlyPrice.toLocaleString('en-IN')}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-400 mt-1">Billed annually</p>
+                            <div data-pricing-hero className="rounded-[2rem] border border-[#dbe8ff] bg-white p-5 shadow-[0_30px_80px_-30px_rgba(5,105,255,0.28)]">
+                                <div className="rounded-[1.6rem] bg-gradient-to-br from-[#0f172a] via-[#0c234a] to-[#0569ff] p-6 text-white">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm uppercase tracking-[0.22em] text-white/60">Live Quote</p>
+                                            <p className="mt-2 text-2xl font-bold">{students.toLocaleString('en-IN')} students</p>
                                         </div>
-
-                                        {/* Monthly per Child */}
-                                        <div className="bg-white rounded-xl p-5 border-2 border-green-200 relative">
-                                            <div className="absolute -top-2 -right-2">
-                                                <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                                                    BEST VALUE
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-slate-500 text-sm mb-2">
-                                                <Users className="w-4 h-4" />
-                                                Per Child / Month
-                                            </div>
-                                            <div className="flex items-baseline gap-1">
-                                                <IndianRupee className="w-4 h-4 text-green-600" />
-                                                <span className="text-2xl font-black text-green-600">
-                                                    {perStudentMonthly.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-green-600 font-medium mt-1">Only ₹10/month!</p>
-                                        </div>
-
-                                        {/* Monthly Equivalent */}
-                                        <div className="bg-white rounded-xl p-5 border border-slate-100">
-                                            <div className="flex items-center gap-2 text-slate-500 text-sm mb-2">
-                                                <Calendar className="w-4 h-4" />
-                                                Monthly (School)
-                                            </div>
-                                            <div className="flex items-baseline gap-1">
-                                                <IndianRupee className="w-4 h-4 text-[#1a1a2e]" />
-                                                <span className="text-2xl font-bold text-[#1a1a2e]">
-                                                    {monthlyEquivalent.toLocaleString('en-IN')}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-[#0569ff] font-medium mt-1">(Paid yearly)</p>
+                                        <div className="rounded-2xl bg-white/10 p-3">
+                                            <Users className="h-7 w-7" />
                                         </div>
                                     </div>
-
-
-
-                                    {/* Breakdown */}
-                                    <div className="bg-white rounded-xl p-4 border border-slate-100 mb-6">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-slate-600">
-                                                {students.toLocaleString('en-IN')} student{students > 1 ? 's' : ''} × ₹120/year
-                                            </span>
-                                            <span className="font-bold text-[#1a1a2e]">
-                                                = ₹{yearlyPrice.toLocaleString('en-IN')}
-                                            </span>
+                                    <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                                        <div className="rounded-2xl border border-white/10 bg-white/8 p-4">
+                                            <p className="text-sm text-white/70">BASE yearly</p>
+                                            <p className="mt-2 text-3xl font-black">₹{formatCurrency(baseYearly)}</p>
+                                            <p className="mt-2 text-sm text-white/60">₹10 per student / year</p>
                                         </div>
-                                        <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-slate-100">
-                                            <span className="text-slate-600">Per student monthly</span>
-                                            <span className="font-bold text-[#0569ff]">₹{perStudentMonthly}/month</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-slate-100">
-                                            <span className="text-slate-600">Per student yearly</span>
-                                            <span className="font-bold text-green-600">₹{perStudentYearly}/year</span>
+                                        <div className="rounded-2xl border border-white/10 bg-white/8 p-4">
+                                            <p className="text-sm text-white/70">PRO yearly</p>
+                                            <p className="mt-2 text-3xl font-black">₹{formatCurrency(proYearly)}</p>
+                                            <p className="mt-2 text-sm text-white/60">₹20 per student / year</p>
                                         </div>
                                     </div>
-
-                                    {/* Note */}
-                                    <p className="text-xs text-slate-500 text-center mb-6">
-                                        💡 Exact pricing: ₹120 per student per year, or ₹10 per student per month.
-                                    </p>
-
-                                    {/* CTA Buttons */}
-                                    <div className="flex flex-col gap-3">
-                                        <Link href="/contact">
-                                            <button className="w-full py-4 bg-[#0569ff] text-white font-bold rounded-xl hover:bg-[#0358dd] transition-all duration-300 flex items-center justify-center gap-2 group">
-                                                Get Started
-                                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                            </button>
-                                        </Link>
-                                        <Link href="/contact">
-                                            <button className="w-full py-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all duration-300 flex items-center justify-center gap-2">
-                                                <Phone className="w-5 h-5" />
-                                                Talk to Sales
-                                            </button>
-                                        </Link>
+                                    <div className="mt-6 rounded-2xl border border-white/10 bg-white/8 p-4">
+                                        <p className="text-sm text-white/70">Current selection</p>
+                                        <div className="mt-2 flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-2xl bg-white/12 p-2">
+                                                    <ActiveIcon className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold">{selectedPlan}</p>
+                                                    <p className="text-sm text-white/60">{planCopy.eyebrow}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-2xl font-black">₹{formatCurrency(activeYearly)}</p>
+                                                <p className="text-sm text-white/60">about ₹{formatCurrency(monthlyEquivalent)}/month</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -364,69 +212,192 @@ export default function PricingCalculatorPage() {
                     </div>
                 </section>
 
-                {/* Features Section */}
-                {/* <section className="px-5 py-20">
-                    <div className="max-w-5xl mx-auto">
-                        <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] text-center mb-10">
-                            Everything Included
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {[
-                                'Student Management',
-                                'Fee Collection',
-                                'Attendance Tracking',
-                                'Exam & Results',
-                                'Timetable Management',
-                                'Parent Communication',
-                                'Staff & Payroll',
-                                'Transport Module',
-                                'Library Management',
-                                'Reports & Analytics',
-                                'Mobile Apps',
-                                'Priority Support'
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
-                                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                                    <span className="text-slate-700 font-medium text-sm">{feature}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section> */}
+                <section data-pricing-reveal className="px-5 pb-10">
+                    <div data-plan-grid className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2">
+                        {[SCHOOL_FEATURE_PLAN.BASE, SCHOOL_FEATURE_PLAN.PRO].map((plan) => {
+                            const copy = PLAN_COPY[plan];
+                            const Icon = copy.icon;
+                            const planFeatures = plan === SCHOOL_FEATURE_PLAN.BASE ? baseFeatures : proFeatures;
 
-                {/* FAQ Section */}
-                {/* <section className="px-5 py-16 bg-[#f5f7fa]">
-                    <div className="max-w-3xl mx-auto">
-                        <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] text-center mb-10">
-                            Frequently Asked Questions
-                        </h2>
-                        <div className="space-y-4">
-                            {[
-                                {
-                                    q: 'How is pricing calculated?',
-                                    a: 'Pricing is calculated per student: ₹120 per student per year, or ₹10 per student per month.'
-                                },
-                                {
-                                    q: 'Is there a minimum commitment?',
-                                    a: 'The plan is billed annually, based on your total active student count.'
-                                },
-                                {
-                                    q: 'What if our student count changes?',
-                                    a: 'Your pricing scales with your student count. Contact us anytime to adjust your plan.'
-                                },
-                                {
-                                    q: 'Is setup included?',
-                                    a: 'Yes! Free setup, data migration, and staff training are included.'
-                                }
-                            ].map((faq, i) => (
-                                <div key={i} className="bg-white rounded-xl p-6 border border-slate-100">
-                                    <h3 className="font-bold text-[#1a1a2e] mb-2">{faq.q}</h3>
-                                    <p className="text-slate-600">{faq.a}</p>
+                            return (
+                                <div
+                                    key={plan}
+                                    data-plan-card
+                                    className={`rounded-[2rem] border p-7 shadow-[0_25px_65px_-35px_rgba(15,23,42,0.25)] ${copy.cardTone}`}
+                                >
+                                    <div className={`inline-flex rounded-full bg-gradient-to-r px-4 py-2 text-sm font-bold text-white ${copy.accent}`}>
+                                        {copy.eyebrow}
+                                    </div>
+                                    <div className="mt-6 flex items-start justify-between gap-6">
+                                        <div>
+                                            <h2 className="text-3xl font-black text-[#0f172a]">{plan}</h2>
+                                            <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">{copy.description}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                            <Icon className="h-6 w-6 text-[#0569ff]" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-8 flex items-end gap-3">
+                                        <span className="text-6xl font-black text-[#0f172a]">₹{PLAN_BILLING[plan].pricePerStudent}</span>
+                                        <div className="pb-2 text-sm text-slate-500">
+                                            <div>per student</div>
+                                            <div>per year</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                                        {planFeatures.slice(0, 8).map((feature) => (
+                                            <div key={feature} className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-4">
+                                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#0569ff]" />
+                                                <span className="text-sm font-medium text-slate-700">{feature}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            ))}
+                            );
+                        })}
+                    </div>
+                </section>
+
+                <section id="plan-calculator" data-pricing-reveal className="px-5 py-20">
+                    <div className="mx-auto max-w-7xl rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-[0_35px_90px_-40px_rgba(5,105,255,0.35)] md:p-10">
+                        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+                            <div className="space-y-6">
+                                <div>
+                                    <span className="inline-flex items-center gap-2 rounded-full bg-[#0569ff]/8 px-4 py-2 text-sm font-semibold text-[#0569ff]">
+                                        <Layers3 className="h-4 w-4" />
+                                        Interactive calculator
+                                    </span>
+                                    <h2 className="mt-4 text-4xl font-black leading-tight text-[#0f172a]">
+                                        See the exact amount before you ever talk to sales.
+                                    </h2>
+                                    <p className="mt-4 text-base leading-7 text-slate-600">
+                                        Switch between BASE and PRO, enter your active student count, and the page recalculates instantly. Same model we now use inside the ERP control system.
+                                    </p>
+                                </div>
+
+                                <div className="rounded-[1.5rem] border border-slate-200 bg-[#f8fbff] p-5">
+                                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Student count</p>
+                                    <div className="mt-5 flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setStudents((current) => Math.max(100, current - 100))}
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-700 transition-all hover:border-[#0569ff] hover:text-[#0569ff]"
+                                        >
+                                            -100
+                                        </button>
+                                        <div className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                                            <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Active students</div>
+                                            <input
+                                                value={students}
+                                                onChange={(event) => {
+                                                    const nextValue = Number(event.target.value || 0);
+                                                    setStudents(Math.max(1, Math.min(100000, nextValue || 1)));
+                                                }}
+                                                className="mt-2 w-full bg-transparent text-4xl font-black text-[#0f172a] outline-none"
+                                                inputMode="numeric"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStudents((current) => Math.min(100000, current + 100))}
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-700 transition-all hover:border-[#0569ff] hover:text-[#0569ff]"
+                                        >
+                                            +100
+                                        </button>
+                                    </div>
+                                    <input
+                                        className="mt-6 w-full accent-[#0569ff]"
+                                        type="range"
+                                        min="100"
+                                        max="5000"
+                                        step="50"
+                                        value={sliderStudentCount}
+                                        onChange={(event) => setStudents(Number(event.target.value))}
+                                    />
+                                    <div className="mt-2 flex justify-between text-xs text-slate-400">
+                                        <span>100</span>
+                                        <span>1,500</span>
+                                        <span>3,000</span>
+                                        <span>5,000</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[SCHOOL_FEATURE_PLAN.BASE, SCHOOL_FEATURE_PLAN.PRO].map((plan) => (
+                                        <button
+                                            key={plan}
+                                            type="button"
+                                            onClick={() => setSelectedPlan(plan)}
+                                            className={`rounded-[1.4rem] border p-5 text-left transition-all duration-300 ${selectedPlan === plan
+                                                ? 'border-[#0569ff] bg-[#0569ff] text-white shadow-lg'
+                                                : 'border-slate-200 bg-white text-slate-700 hover:border-[#0569ff]/40'}`}
+                                        >
+                                            <div className="text-xs uppercase tracking-[0.18em] opacity-70">{plan}</div>
+                                            <div className="mt-3 text-3xl font-black">₹{PLAN_BILLING[plan].pricePerStudent}</div>
+                                            <div className="mt-1 text-sm opacity-80">per student / year</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="rounded-[2rem] bg-gradient-to-br from-[#0f172a] via-[#13264d] to-[#0569ff] p-6 text-white md:p-8">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm uppercase tracking-[0.22em] text-white/60">Selected plan</p>
+                                        <p className="mt-2 text-3xl font-black">{selectedPlan}</p>
+                                    </div>
+                                    <div className="rounded-2xl bg-white/10 p-3">
+                                        <ActiveIcon className="h-7 w-7" />
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 grid gap-4 md:grid-cols-2">
+                                    <div className="rounded-2xl border border-white/10 bg-white/8 p-5">
+                                        <p className="text-sm text-white/70">Yearly ERP cost</p>
+                                        <p className="mt-3 text-4xl font-black">₹{formatCurrency(activeYearly)}</p>
+                                        <p className="mt-2 text-sm text-white/60">
+                                            {students.toLocaleString('en-IN')} × ₹{PLAN_BILLING[selectedPlan].pricePerStudent}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/8 p-5">
+                                        <p className="text-sm text-white/70">Monthly equivalent</p>
+                                        <p className="mt-3 text-4xl font-black">₹{formatCurrency(monthlyEquivalent)}</p>
+                                        <p className="mt-2 text-sm text-white/60">For internal budgeting only</p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 rounded-[1.6rem] border border-white/10 bg-white/8 p-5">
+                                    <div className="flex items-center gap-3">
+                                        <Zap className="h-5 w-5 text-[#7ec3ff]" />
+                                        <p className="font-semibold">What you unlock with {selectedPlan}</p>
+                                    </div>
+                                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                        {(selectedPlan === SCHOOL_FEATURE_PLAN.BASE ? baseFeatures : proFeatures).slice(0, 10).map((feature) => (
+                                            <div key={feature} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/6 p-4">
+                                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#7ec3ff]" />
+                                                <span className="text-sm text-white/90">{feature}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                                    <Link href="/contact" className="flex-1">
+                                        <span className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-4 font-bold text-[#0569ff] transition-all duration-300 hover:-translate-y-0.5">
+                                            Request Proposal
+                                            <ArrowRight className="h-5 w-5" />
+                                        </span>
+                                    </Link>
+                                    <Link href="/" className="flex-1">
+                                        <span className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-4 font-bold text-white transition-all duration-300 hover:bg-white/16">
+                                            Back to Homepage
+                                        </span>
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </section> */}
+                </section>
             </main>
         </div>
     );

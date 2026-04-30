@@ -2,6 +2,8 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { remember, generateKey } from "@/lib/cache";
+import { buildBillingSummary, getFeatureDefinition, getPlanFeatureKeys, getFeatureCatalogForAdmin, resolveFeatureState } from "@/lib/school-feature-config";
+import { getSchoolFeatureControlConfig } from "@/lib/school-feature-access";
 
 // Pricing constants (must match Step5ERPPlan.jsx)
 const PRICE_PER_UNIT = 12000;
@@ -51,7 +53,8 @@ export const GET = withSchoolAccess(async function GET(request, props) {
       feeStats,
       recentStudents,
       classDistribution,
-      subscription] =
+      subscription,
+      schoolFeatureMeta] =
       await Promise.all([
       prisma.student.count({ where: studentWhere }),
       prisma.teachingStaff.count({ where: { schoolId } }),
@@ -100,8 +103,21 @@ export const GET = withSchoolAccess(async function GET(request, props) {
       // Subscription / plan data (not year-scoped)
       prisma.schoolSubscription.findUnique({
         where: { schoolId }
+      }),
+      prisma.school.findUnique({
+        where: { id: schoolId },
+        select: {
+          websiteConfig: true,
+        }
       })]
       );
+
+      const featureControl = getSchoolFeatureControlConfig(schoolFeatureMeta || {});
+      const resolvedFeatureState = resolveFeatureState(featureControl);
+      const planBilling = buildBillingSummary({
+        plan: resolvedFeatureState.plan,
+        activeStudentCount: studentCount,
+      });
 
       // Calculate plan info (from subscription or defaults)
       const planInfo = subscription ? (() => {
@@ -109,19 +125,24 @@ export const GET = withSchoolAccess(async function GET(request, props) {
         const recommendedUnits = Math.max(1, Math.ceil(studentCount / STUDENTS_PER_UNIT));
         const recommendedIncludedCapacity = recommendedUnits * STUDENTS_PER_UNIT;
         const recommendedSoftCapacity = Math.floor(recommendedIncludedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
-        const currentYearlyAmount = Number(subscription.yearlyAmount);
-        const recommendedYearlyAmount = recommendedUnits * PRICE_PER_UNIT;
+        const currentYearlyAmount = planBilling.yearlyAmount;
+        const recommendedYearlyAmount = recommendedIncludedCapacity > 0
+          ? planBilling.pricePerStudent * recommendedIncludedCapacity
+          : 0;
         const additionalUnitsNeeded = Math.max(0, recommendedUnits - currentUnits);
         const additionalYearlyAmount = Math.max(0, recommendedYearlyAmount - currentYearlyAmount);
         const studentsAboveIncludedCapacity = Math.max(0, studentCount - subscription.includedCapacity);
         const studentsAboveSoftCapacity = Math.max(0, studentCount - subscription.softCapacity);
 
         return {
+          planType: resolvedFeatureState.plan,
           expectedStudents: subscription.expectedStudents,
           unitsPurchased: subscription.unitsPurchased,
           includedCapacity: subscription.includedCapacity,
           softCapacity: subscription.softCapacity,
           yearlyAmount: currentYearlyAmount,
+          storedSubscriptionAmount: Number(subscription.yearlyAmount),
+          pricePerStudent: planBilling.pricePerStudent,
           pricePerUnit: Number(subscription.pricePerUnit),
           billingStartDate: subscription.billingStartDate,
           billingEndDate: subscription.billingEndDate,
@@ -138,7 +159,7 @@ export const GET = withSchoolAccess(async function GET(request, props) {
           perStudentYearly: subscription.expectedStudents > 0 ?
           Math.round(currentYearlyAmount / subscription.expectedStudents) :
           0,
-          savings: subscription.unitsPurchased * BASE_PRICE_PER_UNIT - currentYearlyAmount,
+          savings: 0,
           recommendedUnits,
           recommendedIncludedCapacity,
           recommendedSoftCapacity,
@@ -148,6 +169,7 @@ export const GET = withSchoolAccess(async function GET(request, props) {
           studentsAboveIncludedCapacity,
           studentsAboveSoftCapacity,
           renewalAmountDue: recommendedYearlyAmount,
+          enabledFeatures: resolvedFeatureState.enabledFeatures,
         };
       })() : null;
 

@@ -37,6 +37,8 @@ import { BulkUploadProvider } from "@/context/BulkUploadContext";
 import BulkUploadToast from "@/components/gallery/BulkUploadToast";
 import { AcademicYearProvider } from "@/context/AcademicYearContext";
 import { SchoolAccountStatusBanner } from "@/components/school-account-status-banner";
+import { getFeatureAccessForPath } from "@/lib/school-feature-config";
+import { SchoolFeatureBlockedState } from "@/components/school-feature-blocked-state";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -190,6 +192,25 @@ export default function ClientLayout({ children }) {
                     }
                 }
 
+                if (response.status === 403) {
+                    try {
+                        const payload = await clone.json();
+                        if (payload?.code === 'SCHOOL_FEATURE_DISABLED') {
+                            const nextMessage = `FEATURE:${payload?.featureKey || 'unknown'}`;
+                            if (lastSchoolAccessToast.current !== nextMessage) {
+                                lastSchoolAccessToast.current = nextMessage;
+                                toast.error(payload?.error || 'This module is not enabled for the current school.', {
+                                    description: payload?.plan
+                                        ? `Current plan: ${payload.plan}. Upgrade the plan or enable the module for this school.`
+                                        : 'Upgrade the plan or enable the module for this school.',
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        // Ignore non-JSON forbidden responses
+                    }
+                }
+
                 if (response.status === 500 || response.status === 503) {
                     try {
                         const text = await clone.text();
@@ -267,6 +288,15 @@ export default function ClientLayout({ children }) {
     }
 
     const hideUI = ["/dashboard/login"].includes(pathname);
+    const currentFeatureAccess = fullUser?.role?.name === 'SUPER_ADMIN'
+        ? null
+        : getFeatureAccessForPath(pathname, fullUser?.schoolFeatureAccess || null);
+    const shouldBlockCurrentPage = Boolean(
+        !hideUI &&
+        pathname?.startsWith('/dashboard') &&
+        currentFeatureAccess &&
+        !currentFeatureAccess.enabled
+    );
 
     return (
         <NetworkStatusProvider>
@@ -447,7 +477,14 @@ export default function ClientLayout({ children }) {
                                                 <>
                                                     <WebPushListener />
                                                     <FeeAssignJobProvider>
-                                                        {children}
+                                                        {shouldBlockCurrentPage ? (
+                                                            <SchoolFeatureBlockedState
+                                                                feature={currentFeatureAccess}
+                                                                plan={fullUser?.schoolFeatureAccess?.plan}
+                                                            />
+                                                        ) : (
+                                                            children
+                                                        )}
                                                     </FeeAssignJobProvider>
                                                 </>
                                             )}

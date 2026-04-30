@@ -2,7 +2,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { resolveSchoolIdForUser } from '@/lib/school-account-state';
+import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
+import { getSchoolFeatureStateFromSchool } from "@/lib/school-feature-access";
 
 // Helper: get current user from Supabase session
 async function getAuthenticatedUser(req) {
@@ -259,6 +260,16 @@ export async function GET(req) {
             }
             default:
                 console.log("⚠️ [API] Unhandled role:", user.role.name);
+        }
+
+        if (response.schoolId && !response.school) {
+            response.school = await prisma.school.findUnique({
+                where: { id: response.schoolId },
+            });
+        }
+
+        if (response.school) {
+            response.schoolFeatureAccess = getSchoolFeatureStateFromSchool(response.school);
         }
 
         const end = performance.now();

@@ -69,6 +69,7 @@ export default function SchoolWizard() {
         principalPassword: '',
 
         // ERP Plan & Capacity (Super Admin controlled)
+        erpPlan: 'BASE',
         expectedStudents: 100,
         unitsPurchased: 1,
         includedCapacity: 100,

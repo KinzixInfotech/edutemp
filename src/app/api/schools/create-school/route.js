@@ -8,6 +8,8 @@ import { addYears, addDays } from "date-fns";
 import { invalidatePattern, invalidateSchoolMarketplaceCache } from "@/lib/cache";
 import { generateSchoolSlug, generateUniqueSlug } from "@/lib/slug-generator";
 import { buildTenantDomain, normalizeSchoolDomain } from "@/lib/school-domain";
+import { buildBillingSummary, SCHOOL_FEATURE_PLAN } from "@/lib/school-feature-config";
+import { mergeSchoolFeatureControlIntoWebsiteConfig } from "@/lib/school-feature-access";
 // Schema validation
 const schoolSchema = z.object({
   name: z.string(),
@@ -44,6 +46,7 @@ const schoolSchema = z.object({
   generateWebsite: z.boolean().optional(),
 
   // ERP Plan & Capacity (Super Admin controlled)
+  erpPlan: z.enum([SCHOOL_FEATURE_PLAN.BASE, SCHOOL_FEATURE_PLAN.PRO]).default(SCHOOL_FEATURE_PLAN.BASE),
   expectedStudents: z.coerce.number().min(1).default(100),
   unitsPurchased: z.coerce.number().min(1).optional(),
   includedCapacity: z.coerce.number().optional(),
@@ -94,7 +97,7 @@ const schoolSchema = z.object({
   }
 });
 
-// Pricing constants
+// Capacity constants
 const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
 const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5;
@@ -113,11 +116,16 @@ export const POST = withSchoolAccess(async function POST(req) {
     normalizeSchoolDomain(parsed.customDomain || "");
 
     // Calculate ERP capacity values
+    const erpPlan = parsed.erpPlan || SCHOOL_FEATURE_PLAN.BASE;
     const expectedStudents = parsed.expectedStudents || 100;
     const unitsPurchased = parsed.unitsPurchased || Math.ceil(expectedStudents / STUDENTS_PER_UNIT);
     const includedCapacity = parsed.includedCapacity || unitsPurchased * STUDENTS_PER_UNIT;
     const softCapacity = parsed.softCapacity || Math.floor(includedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
-    const yearlyAmount = parsed.yearlyAmount || unitsPurchased * PRICE_PER_UNIT;
+    const calculatedBilling = buildBillingSummary({
+      plan: erpPlan,
+      activeStudentCount: expectedStudents,
+    });
+    const yearlyAmount = parsed.yearlyAmount || calculatedBilling.yearlyAmount;
     const billingStartDate = parsed.billingStartDate || new Date();
     const billingEndDate = parsed.billingEndDate || addYears(billingStartDate, 1);
     const isTrial = parsed.isTrial || false;
@@ -179,6 +187,52 @@ export const POST = withSchoolAccess(async function POST(req) {
 
     // Step 2: Prisma transaction with extended timeout
     const result = await prisma.$transaction(async (tx) => {
+      const baseWebsiteConfig = parsed.generateWebsite ? {
+        hero: {
+          title: `Welcome to ${parsed.name}`,
+          subtitle: "Empowering Minds, Shaping Futures",
+          image: parsed.profilePicture || "/default-hero.jpg",
+          ctaText: "Admissions Open",
+          ctaLink: "#admissions"
+        },
+        about: {
+          title: "About Us",
+          content: `${parsed.name} is dedicated to providing quality education...`
+        },
+        principal: {
+          name: "Principal Name",
+          message: "Welcome to our school...",
+          image: "/default-principal.jpg"
+        },
+        notices: [],
+        gallery: [],
+        facilities: [
+        { title: "Library", icon: "book" },
+        { title: "Science Lab", icon: "flask" },
+        { title: "Sports", icon: "trophy" }],
+
+        admissions: {
+          title: "Admissions",
+          content: "Admissions are open for the academic year...",
+          link: "/admissions"
+        },
+        contact: {
+          address: parsed.location,
+          phone: parsed.phone,
+          email: parsed.email
+        },
+        theme: {
+          primaryColor: "#000000",
+          secondaryColor: "#ffffff"
+        },
+        menus: [
+        { label: "Home", link: "#hero" },
+        { label: "About", link: "#about" },
+        { label: "Admissions", link: "#admissions" },
+        { label: "Contact", link: "#contact" }]
+
+      } : undefined;
+
       const school = await tx.school.create({
         data: {
           name: parsed.name,
@@ -192,51 +246,10 @@ export const POST = withSchoolAccess(async function POST(req) {
           country: parsed.country || 'India',
           SubscriptionType: parsed.subscriptionType,
           Language: parsed.language,
-          websiteConfig: parsed.generateWebsite ? {
-            hero: {
-              title: `Welcome to ${parsed.name}`,
-              subtitle: "Empowering Minds, Shaping Futures",
-              image: parsed.profilePicture || "/default-hero.jpg",
-              ctaText: "Admissions Open",
-              ctaLink: "#admissions"
-            },
-            about: {
-              title: "About Us",
-              content: `${parsed.name} is dedicated to providing quality education...`
-            },
-            principal: {
-              name: "Principal Name",
-              message: "Welcome to our school...",
-              image: "/default-principal.jpg"
-            },
-            notices: [],
-            gallery: [],
-            facilities: [
-            { title: "Library", icon: "book" },
-            { title: "Science Lab", icon: "flask" },
-            { title: "Sports", icon: "trophy" }],
-
-            admissions: {
-              title: "Admissions",
-              content: "Admissions are open for the academic year...",
-              link: "/admissions"
-            },
-            contact: {
-              address: parsed.location,
-              phone: parsed.phone,
-              email: parsed.email
-            },
-            theme: {
-              primaryColor: "#000000",
-              secondaryColor: "#ffffff"
-            },
-            menus: [
-            { label: "Home", link: "#hero" },
-            { label: "About", link: "#about" },
-            { label: "Admissions", link: "#admissions" },
-            { label: "Contact", link: "#contact" }]
-
-          } : undefined
+          websiteConfig: mergeSchoolFeatureControlIntoWebsiteConfig(baseWebsiteConfig, {
+            plan: erpPlan,
+            overrides: { enabled: [], disabled: [] },
+          }),
         }
       });
 

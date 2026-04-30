@@ -85,6 +85,7 @@ export default function HomePage() {
             <HPCSection />
             <FeaturesSection />
             <IntegrationsSection />
+            {/* <EcosystemSection /> */}
             <AppGlimpseSection />
 
             {/* AI Product Guide - Ask questions about EduBreezy */}
@@ -507,6 +508,257 @@ function AttendanceSection() {
             </div>
         </section>
     )
+}
+
+// ============================================================================
+// Ecosystem Section
+// ============================================================================
+const ecosystemData = [
+    {
+        id: 'parent',
+        title: 'Parent App',
+        image: '/app-screenshot.png',
+        features: [
+            { icon: MapPin, text: 'Track Bus' },
+            { icon: CreditCard, text: 'Pay Fees' },
+            { icon: Award, text: 'View Report Card' },
+            { icon: Bell, text: 'Attendance Alerts' },
+            { icon: MessageSquare, text: 'Communication' },
+            { icon: BookMarked, text: 'Homework Updates' }
+        ]
+    },
+    {
+        id: 'teacher',
+        title: 'Teacher App',
+        image: '/mock_att.png',
+        features: [
+            { icon: ClipboardCheck, text: 'Mark Attendance' },
+            { icon: BookMarked, text: 'Assign Homework' },
+            { icon: Calendar, text: 'Leave Management' },
+            { icon: FileCheck, text: 'Upload Marks' },
+            { icon: BookOpen, text: 'Syllabus Tracking' },
+            { icon: Bell, text: 'Notice Board' }
+        ]
+    },
+    {
+        id: 'director',
+        title: 'Director App',
+        image: '/ss2.png',
+        features: [
+            { icon: PieChart, text: 'Revenue Analytics' },
+            { icon: Building2, text: 'Multi-Branch Management' },
+            { icon: TrendingUp, text: 'Growth Tracking' },
+            { icon: Users, text: 'Staff Overview' },
+            { icon: BarChart3, text: 'Financial Reports' },
+            { icon: Bell, text: 'Critical Alerts' }
+        ]
+    },
+    {
+        id: 'principal',
+        title: 'Principal App',
+        image: '/app-screenshot.png',
+        features: [
+            { icon: FileText, text: 'Daily Reports' },
+            { icon: Users, text: 'Staff Attendance' },
+            { icon: MessageSquare, text: 'Broadcast Messages' },
+            { icon: CreditCard, text: 'Fee Defaulters' },
+            { icon: BookOpen, text: 'Academic Overview' },
+            { icon: Clipboard, text: 'Complaint Management' }
+        ]
+    },
+    {
+        id: 'student',
+        title: 'Student App',
+        image: '/ss2.png',
+        features: [
+            { icon: Play, text: 'Live Classes' },
+            { icon: FileText, text: 'Recorded video lectures' },
+            { icon: MessageCircle, text: 'Doubts' },
+            { icon: FileCheck, text: 'Assessment' },
+            { icon: Trophy, text: 'Scoreboard' },
+            { icon: BarChart3, text: 'Test Analysis' }
+        ]
+    },
+    {
+        id: 'driver',
+        title: 'Driver App',
+        image: './mockups/bus.png',
+        features: [
+            { icon: MapPin, text: 'Route Navigation' },
+            { icon: Users, text: 'Student List' },
+            { icon: Play, text: 'Start/Stop Trip' },
+            { icon: Bell, text: 'SOS Alerts' },
+            { icon: Zap, text: 'Vehicle Health' },
+            { icon: TrendingUp, text: 'Speed Tracking' }
+        ]
+    },
+    {
+        id: 'admin',
+        title: 'Admin App',
+        image: '/ss2.png',
+        features: [
+            { icon: Users, text: 'User Management' },
+            { icon: Zap, text: 'Configuration Setup' },
+            { icon: ClipboardCheck, text: 'Role Permissions' },
+            { icon: FileText, text: 'Audit Logs' },
+            { icon: Bell, text: 'System Alerts' },
+            { icon: FileSpreadsheet, text: 'Data Backups' }
+        ]
+    }
+];
+// ============================================================================
+// EcosystemSection — Drop-in replacement
+// Changes:
+//   1. Timeline replaced with modern pill-chip tab row (scrollable)
+//   2. Feature cards now full-width / filled layout (like image 4)
+//   3. Professional SVG wave pattern background
+//   4. Fully responsive
+// ============================================================================
+function EcosystemSection() {
+    const [activeTab, setActiveTab] = useState('student');
+    const activeIndex = ecosystemData.findIndex(d => d.id === activeTab);
+    const activeData = ecosystemData[activeIndex] || ecosystemData[4];
+
+    return (
+        <section className="py-16 md:py-24 bg-white relative overflow-hidden" id="ecosystem">
+
+            <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+
+                {/* Header */}
+                <div className="text-center mb-10 md:mb-14">
+                    <span className="inline-block text-gray-400 font-medium text-base md:text-lg tracking-wide mb-1">
+                        Experience
+                    </span>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] leading-tight tracking-tight">
+                        The Ecosystem of <span className="text-[#0469ff]">Apps</span>
+                    </h2>
+                </div>
+
+                {/* ── Timeline Tabs — exact style from screenshot ── */}
+                <div className="relative mb-12 md:mb-16 max-w-5xl mx-auto">
+                    {/* Labels row */}
+                    <div className="flex items-center justify-between mb-3">
+                        {ecosystemData.map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className="flex-1 text-center group"
+                                >
+                                    <span className={`
+                                        text-xs sm:text-sm md:text-base lg:text-lg font-bold transition-colors duration-300 whitespace-nowrap
+                                        ${isActive ? 'text-[#0469ff]' : 'text-gray-400 group-hover:text-gray-600'}
+                                    `}>
+                                        {tab.title}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Line + dots row */}
+                    <div className="relative flex items-center justify-between">
+                        {/* Full background line */}
+                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[3px] bg-gray-200" />
+
+                        {/* Dots */}
+                        {ecosystemData.map((tab, i) => {
+                            const isActive = activeTab === tab.id;
+                            const isPast = i < activeIndex;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className="relative z-10 flex items-center justify-center transition-all duration-300"
+                                    style={{ width: 28, height: 28 }}
+                                >
+                                    {isActive ? (
+                                        /* Active: blue ring + white center */
+                                        <span className="w-6 h-6 rounded-full border-[3px] border-[#0469ff] bg-white block shadow-md" />
+                                    ) : isPast ? (
+                                        /* Past: filled gray */
+                                        <span className="w-4 h-4 rounded-full bg-gray-300 block" />
+                                    ) : (
+                                        /* Future: light gray */
+                                        <span className="w-4 h-4 rounded-full bg-gray-200 block" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* ── Content: Cards + Phone ── */}
+                <div className="flex flex-col lg:flex-row items-start gap-8 lg:gap-12">
+
+                    {/* Left: Feature Cards — 2 col, icon left + text, compact */}
+                    <div className="flex-1 w-full grid grid-cols-2 gap-3">
+                        <AnimatePresence mode="wait">
+                            {activeData.features.map((feature, idx) => {
+                                const isHighlighted = idx === 0;
+                                return (
+                                    <motion.div
+                                        key={`${activeTab}-${idx}`}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.22, delay: idx * 0.03 }}
+                                        className={`
+                                            flex items-center gap-3 px-4 py-4 md:py-5 rounded-xl border-2
+                                            transition-all duration-300 cursor-default
+                                            ${isHighlighted
+                                                ? 'bg-[#0469ff] border-[#0469ff] shadow-lg shadow-[#0469ff]/20'
+                                                : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                            }
+                                        `}
+                                    >
+                                        {/* Icon */}
+                                        <div className={`
+                                            w-9 h-9 rounded-lg flex items-center justify-center shrink-0
+                                            ${isHighlighted ? 'bg-white/20' : 'bg-[#f0f4ff]'}
+                                        `}>
+                                            <feature.icon
+                                                strokeWidth={1.8}
+                                                className={`w-[18px] h-[18px] ${isHighlighted ? 'text-white' : 'text-[#0469ff]'}`}
+                                            />
+                                        </div>
+                                        {/* Text */}
+                                        <span className={`text-sm md:text-[15px] font-semibold leading-tight flex-1 ${isHighlighted ? 'text-white' : 'text-[#1a1a2e]'}`}>
+                                            {feature.text}
+                                        </span>
+                                        {isHighlighted && (
+                                            <ArrowRight className="w-4 h-4 text-white/60 shrink-0" />
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Right: Phone mockup */}
+                    <div className="flex-shrink-0 w-full lg:w-auto flex justify-center items-start lg:items-center relative">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={activeTab}
+                                initial={{ opacity: 0, x: 16 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -16 }}
+                                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                            >
+                                <img
+                                    src={activeData.image}
+                                    alt={activeData.title}
+                                    className="w-[220px] sm:w-[260px] lg:w-[280px] xl:w-[320px] h-auto object-contain drop-shadow-2xl"
+                                />
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    );
 }
 // App Glimpse Section — Horizontal scrolling marquee of app screenshots
 function AppGlimpseSection() {
@@ -1645,86 +1897,108 @@ function BentoSection() {
 
 // Pricing Section - New Pricing Model
 function PricingSection() {
-    const features = [
-        "All Modules Included",
-        "Unlimited Users",
-        "Mobile Apps (iOS & Android)",
-        "24/7 Support",
-        "Free Data Migration",
-        "Regular Updates"
+    const plans = [
+        {
+            key: "BASE",
+            price: "₹10",
+            period: "per student / year",
+            description: "Core operations for real schools: students, classes, attendance, exams, academics, documents, homework, and communication.",
+            modules: ["Students", "Attendance", "Exams", "Subjects", "Documents", "Academic Years"],
+            tone: "bg-white text-[#1a1a2e] border-white/70",
+            accent: "text-[#0569ff]",
+        },
+        {
+            key: "PRO",
+            price: "₹20",
+            period: "per student / year",
+            description: "Advanced finance, automation, and growth stack: fees, payroll, transport, library, SMS, app/web, explorer, alumni, and more.",
+            modules: ["Fees", "Payroll", "Transport", "Library", "SMS", "School Explorer"],
+            tone: "bg-[#0f172a] text-white border-white/10",
+            accent: "text-[#7ec3ff]",
+        },
     ];
 
     return (
         <section className="pt-24 md:pt-32 bg-white relative overflow-hidden" id="pricing">
             <div className="w-full relative z-10">
-                {/* Section Header */}
                 <div className="max-w-[1200px] mx-auto px-5">
                     <SectionHeading
-                        badge="SIMPLE PRICING"
+                        badge="BASE + PRO PRICING"
                         title="Transparent Pricing for"
-                        highlightedText="Every School "
-                        description="One simple plan. No hidden fees. Pay yearly and save 30%."
+                        highlightedText="Every Growth Stage "
+                        description="Choose the core operating plan or unlock the full premium stack. Pricing is based on active student count, and the calculator shows the exact amount instantly."
                     />
                 </div>
 
-                {/* Pricing Card - Full Width */}
-                <div className="bg-gradient-to-br from-[#0569ff] to-[#0145c4] overflow-hidden border-y-2 border-black">
-                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-[500px]">
-                        {/* Left */}
-                        <div className="p-10 md:p-16 lg:p-20 flex flex-col justify-center">
-                            <span className="inline-flex items-center gap-1.5 bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold mb-8 backdrop-blur-sm border border-white/30 w-fit">
-                                <Zap className="w-4 h-4" />
-                                30% OFF - Limited Time
-                            </span>
+                <div className="mt-10 bg-gradient-to-br from-[#0569ff] via-[#0255d8] to-[#0f172a] overflow-hidden border-y-2 border-black">
+                    <div className="max-w-[1400px] mx-auto px-5 py-10 md:py-14 lg:py-16">
+                        <div className="grid grid-cols-1 xl:grid-cols-[0.85fr_1.15fr] gap-8 items-start">
+                            <div className="p-2 md:p-4 flex flex-col justify-center">
+                                <span className="inline-flex items-center gap-1.5 bg-white/15 text-white px-4 py-2 rounded-full text-sm font-bold mb-7 backdrop-blur-sm border border-white/20 w-fit">
+                                    <Zap className="w-4 h-4" />
+                                    Plan-based ERP pricing
+                                </span>
 
-                            <div className="mb-10">
-                                <div className="flex items-baseline gap-3 mb-4">
-                                    <span className="text-7xl md:text-8xl font-black text-white">₹120</span>
-                                    <div className="flex flex-col">
-                                        <span className="text-white/90 text-xl font-semibold">per student</span>
-                                        <span className="text-white/60 text-base">per year</span>
-                                    </div>
+                                <div className="space-y-5">
+                                    <h3 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[0.95]">
+                                        Start with BASE.
+                                        <span className="block text-[#b9d7ff]">Scale with PRO.</span>
+                                    </h3>
+                                    <p className="text-white/78 text-lg leading-8 max-w-xl">
+                                        BASE keeps the school running beautifully. PRO adds revenue, operations, automation, communication, and growth modules without switching platforms later.
+                                    </p>
                                 </div>
-                                <p className="text-white/80 text-lg font-medium flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-white rounded-full animate-pulse shrink-0"></span>
-                                    Only ₹10 per month, billed yearly
+
+                                <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                                    <Link href="/pricing" className="flex-1">
+                                        <button className="w-full py-4 bg-white text-[#0569ff] font-bold rounded-full hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg text-base">
+                                            Explore Pricing
+                                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                        </button>
+                                    </Link>
+                                    <Link href="/contact" className="flex-1">
+                                        <button className="w-full py-4 bg-white/10 text-white font-bold rounded-full border border-white/30 hover:bg-white/20 transition-all duration-300 backdrop-blur-sm text-base">
+                                            Talk to Sales
+                                        </button>
+                                    </Link>
+                                </div>
+
+                                <p className="text-white/55 text-sm mt-6">
+                                    Pricing is billed yearly and calculated directly from active student count.
                                 </p>
                             </div>
 
-                            {/* Quotes row */}
-                            <div className="mb-10 border-l-4 border-white/40 pl-5">
-                                <p className="text-white/90 text-xl md:text-2xl font-medium leading-relaxed italic">
-                                    "Technology will not replace great teachers, but technology in the hands of great teachers can be transformational."
-                                </p>
-                                <p className="text-white/50 text-sm mt-3 font-medium">— George Couros</p>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                {plans.map((plan) => (
+                                    <div key={plan.key} className={`rounded-[2rem] border p-6 md:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.16)] ${plan.tone}`}>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <span className={`text-sm font-black tracking-[0.22em] uppercase ${plan.accent}`}>
+                                                {plan.key}
+                                            </span>
+                                            <span className="rounded-full border border-current/10 px-3 py-1 text-xs font-semibold opacity-80">
+                                                Yearly billing
+                                            </span>
+                                        </div>
+                                        <div className="mt-6 flex items-end gap-3">
+                                            <span className="text-5xl md:text-6xl font-black">{plan.price}</span>
+                                            <div className="pb-2 text-sm opacity-70">
+                                                <div>per student</div>
+                                                <div>per year</div>
+                                            </div>
+                                        </div>
+                                        <p className="mt-5 text-sm leading-7 opacity-80">
+                                            {plan.description}
+                                        </p>
+                                        <div className="mt-6 grid grid-cols-2 gap-3">
+                                            {plan.modules.map((module) => (
+                                                <div key={module} className="rounded-2xl border border-current/10 bg-white/5 px-4 py-3 text-sm font-medium">
+                                                    {module}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <Link href="/pricing" className="flex-1">
-                                    <button className="w-full py-4 bg-white text-[#0569ff] font-bold rounded-full hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg text-base">
-                                        Calculate Your Price
-                                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                    </button>
-                                </Link>
-                                <Link href="/contact" className="flex-1">
-                                    <button className="w-full py-4 bg-white/10 text-white font-bold rounded-full border border-white/30 hover:bg-white/20 transition-all duration-300 backdrop-blur-sm text-base">
-                                        Talk to Sales
-                                    </button>
-                                </Link>
-                            </div>
-
-                            <p className="text-white/50 text-sm mt-6">
-                                💡 Billed annually. Minimum 100 students.
-                            </p>
-                        </div>
-
-                        {/* Right */}
-                        <div className="bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 relative min-h-[400px] lg:min-h-full">
-                            <img
-                                src="./120.png"
-                                alt="Pricing Features"
-                                className="absolute inset-0 w-full h-full object-cover"
-                            />
                         </div>
                     </div>
                 </div>

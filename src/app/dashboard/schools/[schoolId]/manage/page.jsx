@@ -48,6 +48,7 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { fetchWithAuth } from '@/lib/fetch-with-auth'
 import SchoolAccountActionDialog from '@/components/schools/SchoolAccountActionDialog'
+import SchoolFeatureControlsCard from '@/components/schools/SchoolFeatureControlsCard'
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316']
 
@@ -567,6 +568,8 @@ export default function ManageSchoolPage({ params }) {
                     )}
                 </CardContent>
             </Card>
+
+            <SchoolFeatureControlsCard schoolId={schoolId} />
 
             {/* Charts */}
             <div className="grid gap-4 md:grid-cols-2">

@@ -71,6 +71,7 @@ import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
 import { useEffect } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { filterSidebarSectionsByFeatures } from "@/lib/school-feature-config"
 
 // ─── Sidebar Skeleton ─────────────────────────────────────────────────────────
 function SidebarSkeleton({ isCollapsed, sections }) {
@@ -723,6 +724,16 @@ export function AppSidebar({ ...props }) {
 
     const isCollapsed = state === "collapsed"
     const isAdmin = fullUser?.role?.name === 'ADMIN';
+    const featureScopedSections = React.useMemo(() => {
+        if (fullUser?.role?.name === 'SUPER_ADMIN') {
+            return SidebarData;
+        }
+
+        return filterSidebarSectionsByFeatures(
+            SidebarData,
+            fullUser?.schoolFeatureAccess || null,
+        );
+    }, [fullUser]);
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -826,7 +837,7 @@ export function AppSidebar({ ...props }) {
                     <SidebarSkeleton isCollapsed={isCollapsed} sections={SidebarData} />
                 ) : (
                     <NavSidebarSections
-                        sections={SidebarData}
+                        sections={featureScopedSections}
                         userRole={fullUser?.role?.name}
                         activePath={pathname}
                     />

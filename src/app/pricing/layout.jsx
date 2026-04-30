@@ -1,10 +1,10 @@
 export const metadata = {
-    title: "Pricing Calculator - Calculate Your Cost",
-    description: "Calculate your school's exact EduBreezy pricing. Just ₹10/student per month. No hidden fees, transparent pricing based on student count.",
-    keywords: ["edubreezy pricing", "school erp cost", "school management pricing", "education software price"],
+    title: "EduBreezy Pricing | BASE and PRO School ERP Plans",
+    description: "Compare EduBreezy BASE and PRO plans, calculate pricing by student count, and explore the modules included in each school ERP plan.",
+    keywords: ["edubreezy pricing", "school erp pricing", "base plan", "pro plan", "school management pricing", "education software price"],
     openGraph: {
-        title: "EduBreezy Pricing - Calculate Your Cost",
-        description: "Simple, transparent pricing. Just ₹10/student per month. Calculate your school's exact cost instantly.",
+        title: "EduBreezy Pricing | BASE and PRO Plans",
+        description: "See BASE and PRO pricing, compare included modules, and calculate exact school ERP cost by student count.",
         url: "https://www.edubreezy.com/pricing",
     },
     alternates: {

@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import supabaseServer from '@/lib/supabase-server'; // Use singleton
 import prisma from '@/lib/prisma';
 import { getSchoolAccessSnapshotForUser } from '@/lib/school-account-state';
+import { getSchoolFeatureAccessSnapshot } from '@/lib/school-feature-access';
 
 async function resolveSchoolIdByLookup(kind, value) {
     if (!value) {
@@ -181,6 +182,24 @@ async function getSchoolIdFromRequest(request, params = null) {
     }
 }
 
+function getPathnameFromRequest(request) {
+    try {
+        return new URL(request.url).pathname;
+    } catch {
+        return '';
+    }
+}
+
+async function getFeatureAccessSnapshotForRequest(request, user, schoolId, options = {}) {
+    const bypass = options.bypass === true || user?.role?.name === 'SUPER_ADMIN';
+
+    return getSchoolFeatureAccessSnapshot({
+        schoolId,
+        pathname: getPathnameFromRequest(request),
+        bypass,
+    });
+}
+
 /**
  * Extract and verify JWT token from request
  * Returns Supabase user if valid, error response if not
@@ -246,10 +265,25 @@ export async function verifyAuthWithRole(request) {
             };
         }
 
+        const featureAccess = await getFeatureAccessSnapshotForRequest(
+            request,
+            fullUser,
+            schoolAccess.schoolId,
+            { bypass: schoolAccess.bypass }
+        );
+
+        if (!featureAccess.ok) {
+            return {
+                error: 'Feature access blocked',
+                response: featureAccess.response,
+            };
+        }
+
         return {
             user: fullUser,
             supabaseUser: authResult.supabaseUser,
             schoolAccess,
+            featureAccess,
         };
     } catch (err) {
         console.error('User lookup error:', err);
@@ -300,7 +334,21 @@ export async function verifyAdminAccess(request, schoolId = null) {
         };
     }
 
-    return { user, supabaseUser: authResult.supabaseUser, schoolAccess };
+    const featureAccess = await getFeatureAccessSnapshotForRequest(
+        request,
+        user,
+        schoolAccess.schoolId,
+        { bypass: schoolAccess.bypass }
+    );
+
+    if (!featureAccess.ok) {
+        return {
+            error: 'Feature access blocked',
+            response: featureAccess.response,
+        };
+    }
+
+    return { user, supabaseUser: authResult.supabaseUser, schoolAccess, featureAccess };
 }
 
 /**
@@ -341,7 +389,21 @@ export async function verifyRoleAccess(request, allowedRoles, schoolId = null) {
         };
     }
 
-    return { user, supabaseUser: authResult.supabaseUser, schoolAccess };
+    const featureAccess = await getFeatureAccessSnapshotForRequest(
+        request,
+        user,
+        schoolAccess.schoolId,
+        { bypass: schoolAccess.bypass }
+    );
+
+    if (!featureAccess.ok) {
+        return {
+            error: 'Feature access blocked',
+            response: featureAccess.response,
+        };
+    }
+
+    return { user, supabaseUser: authResult.supabaseUser, schoolAccess, featureAccess };
 }
 
 export function withSchoolAccess(handler, options = {}) {
@@ -365,8 +427,19 @@ export function withSchoolAccess(handler, options = {}) {
             return schoolAccess.response;
         }
 
+        const featureAccess = await getSchoolFeatureAccessSnapshot({
+            schoolId: resolvedSchoolId,
+            pathname: getPathnameFromRequest(request),
+            bypass: options.bypass === true,
+        });
+
+        if (!featureAccess.ok) {
+            return featureAccess.response;
+        }
+
         return handler(request, { ...context, params }, {
             schoolAccess,
+            featureAccess,
             schoolId: resolvedSchoolId,
             params,
         });

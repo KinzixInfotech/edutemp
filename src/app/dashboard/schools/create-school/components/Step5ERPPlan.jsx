@@ -20,9 +20,11 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, addYears } from 'date-fns';
 import { CalendarIcon, Calculator, Users, IndianRupee, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PLAN_BILLING, SCHOOL_FEATURE_PLAN } from '@/lib/school-feature-config';
 
 // Pricing constants
 const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
@@ -31,6 +33,7 @@ const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5; // 5% buffer
 
 const step5Schema = z.object({
+    erpPlan: z.enum([SCHOOL_FEATURE_PLAN.BASE, SCHOOL_FEATURE_PLAN.PRO]),
     expectedStudents: z.coerce.number()
         .min(1, 'Expected students is required')
         .max(50000, 'Maximum 50,000 students supported'),
@@ -56,6 +59,7 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
     const form = useForm({
         resolver: zodResolver(step5Schema),
         defaultValues: {
+            erpPlan: data.erpPlan || SCHOOL_FEATURE_PLAN.BASE,
             expectedStudents: data.expectedStudents || 100,
             billingStartDate: data.billingStartDate ? new Date(data.billingStartDate) : new Date(),
             isTrial: data.isTrial || false,
@@ -65,6 +69,7 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
     });
 
     const expectedStudents = useWatch({ control: form.control, name: 'expectedStudents' });
+    const erpPlan = useWatch({ control: form.control, name: 'erpPlan' });
     const billingStartDate = useWatch({ control: form.control, name: 'billingStartDate' });
     const isTrial = useWatch({ control: form.control, name: 'isTrial' });
 
@@ -74,12 +79,14 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
         const units = Math.ceil(students / STUDENTS_PER_UNIT);
         const includedCapacity = units * STUDENTS_PER_UNIT;
         const softCapacity = Math.floor(includedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
-        const yearlyAmount = units * PRICE_PER_UNIT;
+        const pricePerStudent = PLAN_BILLING[erpPlan || SCHOOL_FEATURE_PLAN.BASE].pricePerStudent;
+        const yearlyAmount = students * pricePerStudent;
         const baseAmount = units * BASE_PRICE_PER_UNIT;
         const discount = baseAmount - yearlyAmount;
         const billingEndDate = billingStartDate ? addYears(new Date(billingStartDate), 1) : null;
 
         return {
+            pricePerStudent,
             units,
             includedCapacity,
             softCapacity,
@@ -89,7 +96,7 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
             billingEndDate,
             perStudentYearly: students > 0 ? Math.round(yearlyAmount / students) : 0,
         };
-    }, [expectedStudents, billingStartDate]);
+    }, [erpPlan, expectedStudents, billingStartDate]);
 
     const onSubmit = (formValues) => {
         updateFormData({
@@ -128,15 +135,39 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium">Current Pricing</p>
-                            <p className="text-xs text-muted-foreground">Early Access Discount Applied (30% off)</p>
+                            <p className="text-xs text-muted-foreground">Pricing follows the selected plan per active student.</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">₹12,000</p>
-                            <p className="text-xs text-muted-foreground line-through">₹17,143</p>
-                            <p className="text-xs text-muted-foreground">per 100 students / year</p>
+                            <p className="text-lg font-bold text-green-600">₹{calculations.pricePerStudent}</p>
+                            <p className="text-xs text-muted-foreground">per student / year</p>
                         </div>
                     </div>
                 </div>
+
+                <FormField
+                    control={form.control}
+                    name="erpPlan"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>ERP Plan *</FormLabel>
+                            <FormControl>
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select ERP plan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={SCHOOL_FEATURE_PLAN.BASE}>BASE</SelectItem>
+                                        <SelectItem value={SCHOOL_FEATURE_PLAN.PRO}>PRO</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormDescription>
+                                BASE covers core operations. PRO unlocks advanced finance, automation, and growth modules.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
 
                 {/* Expected Students Input */}
                 <FormField
