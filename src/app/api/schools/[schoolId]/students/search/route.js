@@ -1,6 +1,7 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getVisibleContactEmail } from "@/lib/auth-identifiers";
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -87,7 +88,12 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       }
     });
 
-    return NextResponse.json({ students });
+    return NextResponse.json({
+      students: students.map((student) => ({
+        ...student,
+        email: getVisibleContactEmail(student.email),
+      })),
+    });
   } catch (err) {
     console.error("[STUDENT_SEARCH]", err);
     return NextResponse.json({ error: "Failed to fetch students" }, { status: 500 });

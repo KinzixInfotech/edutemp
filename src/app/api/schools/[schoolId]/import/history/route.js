@@ -33,8 +33,15 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
     prisma.importHistory.count({ where })]
     );
 
+    const normalizedHistory = history.map((item) => ({
+      ...item,
+      credentials: item.errors?.credentials || [],
+      errorReportUrl: item.errors?.errorReportUrl || null,
+      fileUrl: item.errors?.fileUrl || null,
+    }));
+
     return NextResponse.json({
-      history,
+      history: normalizedHistory,
       total,
       page: pageNum,
       pages: Math.ceil(total / limitNum)

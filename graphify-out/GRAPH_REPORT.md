@@ -1,12 +1,12 @@
-# Graph Report - edutemp  (2026-04-30)
+# Graph Report - edutemp  (2026-05-03)
 
 ## Corpus Check
-- 1324 files · ~3,056,522 words
+- 1328 files · ~3,059,745 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4171 nodes · 7154 edges · 41 communities detected
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 1890 edges (avg confidence: 0.8)
+- 4206 nodes · 7216 edges · 40 communities detected
+- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 1909 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -30,7 +30,6 @@
 - [[_COMMUNITY_Community 17|Community 17]]
 - [[_COMMUNITY_Community 18|Community 18]]
 - [[_COMMUNITY_Community 19|Community 19]]
-- [[_COMMUNITY_Community 20|Community 20]]
 - [[_COMMUNITY_Community 22|Community 22]]
 - [[_COMMUNITY_Community 23|Community 23]]
 - [[_COMMUNITY_Community 24|Community 24]]
@@ -54,12 +53,12 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `cn()` - 223 edges
-2. `POST()` - 218 edges
+2. `POST()` - 221 edges
 3. `useAuth()` - 209 edges
-4. `GET()` - 185 edges
+4. `GET()` - 186 edges
 5. `Error()` - 145 edges
-6. `slice()` - 112 edges
-7. `includes()` - 91 edges
+6. `slice()` - 114 edges
+7. `includes()` - 92 edges
 8. `from()` - 89 edges
 9. `get()` - 80 edges
 10. `toString()` - 79 edges
@@ -69,98 +68,94 @@
   cleanup-duplicate-classes.js → src\app\generated\prisma\runtime\wasm-compiler-edge.js
 - `getHealthMetrics()` --calls--> `GET()`  [INFERRED]
   src\middleware.js → src\app\dashboard\schools\[schoolId]\students\route.js
+- `Error()` --calls--> `enqueueAttendancePostProcessing()`  [INFERRED]
+  src\app\error.jsx → src\app\api\schools\[schoolId]\attendance\mark\route.js
+- `Error()` --calls--> `getCalendarConfig()`  [INFERRED]
+  src\app\error.jsx → src\app\api\schools\[schoolId]\calendar\populate\route.js
 - `Error()` --calls--> `markAttendance()`  [INFERRED]
   src\app\error.jsx → src\components\profile.jsx
-- `Error()` --calls--> `logCapacityExceeded()`  [INFERRED]
-  src\app\error.jsx → src\lib\subscription\capacityHelper.js
-- `FeaturesSection()` --calls--> `from()`  [INFERRED]
-  src\app\page.jsx → src\app\generated\prisma\runtime\wasm-compiler-edge.js
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (292): AcademicYearProvider(), AcademicYearSetupBannerProvider(), AlumniConversionDialog(), paginate(), AssignmentsTab(), AtlasAchievementDialog(), AttendanceTable(), useAuth() (+284 more)
+Nodes (229): AcademicYearProvider(), AcademicYearSetupBannerProvider(), AlumniConversionDialog(), paginate(), AssignmentsTab(), AtlasAchievementDialog(), AttendanceTable(), useAuth() (+221 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
-Nodes (409): #a(), aa(), ac(), Ad(), addErrorMessage(), addField(), addItem(), addMarginSymbol() (+401 more)
+Nodes (407): #a(), aa(), ac(), Ad(), addErrorMessage(), addField(), addItem(), addMarginSymbol() (+399 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (390): as(), generate(), handleAndLogRequestError(), kc(), Pa(), Vo(), updateSession(), de() (+382 more)
+Nodes (391): as(), generate(), #n(), Pa(), updateSession(), _e(), I(), me() (+383 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.01
-Nodes (194): getFeatureAccessSnapshotForRequest(), getPathnameFromRequest(), getSchoolIdFromRequest(), resolveSchoolIdByLookup(), verifyAdminAccess(), verifyAuth(), verifyAuthWithRole(), verifyRoleAccess() (+186 more)
+Nodes (206): AccordionContent(), AccordionItem(), AccordionTrigger(), AdminTodoWidget(), Alert(), AlertDescription(), AlertTitle(), AlertDialogAction() (+198 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.01
-Nodes (209): AccordionContent(), AccordionItem(), AccordionTrigger(), AdminTodoWidget(), Alert(), AlertDescription(), AlertTitle(), AlertDialogAction() (+201 more)
+Nodes (178): getFeatureAccessSnapshotForRequest(), getPathnameFromRequest(), getSchoolIdFromRequest(), resolveSchoolIdByLookup(), verifyAdminAccess(), verifyAuth(), verifyAuthWithRole(), verifyRoleAccess() (+170 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.02
-Nodes (155): buildRuleKey(), finalizeAttendance(), isWithinWindow(), processAttendanceLifecycleWorker(), queueNotification(), sendGroupedNotifications(), AutoStatuspageSync, applyMappingsToTemplateElements() (+147 more)
+Cohesion: 0.01
+Nodes (166): buildRuleKey(), finalizeAttendance(), isWithinWindow(), processAttendanceLifecycleWorker(), queueNotification(), sendGroupedNotifications(), AutoStatuspageSync, applyMappingsToTemplateElements() (+158 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.02
-Nodes (72): checkCapacity(), logCapacityExceeded(), $(), Fn(), DocsPageClient(), DocsTableOfContents(), getIcon(), SearchModal() (+64 more)
+Cohesion: 0.01
+Nodes (103): DailyStatsCards(), fetchChartData(), fetchDailyStats(), PieTooltip(), downloadExcel(), exportClassWiseToExcel(), exportDefaultersToExcel(), exportLeaveAnalysisToExcel() (+95 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.02
-Nodes (80): AttendanceReminderProvider(), generateSchoolSlug(), generateUniqueSlug(), main(), slugify(), main(), CertificateDesignEditor(), ElementRenderer() (+72 more)
+Nodes (78): main(), checkCapacity(), logCapacityExceeded(), $(), DocsPageClient(), DocsTableOfContents(), getIcon(), SearchModal() (+70 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.04
-Nodes (46): AxisAdapter, Calendar(), CalendarDayButton(), refreshGoogleToken(), HDFCAdapter, ICICIAdapter, notifySchoolAccountStatusChange(), allocatePaymentToInstallments() (+38 more)
+Cohesion: 0.02
+Nodes (78): AtlasGalleryUploadDialog(), extractImagesFromZip(), getExtension(), isImageFile(), AttendanceReminderProvider(), generateSchoolSlug(), generateUniqueSlug(), main() (+70 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.04
-Nodes (48): checkBusStatus(), getDistanceMeters(), isOperatingHours(), CommandMenu(), checkDailyLimit(), checkDuplicate(), chunkArray(), getDateKey() (+40 more)
+Nodes (60): createAttendanceAuditLog(), buildParentAuthEmail(), buildStudentAuthEmail(), getSchoolAuthNamespace(), getVisibleContactEmail(), isInternalAuthEmail(), normalizeOptionalEmail(), normalizePhoneNumber() (+52 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.06
-Nodes (31): createAttendanceAuditLog(), getBulkJob(), getJobKey(), listBulkJobs(), setBulkJob(), updateBulkJob(), getAccountCredentialsEmailTemplate(), sendBulkEmails() (+23 more)
+Cohesion: 0.03
+Nodes (40): AxisAdapter, Calendar(), CalendarDayButton(), refreshGoogleToken(), HDFCAdapter, ICICIAdapter, migrate(), notifySchoolAccountStatusChange() (+32 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.05
-Nodes (14): DailyStatsCards(), fetchChartData(), fetchDailyStats(), PieTooltip(), checkDuplicate(), createDriver(), fetchConductors(), fetchDrivers() (+6 more)
+Cohesion: 0.04
+Nodes (48): checkBusStatus(), getDistanceMeters(), isOperatingHours(), CommandMenu(), checkDailyLimit(), checkDuplicate(), chunkArray(), getDateKey() (+40 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.08
-Nodes (20): $(), a(), F, fe(), G(), ge(), I(), J() (+12 more)
+Cohesion: 0.07
+Nodes (20): $(), a(), de(), F, fe(), G(), ge(), J() (+12 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.06
 Nodes (2): FeaturesSection(), TestimonialsSection()
 
 ### Community 14 - "Community 14"
-Cohesion: 0.12
-Nodes (24): applyTextStyles(), createPdfBlobFromLayout(), downloadPdfFromLayout(), getImageFormat(), getPdfFormat(), renderBackground(), renderImage(), renderPdfFromLayout() (+16 more)
+Cohesion: 0.13
+Nodes (23): applyTextStyles(), createPdfBlobFromLayout(), downloadPdfFromLayout(), getImageFormat(), getPdfFormat(), renderBackground(), renderImage(), renderPdfFromLayout() (+15 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.13
-Nodes (24): ClientLayout(), StatusIndicator(), buildFeatureLabels(), expandDisabledOverrides(), buildFeaturePolicySnapshot(), buildSchoolFeatureAccessErrorResponse(), getSchoolFeatureAccessSnapshot(), getSchoolFeatureControlConfig() (+16 more)
-
-### Community 16 - "Community 16"
 Cohesion: 0.1
 Nodes (16): ChatView(), ConversationItem(), ConversationSidebar(), formatTime(), MessageBubble(), NewChatModal(), PublicExamPage(), useConversations() (+8 more)
 
-### Community 17 - "Community 17"
-Cohesion: 0.11
-Nodes (13): AtlasGalleryUploadDialog(), extractImagesFromZip(), getExtension(), isImageFile(), useBulkUpload(), BulkUploadDialog(), BulkUploadToast(), extractImagesFromZip() (+5 more)
-
-### Community 18 - "Community 18"
+### Community 16 - "Community 16"
 Cohesion: 0.14
 Nodes (7): AiInsightsCard(), useAiInsights(), useDashboardContext(), useDashboardInsights(), getInitials(), useTypingEffect(), WelcomeBanner()
 
-### Community 19 - "Community 19"
+### Community 17 - "Community 17"
+Cohesion: 0.29
+Nodes (13): generateAdmitCardPDF(), generateStaticPDF(), hexToRgb(), pxToMm(), renderElement(), renderImageElement(), renderTableElement(), renderTextElement() (+5 more)
+
+### Community 18 - "Community 18"
 Cohesion: 0.22
 Nodes (9): batchCalculateStreak(), calculateStreak(), generateClassWiseReport(), generateLeaveAnalysis(), generateMonthlyReport(), generateStudentWiseReport(), generateSummaryReport(), generateTeacherReport() (+1 more)
 
-### Community 20 - "Community 20"
-Cohesion: 0.4
-Nodes (9): formatCurrency(), generateAttendanceHints(), generateEventHints(), generateExamHints(), generateFeeHints(), generateLiveHints(), getTimePeriod(), getTopHints() (+1 more)
+### Community 19 - "Community 19"
+Cohesion: 0.22
+Nodes (7): buildLedgerMonths(), formatCurrencyNumber(), formatMonthKey(), formatMonthLabel(), getCategoryHeading(), getLedgerStatusMeta(), syncFeeComponents()
 
 ### Community 22 - "Community 22"
 Cohesion: 0.22
@@ -171,12 +166,12 @@ Cohesion: 0.28
 Nodes (2): ApiLoaderState, load()
 
 ### Community 24 - "Community 24"
-Cohesion: 0.25
-Nodes (1): getMonthlyTrendReport()
-
-### Community 25 - "Community 25"
 Cohesion: 0.29
 Nodes (1): run()
+
+### Community 25 - "Community 25"
+Cohesion: 0.33
+Nodes (2): calculateDistance(), enqueueAttendancePostProcessing()
 
 ### Community 26 - "Community 26"
 Cohesion: 0.47
@@ -249,9 +244,9 @@ Nodes (1): PrismaClient
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 23`** (9 nodes): `ApiLoaderState`, `.notify()`, `.start()`, `.stop()`, `.subscribe()`, `TopProgressBar.js`, `api-loader.js`, `load()`, `stop()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 24`** (8 nodes): `getClassWiseReport()`, `getCollectionReport()`, `getDashboardReport()`, `getDayCollectionReport()`, `getDefaultersReport()`, `getMonthlyTrendReport()`, `getPaymentMethodsReport()`, `route.js`
+- **Thin community `Community 24`** (7 nodes): `dedupeClassScopedTables()`, `dedupeSectionScopedTables()`, `cleanup-duplicate-classes.js`, `normalizeName()`, `run()`, `updateForeignKey()`, `updateSectionForeignKey()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 25`** (7 nodes): `dedupeClassScopedTables()`, `dedupeSectionScopedTables()`, `cleanup-duplicate-classes.js`, `normalizeName()`, `run()`, `updateForeignKey()`, `updateSectionForeignKey()`
+- **Thin community `Community 25`** (6 nodes): `calculateDistance()`, `enqueueAttendancePostProcessing()`, `getMonthlyStats()`, `logAttendanceDebug()`, `route.js`, `route.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 32`** (5 nodes): `PaymentAdapter`, `.constructor()`, `.initiatePayment()`, `.verifyPayment()`, `PaymentAdapter.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -279,17 +274,17 @@ Nodes (1): PrismaClient
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useAuth()` connect `Community 0` to `Community 4`, `Community 6`, `Community 39`, `Community 7`, `Community 9`, `Community 14`, `Community 15`, `Community 17`, `Community 26`?**
-  _High betweenness centrality (0.107) - this node is a cross-community bridge._
-- **Why does `from()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 13`, `Community 14`?**
-  _High betweenness centrality (0.099) - this node is a cross-community bridge._
-- **Why does `cn()` connect `Community 4` to `Community 0`, `Community 7`, `Community 8`, `Community 15`, `Community 17`?**
-  _High betweenness centrality (0.088) - this node is a cross-community bridge._
+- **Why does `slice()` connect `Community 0` to `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 22`, `Community 24`?**
+  _High betweenness centrality (0.094) - this node is a cross-community bridge._
+- **Why does `cn()` connect `Community 3` to `Community 0`, `Community 4`, `Community 5`, `Community 8`, `Community 10`?**
+  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+- **Why does `from()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 13`, `Community 14`, `Community 19`?**
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **Are the 222 inferred relationships involving `cn()` (e.g. with `CropImageDialog()` and `SchoolCalendar()`) actually correct?**
   _`cn()` has 222 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 158 inferred relationships involving `POST()` (e.g. with `includes()` and `update()`) actually correct?**
-  _`POST()` has 158 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 159 inferred relationships involving `POST()` (e.g. with `includes()` and `update()`) actually correct?**
+  _`POST()` has 159 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 208 inferred relationships involving `useAuth()` (e.g. with `AssignmentsTab()` and `SignaturesTab()`) actually correct?**
   _`useAuth()` has 208 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 74 inferred relationships involving `GET()` (e.g. with `verifyAdminAccess()` and `Error()`) actually correct?**
-  _`GET()` has 74 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 75 inferred relationships involving `GET()` (e.g. with `verifyAdminAccess()` and `Error()`) actually correct?**
+  _`GET()` has 75 INFERRED edges - model-reasoned connections that need verification._

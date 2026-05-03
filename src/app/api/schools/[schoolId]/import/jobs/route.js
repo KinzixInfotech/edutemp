@@ -164,6 +164,7 @@ async function enqueueWorker(jobId) {
       failed: 0,
       accountsCreated: 0,
       accountsFailed: 0,
+      credentials: [],
       chunks,
       failedRows: [],
       createdAt: new Date().toISOString(),

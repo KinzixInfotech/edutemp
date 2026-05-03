@@ -1,7 +1,7 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { invalidatePattern } from "@/lib/cache";
+import { invalidateStudentDirectoryCaches } from "@/lib/cache";
 
 export const PATCH = withSchoolAccess(async function PATCH(req, props) {
   const params = await props.params;
@@ -39,9 +39,7 @@ export const PATCH = withSchoolAccess(async function PATCH(req, props) {
       data: { status }
     });
 
-    // Invalidate student caches
-    await invalidatePattern("students*");
-    await invalidatePattern("student:*");
+    await invalidateStudentDirectoryCaches({ schoolId });
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,8 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import { remember, generateKey, invalidateParentDirectoryCaches } from "@/lib/cache";
+import { getVisibleContactEmail } from "@/lib/auth-identifiers";
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -65,7 +66,17 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       })]
       );
 
-      return { parents, total, activeCount, page, limit, totalPages: Math.ceil(total / limit) };
+      return {
+        parents: parents.map((parent) => ({
+          ...parent,
+          email: getVisibleContactEmail(parent.email, parent.user?.email),
+        })),
+        total,
+        activeCount,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
     }, 300); // 5 minutes cache
 
     return NextResponse.json(result);
@@ -93,10 +104,7 @@ export const DELETE = withSchoolAccess(async function DELETE(req, props) {
     })]
     );
 
-    // Invalidate all parent list caches + profile caches + search caches
-    await invalidatePattern('parents:list*');
-    await invalidatePattern('parent:profile*');
-    await invalidatePattern('parents:search*');
+    await invalidateParentDirectoryCaches({ schoolId });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -110,7 +110,7 @@ export default function HomePage() {
             </div> */}
 
             <FinalCTA />
-            <PartnerTeaser />
+            {/* <PartnerTeaser /> */}
             {/* <Footer /> */}
         </div>
     );

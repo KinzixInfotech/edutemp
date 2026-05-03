@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -112,6 +112,7 @@ export default function ImportDataPage() {
     const [exportProgress, setExportProgress] = useState("");
     const [activeImportJobId, setActiveImportJobId] = useState(null);
     const [activeExportJobId, setActiveExportJobId] = useState(null);
+    const autoExportedJobRef = useRef(null);
 
     // Export credentials state (auto-export after import)
     const [exportCredentials, setExportCredentials] = useState(true);
@@ -211,6 +212,23 @@ export default function ImportDataPage() {
                     : `Processing ${activeExportJob.processedModules || 0}/${activeExportJob.totalModules || 0} modules`
         )
         : exportProgress;
+
+    useEffect(() => {
+        if (!activeImportJob?.id || activeImportJob.status !== "completed") return;
+
+        setImportResults(activeImportJob);
+        queryClient.invalidateQueries({ queryKey: ['importHistory', schoolId] });
+        queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
+
+        if (
+            exportCredentials &&
+            activeImportJob.credentials?.length > 0 &&
+            autoExportedJobRef.current !== activeImportJob.id
+        ) {
+            autoExportedJobRef.current = activeImportJob.id;
+            handleExportCredentials(activeImportJob.credentials, activeImportJob.moduleKey);
+        }
+    }, [activeImportJob, exportCredentials, queryClient, schoolId]);
 
     // Handle retry for failed Supabase accounts
     const handleRetryAccounts = async (failedAccounts) => {
@@ -413,28 +431,31 @@ export default function ImportDataPage() {
         if (!credentials || credentials.length === 0) return;
 
         try {
-            // Prepare data for Excel
             const exportData = credentials.map((cred, index) => ({
                 'S.No': index + 1,
                 'Name': cred.name,
-                'Email': cred.email,
-                'Password': cred.password,
                 'User Type': cred.userType === 'student' ? 'Student' :
                     cred.userType === 'teacher' ? 'Teacher' :
-                        cred.userType === 'staff' ? 'Non-Teaching Staff' : 'Parent'
+                        cred.userType === 'staff' ? 'Non-Teaching Staff' : 'Parent',
+                'Login Type': cred.loginLabel || 'Login',
+                'Login ID': cred.loginValue || '',
+                'Temporary Auth Email': cred.internalEmail || cred.email || '',
+                'Visible Email': cred.visibleEmail || '',
+                'Password': cred.password,
             }));
 
-            // Create workbook and worksheet
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.json_to_sheet(exportData);
 
-            // Set column widths
             ws['!cols'] = [
-                { wch: 6 },   // S.No
-                { wch: 25 },  // Name
-                { wch: 35 },  // Email
-                { wch: 20 },  // Password
-                { wch: 18 },  // User Type
+                { wch: 6 },
+                { wch: 28 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 24 },
+                { wch: 34 },
+                { wch: 32 },
+                { wch: 20 },
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
@@ -575,6 +596,11 @@ export default function ImportDataPage() {
                                         <span>Accounts: {job.accountsCreated || 0}</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
+                                        {job.status === "completed" && job.credentials?.length > 0 && (
+                                            <Button variant="outline" size="sm" onClick={() => handleExportCredentials(job.credentials, job.moduleKey)}>
+                                                Download Credentials
+                                            </Button>
+                                        )}
                                         {job.errorReportUrl && (
                                             <Button variant="outline" size="sm" onClick={() => window.open(job.errorReportUrl, "_blank", "noopener,noreferrer")}>
                                                 Download Error CSV
@@ -783,6 +809,7 @@ export default function ImportDataPage() {
                                         <TableHead>Failed</TableHead>
                                         <TableHead>Accounts</TableHead>
                                         <TableHead>Imported By</TableHead>
+                                        <TableHead>Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -825,6 +852,20 @@ export default function ImportDataPage() {
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {item.user?.name || 'System'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {item.credentials?.length > 0 && (
+                                                        <Button variant="outline" size="sm" onClick={() => handleExportCredentials(item.credentials, item.module)}>
+                                                            Credentials
+                                                        </Button>
+                                                    )}
+                                                    {item.errorReportUrl && (
+                                                        <Button variant="outline" size="sm" onClick={() => window.open(item.errorReportUrl, "_blank", "noopener,noreferrer")}>
+                                                            Error CSV
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -1207,7 +1248,7 @@ export default function ImportDataPage() {
                                                                 className="rounded"
                                                             />
                                                             <label htmlFor="sendEmails" className="text-sm">
-                                                                Send login credentials via email
+                                                                Send credentials by email when a visible email is available
                                                             </label>
                                                         </div>
                                                         <div className="flex items-center gap-2">
@@ -1413,14 +1454,14 @@ export default function ImportDataPage() {
                                                                     <Table>
                                                                         <TableHeader>
                                                                             <TableRow>
-                                                                                <TableHead>Email</TableHead>
+                                                                                <TableHead>Login ID</TableHead>
                                                                                 <TableHead>Error</TableHead>
                                                                             </TableRow>
                                                                         </TableHeader>
                                                                         <TableBody>
                                                                             {importResults.accountErrors.slice(0, 5).map((err, i) => (
                                                                                 <TableRow key={i}>
-                                                                                    <TableCell className="text-sm">{err.email}</TableCell>
+                                                                                    <TableCell className="text-sm">{err.loginValue || err.email || err.phone || err.studentId || "Unavailable"}</TableCell>
                                                                                     <TableCell className="text-orange-600 text-xs">
                                                                                         {err.message}
                                                                                     </TableCell>

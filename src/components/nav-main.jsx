@@ -295,7 +295,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             } ${isRestricted ? 'pointer-events-none opacity-50' : ''}`}
                                                     >
-                                                        <Link href={isRestricted ? '#' : item.url} prefetch={false} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined}>
+                                                        <Link href={isRestricted ? '#' : item.url} prefetch={true} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Pulsing indicator for Self Attendance in collapsed mode */}
                                                             {item.label === "Self Attendance" && attendanceActionNeeded && (
@@ -329,7 +329,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                 } ${isRestricted ? 'pointer-events-none opacity-50' : ''}`}
                                         >
-                                            <Link href={isRestricted ? '#' : item.url} prefetch={false} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined} className="flex items-center justify-between w-full">
+                                            <Link href={isRestricted ? '#' : item.url} prefetch={true} onClick={isRestricted ? (event) => event.preventDefault() : handleClick} title={isRestricted ? readOnlyReason : undefined} className="flex items-center justify-between w-full">
                                                 <div className="flex items-center gap-2">
                                                     {item.icon && <item.icon className="w-4 h-4" />}
                                                     <span>{item.label}</span>

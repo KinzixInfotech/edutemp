@@ -1,6 +1,7 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { generateNextStudentId } from "@/lib/profile-auth";
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -24,16 +25,8 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     let lastId = null;
 
     if (type === "student") {
-      // Find last student admission number starting with prefix
-      const lastStudent = await prisma.student.findFirst({
-        where: {
-          schoolId,
-          admissionNo: { startsWith: prefix }
-        },
-        orderBy: { admissionNo: "desc" },
-        select: { admissionNo: true }
-      });
-      lastId = lastStudent?.admissionNo;
+      const nextId = await generateNextStudentId({ schoolId });
+      return NextResponse.json({ nextId });
     } else if (type === "employee") {
       // Find last employee ID from teaching, non-teaching, AND transport staff
       // We need to check all three tables that use employee IDs.
@@ -86,10 +79,6 @@ export const GET = withSchoolAccess(async function GET(req, props) {
         lastId = lastTransportStaff.employeeId;
       }
     }
-
-    // Generate Next ID
-    // Assumes format: PREFIXXX... or PREFIX-XXX...
-    // We will try to extract the last number.
 
     let nextNumber = 1;
     if (lastId) {

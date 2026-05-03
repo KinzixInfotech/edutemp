@@ -24,6 +24,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
+import {
+    optimisticallyPatchParentLists,
+    optimisticallyPatchParentProfile,
+    restoreQueries,
+    schoolDirectoryQueryKeys,
+    snapshotQueries,
+} from '@/lib/school-directory-query';
 
 // Relation badge color map (restricted to allowed types)
 const RELATION_COLORS = {
@@ -159,12 +166,14 @@ export default function ParentProfilePage() {
     const [linkIsPrimary, setLinkIsPrimary] = useState(false);
 
     const { data: parent, isLoading } = useQuery({
-        queryKey: ['parent-profile', parentId],
+        queryKey: schoolDirectoryQueryKeys.parentProfile(parentId),
         queryFn: async () => {
             const res = await axios.get(`/api/schools/${schoolId}/parents/${parentId}`);
             return res.data;
         },
         enabled: !!schoolId && !!parentId,
+        staleTime: 30000,
+        refetchOnWindowFocus: false,
     });
 
     // Search students for linking
@@ -185,12 +194,27 @@ export default function ParentProfilePage() {
             const res = await axios.patch(`/api/schools/${schoolId}/parents/${parentId}`, data);
             return res.data;
         },
+        onMutate: async (patch) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.parentProfile(parentId) });
+            const profileSnapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.parentProfile(parentId));
+            const listSnapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.parentsRoot(schoolId));
+            optimisticallyPatchParentProfile(queryClient, parentId, patch);
+            optimisticallyPatchParentLists(queryClient, schoolId, parentId, patch);
+            return { profileSnapshots, listSnapshots };
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parent-profile', parentId] });
             toast.success('Updated successfully');
             setEditingField(null);
         },
-        onError: () => toast.error('Failed to update'),
+        onError: (_error, _patch, context) => {
+            restoreQueries(queryClient, context?.profileSnapshots);
+            restoreQueries(queryClient, context?.listSnapshots);
+            toast.error('Failed to update');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentProfile(parentId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+        },
     });
 
     // Link student mutation
@@ -202,13 +226,17 @@ export default function ParentProfilePage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parent-profile', parentId] });
             toast.success('Student linked successfully');
             resetLinkDialog();
         },
         onError: (error) => {
             toast.error(error.response?.data?.error || 'Failed to link student');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentProfile(parentId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
+        },
     });
 
     // Unlink student mutation
@@ -218,12 +246,16 @@ export default function ParentProfilePage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parent-profile', parentId] });
             toast.success('Student unlinked successfully');
         },
         onError: (error) => {
             toast.error(error.response?.data?.error || 'Failed to unlink student');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentProfile(parentId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
+        },
     });
 
     const resetLinkDialog = () => {

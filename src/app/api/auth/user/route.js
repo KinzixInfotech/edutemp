@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { enforceSchoolStateAccess, resolveSchoolIdForUser } from '@/lib/school-account-state';
 import { getSchoolFeatureStateFromSchool } from "@/lib/school-feature-access";
+import { getVisibleContactEmail } from "@/lib/auth-identifiers";
 
 // Helper: get current user from Supabase session
 async function getAuthenticatedUser(req) {
@@ -72,6 +73,8 @@ export async function GET(req) {
             profilePicture: user.profilePicture,
             schoolId: resolvedSchoolId,
             twoFactorEnabled: user.twoFactorEnabled || false,
+            loginIdentifier: user.email,
+            loginRole: null,
         };
 
         // Role-specific fetch
@@ -99,6 +102,7 @@ export async function GET(req) {
                 response.schoolId = teacher?.schoolId;
                 response.school = teacher?.school;
                 response.teacherData = teacher;
+                response.loginRole = "teacher";
                 break;
             }
             case "NON_TEACHING_STAFF": {
@@ -117,7 +121,13 @@ export async function GET(req) {
                 });
                 console.log("✅ [API] Student details fetched:", student ? "Found" : "Not Found");
                 response.schoolId = student?.schoolId;
-                response.studentData = student;
+                response.studentData = student ? {
+                    ...student,
+                    email: getVisibleContactEmail(student.email, user.email),
+                } : student;
+                response.email = getVisibleContactEmail(student?.email, user.email);
+                response.loginIdentifier = student?.admissionNo || null;
+                response.loginRole = "student";
                 response.class = student?.class;
                 response.section = student?.section;
                 response.school = student?.school;
@@ -148,7 +158,13 @@ export async function GET(req) {
                     response.parentData = null;
                 }
                 response.schoolId = parent?.schoolId;
-                response.parentData = parent;
+                response.parentData = parent ? {
+                    ...parent,
+                    email: getVisibleContactEmail(parent.email, parent.user?.email),
+                } : parent;
+                response.email = getVisibleContactEmail(parent?.email, parent?.user?.email);
+                response.loginIdentifier = parent?.contactNumber || null;
+                response.loginRole = "parent";
                 response.school = parent?.school;
                 break;
             }
@@ -247,6 +263,7 @@ export async function GET(req) {
                 response.schoolId = transportStaff?.schoolId;
                 response.school = transportStaff?.school;
                 response.transportStaffData = transportStaff;
+                response.loginRole = "driver";
                 break;
             }
             case "PARTNER": {

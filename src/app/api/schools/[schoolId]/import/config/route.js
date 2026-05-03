@@ -9,8 +9,8 @@ const MODULE_CONFIGS = {
     description: 'Import student records in bulk',
     fields: [
     { name: 'name', label: 'Full Name', type: 'text', required: true, example: 'John Doe' },
-    { name: 'email', label: 'Email', type: 'email', required: true, example: 'john@example.com' },
-    { name: 'admissionNo', label: 'Admission Number', type: 'text', required: true, example: 'ADM001' },
+    { name: 'email', label: 'Email (Optional)', type: 'email', required: false, example: 'john@example.com' },
+    { name: 'admissionNo', label: 'Student ID', type: 'text', required: false, example: 'SCH-2026-001' },
     { name: 'className', label: 'Class Name', type: 'text', required: true, example: 'Class 10' },
     { name: 'sectionName', label: 'Section', type: 'text', required: true, example: 'A' },
     { name: 'gender', label: 'Gender', type: 'select', required: true, example: 'Male', options: ['Male', 'Female', 'Other'] },
@@ -50,10 +50,10 @@ const MODULE_CONFIGS = {
     description: 'Import parent records',
     fields: [
     { name: 'name', label: 'Full Name', type: 'text', required: true, example: 'Robert Smith' },
-    { name: 'email', label: 'Email', type: 'email', required: true, example: 'robert@email.com' },
+    { name: 'email', label: 'Email (Optional)', type: 'email', required: false, example: 'robert@email.com' },
     { name: 'phone', label: 'Phone Number', type: 'text', required: true, example: '9876543210' },
     { name: 'relation', label: 'Relation', type: 'select', required: true, example: 'Father', options: ['Father', 'Mother', 'Guardian'] },
-    { name: 'studentAdmissionNo', label: 'Student Admission No', type: 'text', required: true, example: 'ADM001' },
+    { name: 'studentAdmissionNo', label: 'Student ID', type: 'text', required: true, example: 'SCH-2026-001' },
     { name: 'address', label: 'Address', type: 'text', required: false, example: '789 Pine Road' },
     { name: 'occupation', label: 'Occupation', type: 'text', required: false, example: 'Engineer' },
     { name: 'annualIncome', label: 'Annual Income', type: 'number', required: false, example: '1000000' }]

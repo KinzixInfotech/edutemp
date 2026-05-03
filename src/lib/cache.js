@@ -221,6 +221,55 @@ export const invalidateSchoolMarketplaceCache = async (identifiers = {}) => {
     revalidatePath('/explore/schools', 'page');
 };
 
+export const invalidateStudentDirectoryCaches = async ({ schoolId, studentId } = {}) => {
+    const patterns = [
+        'students*',
+        'student:*',
+        'parents:list*',
+        'parents:search*',
+        'parent:profile*',
+    ];
+
+    await Promise.all(patterns.map((pattern) => invalidatePattern(pattern)));
+
+    if (schoolId) {
+        revalidatePath('/dashboard/schools/manage-student', 'page');
+        revalidatePath(`/dashboard/schools/${schoolId}/profiles/students/new`, 'page');
+    }
+
+    if (studentId) {
+        revalidatePath(`/dashboard/schools/profiles/students/${studentId}`, 'page');
+    }
+};
+
+export const invalidateParentDirectoryCaches = async ({ schoolId, parentId } = {}) => {
+    const patterns = [
+        'parents:list*',
+        'parents:search*',
+        'parent:profile*',
+        'students*',
+        'student:*',
+    ];
+
+    await Promise.all(patterns.map((pattern) => invalidatePattern(pattern)));
+
+    if (schoolId) {
+        revalidatePath('/dashboard/schools/manage-parent', 'page');
+        revalidatePath(`/dashboard/schools/${schoolId}/profiles/parents/new`, 'page');
+    }
+
+    if (parentId) {
+        revalidatePath(`/dashboard/schools/profiles/parents/${parentId}`, 'page');
+    }
+};
+
+export const invalidateSchoolDirectoryCaches = async ({ schoolId, studentId, parentId } = {}) => {
+    await Promise.all([
+        invalidateStudentDirectoryCaches({ schoolId, studentId }),
+        invalidateParentDirectoryCaches({ schoolId, parentId }),
+    ]);
+};
+
 // FIX: original used `if (cached)` which is falsy for 0, false, [], ""
 // This caused stats with totalProfit=0 or totalRevenue=0 to be treated as
 // a cache miss and re-fetched on every request, bypassing the cache entirely.

@@ -1,7 +1,7 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { generateKey, delCache, invalidatePattern } from "@/lib/cache";
+import { generateKey, delCache, invalidateSchoolDirectoryCaches } from "@/lib/cache";
 
 // Only these relation types are allowed
 const ALLOWED_RELATIONS = ["FATHER", "MOTHER", "GUARDIAN"];
@@ -79,9 +79,7 @@ export const PATCH = withSchoolAccess(async function PATCH(req, props) {
     // Invalidate caches
     const profileKey = generateKey("parent:profile", { schoolId, parentId });
     await delCache(profileKey);
-    await invalidatePattern('parents:list*');
-    await invalidatePattern('parent:profile*');
-    await invalidatePattern('students*');
+    await invalidateSchoolDirectoryCaches({ schoolId, parentId, studentId });
 
     return NextResponse.json({ success: true, link });
   } catch (error) {
@@ -114,9 +112,7 @@ export const DELETE = withSchoolAccess(async function DELETE(req, props) {
     // Invalidate caches
     const profileKey = generateKey("parent:profile", { schoolId, parentId });
     await delCache(profileKey);
-    await invalidatePattern('parents:list*');
-    await invalidatePattern('parent:profile*');
-    await invalidatePattern('students*');
+    await invalidateSchoolDirectoryCaches({ schoolId, parentId, studentId });
 
     return NextResponse.json({ success: true });
   } catch (error) {

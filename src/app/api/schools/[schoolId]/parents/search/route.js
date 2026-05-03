@@ -2,6 +2,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { remember, generateKey } from "@/lib/cache";
+import { getVisibleContactEmail } from "@/lib/auth-identifiers";
 
 // app/api/schools/[schoolId]/parents/search/route.js
 export const GET = withSchoolAccess(async function GET(req, props) {
@@ -27,7 +28,12 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       });
     }, 60); // Cache for 1 minute
 
-    return NextResponse.json({ parents });
+    return NextResponse.json({
+      parents: parents.map((parent) => ({
+        ...parent,
+        email: getVisibleContactEmail(parent.email),
+      })),
+    });
   } catch (error) {
     console.error('Parent search error:', error);
     return NextResponse.json({ error: 'Failed to search parents' }, { status: 500 });

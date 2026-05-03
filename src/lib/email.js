@@ -516,13 +516,24 @@ export function getAdmitCardEmailTemplate({ studentName, examName, examDate, sea
 /**
  * Account Credentials email template (for bulk import)
  */
-export function getAccountCredentialsEmailTemplate({ userName, email, password, userType, schoolName, loginUrl }) {
+export function getAccountCredentialsEmailTemplate({
+    userName,
+    email,
+    password,
+    userType,
+    schoolName,
+    loginUrl,
+    loginLabel,
+    loginValue,
+}) {
     const typeLabels = {
         student: 'Student',
         teacher: 'Teacher',
         staff: 'Staff Member',
         parent: 'Parent'
     };
+    const resolvedLoginLabel = loginLabel || 'Email';
+    const resolvedLoginValue = loginValue || email;
 
     return {
         subject: `Welcome to ${schoolName} - Your Account Details`,
@@ -622,8 +633,8 @@ export function getAccountCredentialsEmailTemplate({ userName, email, password, 
                     <div class="credentials-box">
                         <h3 style="margin-top: 0; color: #10b981;">🔐 Your Login Credentials</h3>
                         <div class="credential-item">
-                            <div class="label">Email</div>
-                            <div class="value">${email}</div>
+                            <div class="label">${resolvedLoginLabel}</div>
+                            <div class="value">${resolvedLoginValue}</div>
                         </div>
                         <div class="credential-item">
                             <div class="label">Password</div>
@@ -658,7 +669,7 @@ Hello ${userName},
 Your ${typeLabels[userType] || 'User'} account has been created.
 
 Login Credentials:
-- Email: ${email}
+- ${resolvedLoginLabel}: ${resolvedLoginValue}
 - Password: ${password}
 
 Please change your password after your first login.

@@ -7,15 +7,11 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PiGraduationCapDuotone } from "react-icons/pi";
-import logocllight from '../../public/cl_light_edu.png';
-import logocldark from '../../public/cl_dark_edu.png';
-
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import logoBlack from "../../public/edu.png"
 import logoWhite from "../../public/logo-white.png"
-
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
-
 import {
     Sidebar,
     SidebarContent,
@@ -26,7 +22,6 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
-
 import {
     IconDashboard,
     IconListDetails,
@@ -703,7 +698,6 @@ const navUser = {
 }
 
 
-import { useAcademicYear } from "@/context/AcademicYearContext";
 
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()

@@ -31,6 +31,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
+import {
+    optimisticallyRemoveParents,
+    optimisticallySetParentStatus,
+    restoreQueries,
+    schoolDirectoryQueryKeys,
+    snapshotQueries,
+} from '@/lib/school-directory-query';
 
 // Relation badge colors
 const RELATION_COLORS = {
@@ -64,7 +71,7 @@ export default function ParentListPage() {
         enabled: !!schoolId,
         placeholderData: (prev) => prev,
         staleTime: 15 * 1000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
     });
 
     const parents = parentData.parents || [];
@@ -81,13 +88,22 @@ export default function ParentListPage() {
             });
             return res.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
-            toast.success('Parents deleted successfully');
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+            const snapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.parentsRoot(schoolId));
+            optimisticallyRemoveParents(queryClient, schoolId, ids);
             setSelected([]);
+            return { snapshots };
         },
-        onError: (error) => {
+        onSuccess: () => {
+            toast.success('Parents deleted successfully');
+        },
+        onError: (error, _ids, context) => {
+            restoreQueries(queryClient, context?.snapshots);
             toast.error(error.response?.data?.error || 'Failed to delete parents');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
         }
     });
 
@@ -100,13 +116,22 @@ export default function ParentListPage() {
             });
             return res.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
-            toast.success('Parents inactivated successfully');
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+            const snapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.parentsRoot(schoolId));
+            optimisticallySetParentStatus(queryClient, schoolId, ids, 'INACTIVE');
             setSelected([]);
+            return { snapshots };
         },
-        onError: (error) => {
+        onSuccess: () => {
+            toast.success('Parents inactivated successfully');
+        },
+        onError: (error, _ids, context) => {
+            restoreQueries(queryClient, context?.snapshots);
             toast.error(error.response?.data?.error || 'Failed to inactivate parents');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
         }
     });
 
@@ -119,13 +144,22 @@ export default function ParentListPage() {
             });
             return res.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
-            toast.success('Parents activated successfully');
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
+            const snapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.parentsRoot(schoolId));
+            optimisticallySetParentStatus(queryClient, schoolId, ids, 'ACTIVE');
             setSelected([]);
+            return { snapshots };
         },
-        onError: (error) => {
+        onSuccess: () => {
+            toast.success('Parents activated successfully');
+        },
+        onError: (error, _ids, context) => {
+            restoreQueries(queryClient, context?.snapshots);
             toast.error(error.response?.data?.error || 'Failed to activate parents');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.parentsRoot(schoolId) });
         }
     });
 

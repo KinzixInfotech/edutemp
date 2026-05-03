@@ -5,6 +5,12 @@ import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail, getAccountCredentialsEmailTemplate } from '@/lib/email';
+import {
+  generateNextStudentId,
+  resolveParentAccountIdentity,
+  resolveStudentAccountIdentity,
+} from '@/lib/profile-auth';
+import { normalizeStudentIdentifier } from '@/lib/auth-identifiers';
 
 // Supabase Admin client for creating auth users
 const supabaseAdmin = createClient(
@@ -46,8 +52,10 @@ function normalizeStudentReligion(value) {
 export const FIELD_MAPPINGS = {
   students: {
     'Full Name *': 'name',
-    'Email *': 'email',
-    'Admission Number *': 'admissionNo',
+    'Email': 'email',
+    'Email (Optional)': 'email',
+    'Admission Number': 'admissionNo',
+    'Student ID': 'admissionNo',
     'Class Name *': 'className',
     'Section *': 'sectionName',
     'Gender *': 'gender',
@@ -91,10 +99,12 @@ export const FIELD_MAPPINGS = {
   },
   parents: {
     'Full Name *': 'name',
-    'Email *': 'email',
+    'Email': 'email',
+    'Email (Optional)': 'email',
     'Phone Number *': 'phone',
     'Relation (Father/Mother/Guardian) *': 'relation',
     'Student Admission No *': 'studentAdmissionNo',
+    'Student ID *': 'studentAdmissionNo',
     'Address': 'address',
     'Occupation': 'occupation'
   },
@@ -251,7 +261,11 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
             results.accountsCreated++;
             // Save for email sending
             createdUsers.push({
-              email: importResult.email,
+              email: importResult.deliveryEmail || null,
+              internalEmail: importResult.email || null,
+              visibleEmail: importResult.deliveryEmail || null,
+              loginValue: importResult.loginValue,
+              loginLabel: importResult.loginLabel,
               name: importResult.name || row['Full Name *'],
               password: importResult.defaultPassword,
               userType: moduleKey === 'students' ? 'student' :
@@ -262,7 +276,8 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
             results.accountsFailed++;
             results.accountErrors.push({
               row: rowNumber,
-              email: importResult.email,
+              loginValue: importResult.loginValue || importResult.email,
+              loginLabel: importResult.loginLabel || 'Login',
               message: importResult.authError,
               canRetry: true,
               recordId: importResult.recordId
@@ -311,6 +326,10 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
       // Send emails in background
       Promise.all(createdUsers.map(async (user) => {
+        if (!user.email) {
+          return;
+        }
+
         try {
           const emailTemplate = getAccountCredentialsEmailTemplate({
             userName: user.name,
@@ -318,7 +337,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
             password: user.password,
             userType: user.userType,
             schoolName: schoolInfo?.name || 'Your School',
-            loginUrl
+            loginUrl,
+            loginLabel: user.loginLabel,
+            loginValue: user.loginValue,
           });
           await sendEmail({
             to: user.email,
@@ -342,6 +363,10 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       credentials: createdUsers.length > 0 ? createdUsers.map((u) => ({
         name: u.name,
         email: u.email,
+        internalEmail: u.internalEmail,
+        visibleEmail: u.visibleEmail,
+        loginLabel: u.loginLabel,
+        loginValue: u.loginValue,
         password: u.password,
         userType: u.userType
       })) : []
@@ -487,8 +512,8 @@ export async function processRow(module, row, schoolId, fieldMap) {
 async function importStudent(data, schoolId) {
   const { name, email, admissionNo, className, sectionName, gender, dob, ...rest } = data;
 
-  if (!name || !email || !admissionNo || !className || !gender || !dob) {
-    throw new Error('Missing required fields: name, email, admissionNo, className, gender, dob');
+  if (!name || !className || !gender || !dob) {
+    throw new Error('Missing required fields: name, className, gender, dob');
   }
 
   // Find class
@@ -511,12 +536,19 @@ async function importStudent(data, schoolId) {
   }
 
   // Check if student already exists
+  const studentId = normalizeStudentIdentifier(admissionNo) || await generateNextStudentId({ schoolId });
+  const { authEmail, externalEmail } = await resolveStudentAccountIdentity({
+    schoolId,
+    studentId,
+    externalEmail: email,
+  });
+
   const existingStudent = await prisma.student.findFirst({
-    where: { OR: [{ admissionNo }, { email }], schoolId }
+    where: { OR: [{ admissionNo: studentId }, { email: authEmail }, ...(externalEmail ? [{ email: externalEmail }] : [])], schoolId }
   });
 
   if (existingStudent) {
-    throw new Error(`Student with admission number '${admissionNo}' or email '${email}' already exists.`);
+    throw new Error(`Student with ID '${studentId}' already exists.`);
   }
 
   // Get or create student role (global table)
@@ -526,7 +558,7 @@ async function importStudent(data, schoolId) {
     create: { name: 'STUDENT' }
   });
 
-  const defaultPassword = `Student@${admissionNo}`;
+  const defaultPassword = `Student@${studentId.split('-').pop() || '001'}`;
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
   // Generate UUID for user
@@ -545,7 +577,7 @@ async function importStudent(data, schoolId) {
       data: {
         id: userId,
         name,
-        email,
+        email: authEmail,
         password: hashedPassword,
         roleId: studentRole.id,
         gender: gender || 'Other',
@@ -559,8 +591,8 @@ async function importStudent(data, schoolId) {
       data: {
         userId: user.id,
         name,
-        email,
-        admissionNo,
+        email: externalEmail || authEmail,
+        admissionNo: studentId,
         classId: existingClass.id,
         sectionId: section.id,
         schoolId,
@@ -609,7 +641,7 @@ async function importStudent(data, schoolId) {
   let authSuccess = false;
   let authError = null;
 
-  const authResult = await createSupabaseAccount(email, defaultPassword);
+  const authResult = await createSupabaseAccount(authEmail, defaultPassword);
   if (authResult.success) {
     authSuccess = true;
     // Update user with Supabase ID if different
@@ -623,7 +655,17 @@ async function importStudent(data, schoolId) {
     authError = authResult.error;
   }
 
-  return { authSuccess, authError, email, recordId: result.id, name, defaultPassword };
+  return {
+    authSuccess,
+    authError,
+    email: authEmail,
+    deliveryEmail: externalEmail,
+    loginLabel: "Student ID",
+    loginValue: studentId,
+    recordId: result.id,
+    name,
+    defaultPassword,
+  };
 }
 
 // Import teacher with Supabase account
@@ -846,13 +888,13 @@ async function importNonTeachingStaff(data, schoolId) {
 async function importParent(data, schoolId) {
   const { name, email, phone, relation, studentAdmissionNo, ...rest } = data;
 
-  if (!name || !email || !phone || !relation || !studentAdmissionNo) {
-    throw new Error('Missing required fields: name, email, phone, relation, studentAdmissionNo');
+  if (!name || !phone || !relation || !studentAdmissionNo) {
+    throw new Error('Missing required fields: name, phone, relation, studentAdmissionNo');
   }
 
   // Find the student
   const student = await prisma.student.findFirst({
-    where: { schoolId, admissionNo: studentAdmissionNo }
+    where: { schoolId, admissionNo: normalizeStudentIdentifier(studentAdmissionNo) }
   });
 
   if (!student) {
@@ -860,9 +902,32 @@ async function importParent(data, schoolId) {
   }
 
   // Check if parent already exists
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    throw new Error(`User with email '${email}' already exists.`);
+  const { authEmail, externalEmail, phone: normalizedPhone } = await resolveParentAccountIdentity({
+    schoolId,
+    phone,
+    externalEmail: email,
+  });
+
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: authEmail },
+        ...(externalEmail ? [{ email: externalEmail }] : []),
+      ],
+    },
+  });
+  const existingParent = await prisma.parent.findFirst({
+    where: {
+      schoolId,
+      OR: [
+        { contactNumber: normalizedPhone },
+        { email: authEmail },
+        ...(externalEmail ? [{ email: externalEmail }] : []),
+      ],
+    },
+  });
+  if (existingUser || existingParent) {
+    throw new Error(`Parent account with this mobile number already exists.`);
   }
 
   // Get or create parent role (global table)
@@ -886,7 +951,7 @@ async function importParent(data, schoolId) {
   };
   const relationEnum = relationMap[relation.toLowerCase()] || 'GUARDIAN';
 
-  const defaultPassword = `Parent@${phone.slice(-4)}`;
+  const defaultPassword = `Parent@${normalizedPhone.slice(-4)}`;
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
   const userId = require('crypto').randomUUID();
 
@@ -896,7 +961,7 @@ async function importParent(data, schoolId) {
       data: {
         id: userId,
         name,
-        email,
+        email: authEmail,
         password: hashedPassword,
         roleId: parentRole.id,
         schoolId,
@@ -909,8 +974,8 @@ async function importParent(data, schoolId) {
       data: {
         userId: user.id,
         name,
-        email,
-        contactNumber: phone, // Required field - use phone as contactNumber
+        email: externalEmail || authEmail,
+        contactNumber: normalizedPhone,
         schoolId,
         address: rest.address || null,
         occupation: rest.occupation || null
@@ -934,7 +999,7 @@ async function importParent(data, schoolId) {
   let authSuccess = false;
   let authError = null;
 
-  const authResult = await createSupabaseAccount(email, defaultPassword);
+  const authResult = await createSupabaseAccount(authEmail, defaultPassword);
   if (authResult.success) {
     authSuccess = true;
     // Update user with Supabase ID if different
@@ -948,7 +1013,17 @@ async function importParent(data, schoolId) {
     authError = authResult.error;
   }
 
-  return { authSuccess, authError, email, recordId: result.id, name, defaultPassword };
+  return {
+    authSuccess,
+    authError,
+    email: authEmail,
+    deliveryEmail: externalEmail,
+    loginLabel: 'Mobile Number',
+    loginValue: normalizedPhone,
+    recordId: result.id,
+    name,
+    defaultPassword,
+  };
 }
 
 // Import inventory item (no auth needed)

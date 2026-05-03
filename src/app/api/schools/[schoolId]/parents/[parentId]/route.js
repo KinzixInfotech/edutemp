@@ -1,7 +1,7 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { remember, generateKey, invalidatePattern, setCache } from "@/lib/cache";
+import { remember, generateKey, invalidateParentDirectoryCaches, setCache } from "@/lib/cache";
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -129,10 +129,7 @@ export const PATCH = withSchoolAccess(async function PATCH(req, props) {
     const cacheKey = generateKey('parent:profile', { schoolId, parentId });
     await setCache(cacheKey, null, 1); // expire in 1 second = effectively invalidate
 
-    // Invalidate parent list caches + profile caches
-    await invalidatePattern('parents:list*');
-    await invalidatePattern('parent:profile*');
-    await invalidatePattern('parents:search*');
+    await invalidateParentDirectoryCaches({ schoolId, parentId });
 
     return NextResponse.json(updated);
   } catch (error) {

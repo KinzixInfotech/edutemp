@@ -28,6 +28,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { cn } from "@/lib/utils";
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
+import {
+    optimisticallyPatchStudentProfile,
+    optimisticallyPatchStudentLists,
+    restoreQueries,
+    schoolDirectoryQueryKeys,
+    snapshotQueries,
+} from '@/lib/school-directory-query';
 
 // --- Shared Inline Components ---
 
@@ -135,14 +142,14 @@ export default function StudentProfilePage() {
 
     // Fetch Student Data
     const { data: student, isLoading } = useQuery({
-        queryKey: ['student-profile', studentId],
+        queryKey: schoolDirectoryQueryKeys.studentProfile(studentId),
         queryFn: async () => {
             const res = await axios.get(`/api/students/${studentId}`);
             return res.data;
         },
         enabled: !!schoolId && !!studentId,
         staleTime: 1000 * 60 * 5,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
     });
 
     // Fetch Classes for editing
@@ -163,14 +170,26 @@ export default function StudentProfilePage() {
             const res = await axios.patch(`/api/students/${studentId}`, data);
             return res.data;
         },
+        onMutate: async (patch) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.studentProfile(studentId) });
+            const profileSnapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.studentProfile(studentId));
+            const listSnapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.studentsRoot(schoolId));
+            optimisticallyPatchStudentProfile(queryClient, studentId, patch);
+            optimisticallyPatchStudentLists(queryClient, schoolId, studentId, patch);
+            return { profileSnapshots, listSnapshots };
+        },
         onSuccess: () => {
             toast.success('Updated successfully!');
-            queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-            queryClient.invalidateQueries({ queryKey: ['students'] });
             setEditingField(null);
         },
-        onError: (err) => {
+        onError: (err, _patch, context) => {
+            restoreQueries(queryClient, context?.profileSnapshots);
+            restoreQueries(queryClient, context?.listSnapshots);
             toast.error(err.response?.data?.error || 'Failed to update');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentProfile(studentId) });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
         }
     });
 
@@ -200,8 +219,8 @@ export default function StudentProfilePage() {
                 await axios.patch(`/api/students/${studentId}`, {
                     profilePicture: res[0].url,
                 });
-                queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-                queryClient.invalidateQueries({ queryKey: ['students'] });
+                queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentProfile(studentId) });
+                queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
                 toast.success('Profile picture updated!');
             }
         } catch (err) {

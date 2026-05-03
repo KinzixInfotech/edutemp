@@ -233,7 +233,7 @@ export default function ClientLayout({ children }) {
                 staleTime: 1000 * 60 * 5,      // 5 minutes - data considered "fresh"
                 gcTime: 1000 * 60 * 30,        // 30 minutes - keep unused data in cache
                 refetchOnWindowFocus: false,   // Don't refetch when tab gets focus
-                refetchOnMount: 'always',      // Always check for updates but show stale first
+                refetchOnMount: true,          // Refetch on mount only when data is stale
                 refetchOnReconnect: true,      // Refetch when network reconnects
                 retry: 1,                      // Only retry once on failure
                 retryDelay: 1000,              // Wait 1 second before retry

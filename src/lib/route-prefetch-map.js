@@ -130,11 +130,14 @@ export function getQueryKeysForRoute(pathname) {
     return [];
 }
 
+
 /**
  * Check if a route has prefetch configuration
  * @param {string} pathname - The route pathname
  * @returns {boolean}
  */
+
+
 export function hasPrefetchConfig(pathname) {
     return getQueryKeysForRoute(pathname).length > 0;
 }

@@ -35,6 +35,13 @@ import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
+import {
+    optimisticallyRemoveStudents,
+    optimisticallySetStudentStatus,
+    restoreQueries,
+    schoolDirectoryQueryKeys,
+    snapshotQueries,
+} from '@/lib/school-directory-query';
 
 export default function StudentListPage() {
     const router = useRouter();
@@ -99,7 +106,7 @@ export default function StudentListPage() {
         enabled: !!schoolId,
         placeholderData: (prev) => prev,
         staleTime: 15 * 1000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
     });
 
     const students = studentData.students || [];
@@ -125,13 +132,22 @@ export default function StudentListPage() {
             });
             return res.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
-            toast.success('Students deleted successfully');
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
+            const snapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.studentsRoot(schoolId));
+            optimisticallyRemoveStudents(queryClient, schoolId, ids);
             setSelected([]);
+            return { snapshots };
         },
-        onError: (error) => {
+        onSuccess: () => {
+            toast.success('Students deleted successfully');
+        },
+        onError: (error, _ids, context) => {
+            restoreQueries(queryClient, context?.snapshots);
             toast.error(error.response?.data?.message || 'Failed to delete students');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
         }
     });
 
@@ -144,13 +160,22 @@ export default function StudentListPage() {
             });
             return res.data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
-            toast.success('Students inactivated successfully');
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
+            const snapshots = snapshotQueries(queryClient, schoolDirectoryQueryKeys.studentsRoot(schoolId));
+            optimisticallySetStudentStatus(queryClient, schoolId, ids, 'INACTIVE');
             setSelected([]);
+            return { snapshots };
         },
-        onError: (error) => {
+        onSuccess: () => {
+            toast.success('Students inactivated successfully');
+        },
+        onError: (error, _ids, context) => {
+            restoreQueries(queryClient, context?.snapshots);
             toast.error(error.response?.data?.message || 'Failed to inactivate students');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
         }
     });
 
@@ -163,7 +188,7 @@ export default function StudentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
             toast.success('Parent linked successfully');
             setDialogData(null);
         },

@@ -1,6 +1,11 @@
 import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import {
+  generateKey,
+  invalidateStudentDirectoryCaches,
+  remember,
+} from "@/lib/cache";
 
 // GET: Fetch single student details with all relations and aggregated stats
 export const GET = withSchoolAccess(async function GET(req, { params }) {
@@ -11,7 +16,9 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
       return NextResponse.json({ error: "Student ID required" }, { status: 400 });
     }
 
-    const student = await prisma.student.findUnique({
+    const cacheKey = generateKey('student:profile', { studentId });
+
+    const student = await remember(cacheKey, async () => prisma.student.findUnique({
       where: { userId: studentId },
       include: {
         user: {
@@ -60,7 +67,7 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
           }
         }
       }
-    });
+    }), 300);
 
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -237,6 +244,8 @@ export const PATCH = withSchoolAccess(async function PATCH(req, { params }) {
 
       return updatedStudent;
     });
+
+    await invalidateStudentDirectoryCaches({ schoolId: result.schoolId, studentId });
 
     return NextResponse.json(result);
 

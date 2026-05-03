@@ -104,6 +104,7 @@ async function updateHistory(job) {
         fileUrl: job.fileUrl,
         errorReportUrl: job.errorReportUrl || null,
         failedRows: job.failedRows.slice(0, 200),
+        credentials: job.credentials || [],
         etaSeconds: toEtaSeconds(job.processedRows, job.totalRows, job.startedAt)
       }
     }
@@ -185,6 +186,7 @@ async function handleWorker(req) {
     let failed = job.failed;
     let accountsCreated = job.accountsCreated;
     let accountsFailed = job.accountsFailed;
+    const credentials = [...(job.credentials || [])];
 
     for (let index = 0; index < chunkRows.length; index++) {
       const row = chunkRows[index];
@@ -196,20 +198,31 @@ async function handleWorker(req) {
 
         if (result?.authSuccess) {
           accountsCreated += 1;
+          credentials.push({
+            name: result.name,
+            userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
+            loginLabel: result.loginLabel || 'Login',
+            loginValue: result.loginValue || null,
+            internalEmail: result.email || null,
+            visibleEmail: result.deliveryEmail || null,
+            password: result.defaultPassword || null,
+          });
 
-          if (job.sendEmails && result.email) {
+          if (job.sendEmails && result.deliveryEmail) {
             const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com'}/login`;
             const emailTemplate = getAccountCredentialsEmailTemplate({
               userName: result.name,
-              email: result.email,
+              email: result.deliveryEmail,
               password: result.defaultPassword,
               userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
               schoolName: school?.name || 'Your School',
-              loginUrl
+              loginUrl,
+              loginLabel: result.loginLabel,
+              loginValue: result.loginValue,
             });
 
             await sendResendEmail({
-              to: result.email,
+              to: result.deliveryEmail,
               subject: emailTemplate.subject,
               html: emailTemplate.html,
               text: emailTemplate.text
@@ -241,6 +254,7 @@ async function handleWorker(req) {
       failed,
       accountsCreated,
       accountsFailed,
+      credentials,
       failedRows,
       chunks: job.chunks
     };

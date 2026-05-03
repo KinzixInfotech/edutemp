@@ -602,7 +602,18 @@ import { supabaseAdmin } from "@/lib/supbase-admin";
 import { verifyAdminAccess, withSchoolAccess } from "@/lib/api-auth";
 import { z } from "zod";
 import { differenceInYears } from "date-fns";
-import { invalidatePattern } from "@/lib/cache";
+import {
+  invalidateParentDirectoryCaches,
+  invalidatePattern,
+  invalidateStudentDirectoryCaches,
+} from "@/lib/cache";
+import {
+  generateNextStudentId,
+  resolveParentAccountIdentity,
+  resolveStudentAccountIdentity,
+} from "@/lib/profile-auth";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const roleMap = {
   students: "STUDENT",
@@ -617,8 +628,8 @@ const roleMap = {
 };
 
 const baseUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().optional().default(""),
+  password: z.string().optional().default(""),
   role: z.string().toUpperCase()
 });
 
@@ -702,7 +713,7 @@ const staffSchema = baseUserSchema.extend({
 
 const parentSchema = baseUserSchema.extend({
   guardianName: z.string(),
-  email: z.string().email(),
+  email: z.string().optional().default(""),
   contactNumber: z.string().regex(/^\d{10}$/, "Contact number must be 10 digits"),
   alternateNumber: z.string().optional(),
   address: z.string().optional(),
@@ -760,10 +771,8 @@ export const POST = withSchoolAccess(async function POST(req, context) {
         return NextResponse.json({ error: "Unsupported role" }, { status: 400 });
     }
 
-    // Duplicate email check
-    const existingUser = await prisma.user.findUnique({ where: { email: parsed.email } });
-    if (existingUser) {
-      return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
+    if (parsed.email && !EMAIL_PATTERN.test(parsed.email)) {
+      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
     // Duplicate phone check (role-specific, within same school)
@@ -806,11 +815,96 @@ export const POST = withSchoolAccess(async function POST(req, context) {
     parsed.guardianName :
     parsed.name;
 
+    let authEmail = parsed.email?.trim().toLowerCase() || "";
+    let profileEmail = parsed.email?.trim().toLowerCase() || "";
+    let authPassword = parsed.password;
+    let loginLabel = "Email";
+    let loginValue = authEmail;
+
+    if (mappedRole === "STUDENT") {
+      if (parsed.password?.trim() && parsed.password.trim().length < 6) {
+        return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+      }
+
+      const studentId = parsed.admissionNo?.trim() || await generateNextStudentId({ schoolId });
+      const identity = await resolveStudentAccountIdentity({
+        schoolId,
+        studentId,
+        externalEmail: parsed.email,
+      });
+
+      parsed.admissionNo = identity.studentId;
+      authEmail = identity.authEmail;
+      profileEmail = identity.externalEmail || identity.authEmail;
+      authPassword = parsed.password?.trim() || `Student@${identity.studentId.split("-").pop() || "001"}`;
+      loginLabel = "Student ID";
+      loginValue = identity.studentId;
+
+      const existingStudent = await prisma.student.findFirst({
+        where: {
+          schoolId,
+          OR: [
+            { admissionNo: identity.studentId },
+            { email: authEmail },
+            ...(identity.externalEmail ? [{ email: identity.externalEmail }] : []),
+          ],
+        },
+      });
+
+      if (existingStudent) {
+        return NextResponse.json({ error: "A student with this student ID already exists." }, { status: 409 });
+      }
+    } else if (mappedRole === "PARENT") {
+      const identity = await resolveParentAccountIdentity({
+        schoolId,
+        phone: parsed.contactNumber,
+        externalEmail: parsed.email,
+      });
+
+      parsed.contactNumber = identity.phone;
+      authEmail = identity.authEmail;
+      profileEmail = identity.externalEmail || identity.authEmail;
+      authPassword = parsed.password?.trim();
+      loginLabel = "Mobile Number";
+      loginValue = identity.phone;
+
+      if (!authPassword || authPassword.length < 6) {
+        return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+      }
+
+      const existingParent = await prisma.parent.findFirst({
+        where: {
+          schoolId,
+          OR: [
+            { contactNumber: identity.phone },
+            { email: authEmail },
+            ...(identity.externalEmail ? [{ email: identity.externalEmail }] : []),
+          ],
+        },
+      });
+
+      if (existingParent) {
+        return NextResponse.json({ error: "A parent with this mobile number already exists." }, { status: 409 });
+      }
+    } else {
+      if (!authEmail) {
+        return NextResponse.json({ error: "Email is required." }, { status: 400 });
+      }
+      if (!authPassword || authPassword.length < 6) {
+        return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+      }
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: authEmail } });
+    if (existingUser) {
+      return NextResponse.json({ error: "A user with this login already exists" }, { status: 409 });
+    }
+
     // Supabase user creation
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       user_metadata: { name: userName },
-      email: parsed.email,
-      password: parsed.password,
+      email: authEmail,
+      password: authPassword,
       email_confirm: true
     });
 
@@ -831,10 +925,10 @@ export const POST = withSchoolAccess(async function POST(req, context) {
       const user = await tx.user.create({
         data: {
           id: createdUserId,
-          password: parsed.password,
+          password: authPassword,
           profilePicture: parsed.profilePicture || "default.png",
           name: userName,
-          email: parsed.email,
+          email: authEmail,
           school: { connect: { id: parsed.schoolId } },
           role: { connect: { id: roleRecord.id } } // ✅ use roleRecord.id
         },
@@ -867,7 +961,7 @@ export const POST = withSchoolAccess(async function POST(req, context) {
               MotherNumber: parsed.motherMobileNumber || "",
               bloodGroup: parsed.bloodGroup || "",
               contactNumber: parsed.contactNumber || "",
-              email: parsed.email,
+              email: profileEmail,
               admissionDate: parsed.admissionDate?.toISOString() || new Date().toISOString(),
               rollNumber: parsed.rollNumber || "",
               city: parsed.city || "",
@@ -1011,7 +1105,7 @@ export const POST = withSchoolAccess(async function POST(req, context) {
               userId: user.id,
               schoolId,
               name: parsed.guardianName,
-              email: parsed.email,
+              email: profileEmail,
               contactNumber: parsed.contactNumber,
               alternateNumber: parsed.alternateNumber || null,
               address: parsed.address || null,
@@ -1067,12 +1161,17 @@ export const POST = withSchoolAccess(async function POST(req, context) {
           await invalidatePattern('teaching-staff*');
           break;
         case 'students':
-          await invalidatePattern('students*');
+          await invalidateStudentDirectoryCaches({
+            schoolId,
+            studentId: created?.user?.id,
+          });
           break;
         case 'parents':
           // generateKey('parents:list', {...}) → "parents:list:limit:...:page:...:schoolId:...:search:"
-          await invalidatePattern('parents:list*');
-          await invalidatePattern('parents*');
+          await invalidateParentDirectoryCaches({
+            schoolId,
+            parentId: created?.profile?.id,
+          });
           break;
         case 'non-teaching':
         case 'staff':
@@ -1089,7 +1188,17 @@ export const POST = withSchoolAccess(async function POST(req, context) {
       console.warn('Cache invalidation warning:', cacheErr?.message);
     }
 
-    return NextResponse.json({ success: true, ...created });
+    return NextResponse.json({
+      success: true,
+      ...created,
+      credentials: mappedRole === "STUDENT" || mappedRole === "PARENT"
+        ? {
+            loginLabel,
+            loginValue,
+            password: authPassword,
+          }
+        : null,
+    });
 
   } catch (error) {
     console.error("❌ User profile creation error:", error);
