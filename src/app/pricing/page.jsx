@@ -147,9 +147,7 @@ export default function PricingCalculatorPage() {
                 .parallax-orb { animation: parallaxFloat 8s ease-in-out infinite; }
                 .parallax-orb-2 { animation: parallaxFloat 10s 2s ease-in-out infinite; }
             `}</style>
-
             <Header />
-
             <main className="pt-24">
                 <section className="relative overflow-hidden px-5 pb-20 pt-14 md:pt-20">
                     <InteractiveGridPattern
@@ -181,7 +179,6 @@ export default function PricingCalculatorPage() {
                                 </Link>
                             </div>
                         </div>
-
                         <div className="pricing-hero-4 mx-auto max-w-3xl mt-16 rounded-[1.2rem] border border-slate-200 bg-white p-4 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                             <div className="flex items-center gap-6 w-full md:w-auto px-4">
                                 <div>
@@ -213,7 +210,6 @@ export default function PricingCalculatorPage() {
                         {[SCHOOL_FEATURE_PLAN.BASE, SCHOOL_FEATURE_PLAN.PRO].map((plan, index) => {
                             const planFeatures = plan === SCHOOL_FEATURE_PLAN.BASE ? baseFeatures : proFeatures;
                             const yearlyPrice = plan === SCHOOL_FEATURE_PLAN.BASE ? baseYearly : proYearly;
-
                             return (
                                 <div
                                     key={plan}
