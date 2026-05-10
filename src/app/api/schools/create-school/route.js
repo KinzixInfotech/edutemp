@@ -10,6 +10,9 @@ import { generateSchoolSlug, generateUniqueSlug } from "@/lib/slug-generator";
 import { buildTenantDomain, normalizeSchoolDomain } from "@/lib/school-domain";
 import { buildBillingSummary, SCHOOL_FEATURE_PLAN } from "@/lib/school-feature-config";
 import { mergeSchoolFeatureControlIntoWebsiteConfig } from "@/lib/school-feature-access";
+import { sendResendEmail } from "@/lib/resend";
+import { buildSchoolWelcomeTemplate } from "@/emails/school-welcome-template";
+import { getPublicEmailAssetOrigin } from "@/lib/email-assets";
 // Schema validation
 const schoolSchema = z.object({
   name: z.string(),
@@ -101,6 +104,109 @@ const schoolSchema = z.object({
 const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
 const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5;
+const WELCOME_EMAIL_FROM = 'EduBreezy <hello@edubreezy.com>';
+const WELCOME_EMAIL_COPY_RECIPIENTS = [
+  'edubreezyindia@gmail.com',
+  'kinzixinfotech@gmail.com',
+  'mansajami2020@gmail.com',
+];
+
+function formatInrAmount(value) {
+  if (value === null || value === undefined || value === '') return null;
+
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
+
+function getUniqueWelcomeRecipients({ publicProfile, directorUser, principalUser }) {
+  const recipients = [
+    {
+      email: directorUser?.email,
+      name: directorUser?.name,
+      role: 'Director',
+    },
+    principalUser?.email ?
+      {
+        email: principalUser.email,
+        name: principalUser.name,
+        role: 'Principal',
+      } :
+      null,
+    {
+      email: publicProfile?.publicEmail,
+      name: `${directorUser?.name || 'School leadership'} and team`,
+      role: 'School Inbox',
+    },
+  ].filter(Boolean);
+
+  const seen = new Set();
+  return recipients.filter((recipient) => {
+    const normalizedEmail = String(recipient.email || '').trim().toLowerCase();
+    if (!normalizedEmail || seen.has(normalizedEmail)) return false;
+    seen.add(normalizedEmail);
+    return true;
+  });
+}
+
+async function sendSchoolWelcomeEmails({ result, resolvedDomain, req, erpPlan }) {
+  const origin = req.nextUrl.origin;
+  const emailAssetOrigin = getPublicEmailAssetOrigin(origin);
+  const loginUrl = `${origin}/login`;
+  const schoolUrl = resolvedDomain ? `https://${resolvedDomain}` : origin;
+  const { school, directorUser, principalUser, subscription, publicProfile } = result;
+  const recipients = getUniqueWelcomeRecipients({ publicProfile, directorUser, principalUser });
+
+  const results = await Promise.allSettled(
+    recipients.map((recipient) => {
+      const template = buildSchoolWelcomeTemplate({
+        recipientName: recipient.name,
+        recipientRole: recipient.role,
+        schoolName: school.name,
+        schoolEmail: publicProfile?.publicEmail,
+        schoolLogoUrl: school.profilePicture,
+        schoolCode: school.schoolCode,
+        schoolPhone: school.contactNumber,
+        schoolLocation: school.location,
+        schoolCity: school.city,
+        schoolState: school.state,
+        schoolCountry: school.country,
+        directorName: directorUser?.name,
+        principalName: principalUser?.name,
+        loginUrl,
+        schoolUrl,
+        plan: erpPlan,
+        includedCapacity: subscription?.includedCapacity ? `${subscription.includedCapacity} students` : null,
+        yearlyAmount: formatInrAmount(subscription?.yearlyAmount),
+        origin: emailAssetOrigin,
+      });
+
+      return sendResendEmail({
+        to: recipient.email,
+        from: WELCOME_EMAIL_FROM,
+        replyTo: 'hello@edubreezy.com',
+        bcc: WELCOME_EMAIL_COPY_RECIPIENTS,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+    })
+  );
+
+  return results.map((result, index) => ({
+    email: recipients[index].email,
+    role: recipients[index].role,
+    status: result.status === 'fulfilled' ? 'SENT' : 'FAILED',
+    providerId:
+      result.status === 'fulfilled' ?
+      result.value?.data?.id || result.value?.id || null :
+      null,
+    error: result.status === 'rejected' ? result.reason?.message || 'Unknown email error' : null,
+    copiedTo: WELCOME_EMAIL_COPY_RECIPIENTS,
+  }));
+}
 
 export const POST = withSchoolAccess(async function POST(req) {
   let createdAdminId = null;
@@ -448,7 +554,7 @@ export const POST = withSchoolAccess(async function POST(req) {
           publicEmail: parsed.email || null,
           website: resolvedDomain ? `https://${resolvedDomain}` : null
         },
-        select: { id: true, schoolId: true, slug: true }
+        select: { id: true, schoolId: true, slug: true, publicEmail: true, publicPhone: true, website: true }
       });
 
       return { school, adminUser, directorUser, principalUser, subscription, publicProfile };
@@ -461,7 +567,20 @@ export const POST = withSchoolAccess(async function POST(req) {
     await invalidatePattern('schools:search:*');
     await invalidateSchoolMarketplaceCache(result.publicProfile);
 
-    return NextResponse.json({ success: true, result });
+    let welcomeEmail = [];
+    try {
+      welcomeEmail = await sendSchoolWelcomeEmails({ result, resolvedDomain, req, erpPlan });
+    } catch (emailError) {
+      console.error("⚠️ Failed to send school welcome email:", emailError);
+      welcomeEmail = [
+        {
+          status: 'FAILED',
+          error: emailError?.message || 'Unknown email error',
+        }
+      ];
+    }
+
+    return NextResponse.json({ success: true, result, welcomeEmail });
 
   } catch (error) {
     console.error("❌ Error creating school:", error);

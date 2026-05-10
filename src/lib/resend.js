@@ -4,7 +4,6 @@ const globalForResend = globalThis;
 
 function createResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
-
   if (!apiKey) {
     throw new Error('RESEND_API_KEY is not configured');
   }
@@ -12,10 +11,22 @@ function createResendClient() {
   return new Resend(apiKey);
 }
 
-export const resend =
-  globalForResend.__edubreezyResendClient || createResendClient();
+export function getResendClient() {
+  if (!globalForResend.__edubreezyResendClient) {
+    globalForResend.__edubreezyResendClient = createResendClient();
+  }
 
-globalForResend.__edubreezyResendClient = resend;
+  return globalForResend.__edubreezyResendClient;
+}
+
+export const resend = new Proxy(
+  {},
+  {
+    get(_target, property) {
+      return getResendClient()[property];
+    },
+  }
+);
 
 export function getResendFromEmail() {
   return (
@@ -32,12 +43,19 @@ export async function sendResendEmail({
   text,
   from = getResendFromEmail(),
   replyTo,
+  cc,
+  bcc,
 }) {
   const recipients = Array.isArray(to) ? to : [to];
+  const ccRecipients = cc ? (Array.isArray(cc) ? cc : [cc]) : undefined;
+  const bccRecipients = bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : undefined;
+  const resendClient = getResendClient();
 
-  const response = await resend.emails.send({
+  const response = await resendClient.emails.send({
     from,
     to: recipients,
+    cc: ccRecipients,
+    bcc: bccRecipients,
     subject,
     html,
     text,
