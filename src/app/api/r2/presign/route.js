@@ -55,4 +55,15 @@ export const POST = withSchoolAccess(async function POST(req) {
             { status: 500 }
         );
     }
+}, {
+    getSchoolId: async ({ request }) => {
+        if (!request.headers.get('content-type')?.includes('application/json')) {
+            return null;
+        }
+
+        const body = await request.clone().json().catch(() => null);
+        const schoolId = String(body?.schoolId || '').trim();
+
+        return schoolId && schoolId !== 'global' ? schoolId : null;
+    },
 });
