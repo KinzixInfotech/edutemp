@@ -2,6 +2,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import qstash from '@/lib/qstash';
 import { createJobId, listBulkJobs, setBulkJob } from '@/lib/bulk-job-store';
+import prisma from '@/lib/prisma';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 
@@ -29,10 +30,21 @@ async function enqueueWorker(jobId) {
 }export const POST = withSchoolAccess(async function POST(req, { params }) {
   try {
     const { schoolId } = await params;
-    const { modules, userId } = await req.json();
+    const { modules, userId, academicYearId } = await req.json();
 
     if (!Array.isArray(modules) || !modules.length) {
       return NextResponse.json({ error: 'No modules selected' }, { status: 400 });
+    }
+
+    let academicYear = null;
+    if (academicYearId) {
+      academicYear = await prisma.academicYear.findFirst({
+        where: { id: academicYearId, schoolId },
+        select: { id: true, name: true, startDate: true, endDate: true, isActive: true }
+      });
+      if (!academicYear) {
+        return NextResponse.json({ error: 'Selected academic year was not found for this school' }, { status: 400 });
+      }
     }
 
     const jobId = createJobId('export');
@@ -41,6 +53,8 @@ async function enqueueWorker(jobId) {
       type: 'export',
       schoolId,
       userId,
+      academicYearId: academicYear?.id || null,
+      academicYearName: academicYear?.name || null,
       modules,
       status: 'queued',
       processedModules: 0,

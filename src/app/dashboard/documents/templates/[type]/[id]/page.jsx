@@ -41,7 +41,7 @@ import CertificateDesignEditor from '@/components/certificate-editor/Certificate
 import FileUploadButton from '@/components/fileupload';
 import CropImageDialog from '@/app/components/CropImageDialog';
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
-import { extractTemplatePlaceholders } from '@/lib/certificate-template-mapping';
+import { extractTemplatePlaceholders, normalizeTemplateLayout } from '@/lib/certificate-template-mapping';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -280,7 +280,7 @@ export default function EditTemplatePage() {
 
     const updateMutation = useMutation({
         mutationFn: async (data) => {
-            const layoutConfig = {
+            const layoutConfig = normalizeTemplateLayout({
                 ...editorConfig,
                 elements: editorConfig.elements,
                 canvasSize: editorConfig.canvasSize,
@@ -289,7 +289,7 @@ export default function EditTemplatePage() {
                 backgroundColor: editorConfig.backgroundColor || '#ffffff',
                 customFonts: editorConfig.customFonts || [],
                 mappingPlaceholders: extractTemplatePlaceholders(editorConfig.elements || []),
-            };
+            });
 
             const res = await fetch(`/api/documents/${schoolId}/${config.apiEndpoint}/${templateId}`, {
                 method: 'PUT',

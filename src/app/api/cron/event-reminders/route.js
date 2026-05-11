@@ -89,7 +89,7 @@ export async function GET(request) {
             },
         });
 
-        console.log(`[CRON] Found ${events.length} potential events`);
+        console.log(`[CRON] Found ${events.length} potential event s`);
 
         if (events.length === 0) {
             return NextResponse.json({

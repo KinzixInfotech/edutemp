@@ -11,7 +11,7 @@ import {
     GraduationCap, Heart, ShieldAlert, Loader2, ExternalLink, School,
     FileText, X, Check, Building2, CreditCard, BadgeInfo,
     PhoneCall, Globe, Hash, UserCheck, Clock, AlertCircle, Pencil,
-    Plus, Search, Link as LinkIcon, BookOpen, IndianRupee, TrendingUp, Camera, Save
+    Plus, Search, Link as LinkIcon, BookOpen, IndianRupee, TrendingUp, Camera, Save, KeyRound
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -139,6 +139,7 @@ export default function StudentProfilePage() {
     // Inline Edit State
     const [editingField, setEditingField] = useState(null);
     const [editValues, setEditValues] = useState({});
+    const [accessBusy, setAccessBusy] = useState(false);
 
     // Fetch Student Data
     const { data: student, isLoading } = useQuery({
@@ -241,6 +242,53 @@ export default function StudentProfilePage() {
     const handleCancel = () => { setEditingField(null); setEditValues({}); };
     const ep = { editingField, editValues, onEdit: handleEdit, onSave: handleSave, onCancel: handleCancel, onChange: handleChange };
 
+    const handleResetAccess = async () => {
+        const studentPassword = window.prompt('Enter a new student password (min 6 characters). Leave blank to skip student reset.');
+        if (studentPassword === null) return;
+        const parentPassword = window.prompt('Enter a new parent password (min 6 characters). Leave blank to skip parent reset.');
+        if (parentPassword === null) return;
+        const payload = {
+            admissionNo: student.admissionNo,
+            ...(studentPassword.trim() ? { studentPassword: studentPassword.trim() } : {}),
+            ...(parentPassword.trim() ? { parentPassword: parentPassword.trim() } : {}),
+            sendEmail: true,
+        };
+        if (!payload.studentPassword && !payload.parentPassword) {
+            toast.error('Enter at least one password to reset.');
+            return;
+        }
+        if (payload.studentPassword && payload.parentPassword && payload.studentPassword === payload.parentPassword) {
+            toast.error('Parent and student passwords must be different.');
+            return;
+        }
+        try {
+            setAccessBusy(true);
+            const res = await axios.post(`/api/schools/${schoolId}/profiles/access`, payload);
+            if (res.data?.credentials?.length) {
+                const XLSX = await import('xlsx');
+                const rows = res.data.credentials.map((credential, index) => ({
+                    'S.No': index + 1,
+                    'Name': credential.name,
+                    'Role': credential.userType,
+                    'Login Type': credential.loginLabel,
+                    'Login ID': credential.loginValue,
+                    'Password': credential.password,
+                    'Email Sent To': credential.email || '',
+                }));
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(rows);
+                ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 20 }, { wch: 32 }];
+                XLSX.utils.book_append_sheet(wb, ws, 'App Access');
+                XLSX.writeFile(wb, `app_access_${res.data.admissionNo}.xlsx`);
+            }
+            toast.success(`App access updated for ${res.data.admissionNo}`);
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to reset app access');
+        } finally {
+            setAccessBusy(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex h-[60vh] items-center justify-center">
@@ -278,9 +326,14 @@ export default function StudentProfilePage() {
                     </h1>
                     <p className="text-sm text-muted-foreground mt-0.5">View and manage all details for this student account</p>
                 </div>
-                <Button onClick={() => router.back()} variant="outline" size="sm" className="shrink-0">
-                    <ArrowLeft className="mr-2 h-4 w-4" />Back
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={handleResetAccess} variant="outline" size="sm" className="shrink-0" disabled={accessBusy}>
+                        {accessBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}Reset App Access
+                    </Button>
+                    <Button onClick={() => router.back()} variant="outline" size="sm" className="shrink-0">
+                        <ArrowLeft className="mr-2 h-4 w-4" />Back
+                    </Button>
+                </div>
             </div>
 
             {/* Hero */}

@@ -6,11 +6,18 @@ import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail, getAccountCredentialsEmailTemplate } from '@/lib/email';
 import {
+  buildMissingContactPlaceholder,
   generateNextStudentId,
+  getSchoolIdentityContext,
   resolveParentAccountIdentity,
   resolveStudentAccountIdentity,
 } from '@/lib/profile-auth';
-import { normalizeStudentIdentifier } from '@/lib/auth-identifiers';
+import { buildParentAuthEmail, buildParentPlaceholderAuthEmail, normalizePhoneNumber, normalizeStudentIdentifier } from '@/lib/auth-identifiers';
+import {
+  analyzeImportHeaders,
+  isIgnoredImportColumn,
+  mapImportRow,
+} from '@/lib/import-column-mapping';
 
 // Supabase Admin client for creating auth users
 const supabaseAdmin = createClient(
@@ -19,7 +26,7 @@ const supabaseAdmin = createClient(
 );
 
 // Modules that require Supabase account creation
-export const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff', 'parents'];
+export const AUTH_MODULES = ['teachers', 'nonTeachingStaff'];
 
 function normalizeStudentReligion(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -101,7 +108,7 @@ export const FIELD_MAPPINGS = {
     'Full Name *': 'name',
     'Email': 'email',
     'Email (Optional)': 'email',
-    'Phone Number *': 'phone',
+    'Phone Number': 'phone',
     'Relation (Father/Mother/Guardian) *': 'relation',
     'Student Admission No *': 'studentAdmissionNo',
     'Student ID *': 'studentAdmissionNo',
@@ -162,56 +169,27 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    // Helper function to normalize column names for flexible matching
-    // Removes: asterisks (*), format hints in parentheses like (YYYY-MM-DD), extra spaces
-    // Makes comparison case-insensitive
-    const normalizeColumnName = (col) => {
-      return col.
-      replace(/\s*\*\s*/g, '') // Remove asterisks
-      .replace(/\s*\([^)]*\)\s*/g, '') // Remove anything in parentheses (format hints)
-      .trim() // Trim whitespace
-      .toLowerCase(); // Case insensitive
-    };
-
     // Validate template columns match expected format
-    const uploadedColumns = Object.keys(rawData[0]).filter((col) => col !== 'S.No');
-    const expectedColumns = Object.keys(expectedFields);
-    const requiredColumns = expectedColumns.filter((col) => col.includes('*'));
-    const unexpectedColumns = uploadedColumns.filter((col) => !expectedColumns.some((exp) => normalizeColumnName(exp) === normalizeColumnName(col)));
+    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
 
-    // Check for missing required columns using flexible matching
-    const missingRequired = requiredColumns.filter((reqCol) => {
-      const normalizedReq = normalizeColumnName(reqCol);
-      return !uploadedColumns.some((upCol) => normalizeColumnName(upCol) === normalizedReq);
-    });
-
-    if (missingRequired.length > 0 || unexpectedColumns.length > 0) {
+    if (!headerAnalysis.isValid) {
       return NextResponse.json({
         error: 'Template mapping not matched',
         details: {
           message: 'The uploaded file does not match the expected template format.',
-          missingColumns: missingRequired.map((c) => c.replace(' *', '')),
-          unexpectedColumns,
-          expectedColumns: expectedColumns,
-          uploadedColumns: uploadedColumns,
-          suggestion: 'Please download the correct template. Header names are matched strictly after normalization.'
+          ...headerAnalysis,
+          suggestion: 'Fix the missing or unrecognized headers shown above, or download the latest template for this module.'
         }
       }, { status: 400 });
     }
 
     // Check for completely wrong format (no matching columns at all)
-    const matchingColumns = expectedColumns.filter((expCol) => {
-      const normalizedExp = normalizeColumnName(expCol);
-      return uploadedColumns.some((upCol) => normalizeColumnName(upCol) === normalizedExp);
-    });
-
-    if (matchingColumns.length === 0) {
+    if (headerAnalysis.matchedColumns.length === 0) {
       return NextResponse.json({
         error: 'Template mapping not matched',
         details: {
           message: 'The uploaded file appears to be for a different module or has incorrect format.',
-          expectedColumns: expectedColumns.slice(0, 5).map((c) => c.replace(' *', '')),
-          uploadedColumns: uploadedColumns.slice(0, 5),
+          ...headerAnalysis,
           suggestion: `Please use the correct ${moduleKey} template.`
         }
       }, { status: 400 });
@@ -219,8 +197,11 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     // Filter out empty rows (rows with only S.No or empty values)
     const data = rawData.filter((row) => {
-      const values = Object.values(row).filter((v) => v !== '' && v !== null && v !== undefined);
-      return values.length > 1; // More than just S.No
+      const values = Object.entries(row)
+        .filter(([key]) => !isIgnoredImportColumn(key))
+        .map(([, value]) => String(value ?? '').trim())
+        .filter(Boolean);
+      return values.length > 0;
     });
 
     if (data.length === 0) {
@@ -252,7 +233,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       const rowNumber = row['S.No'] || i + 2;
 
       try {
-        const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {});
+        const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {}, {
+          academicYearId: String(formData.get('academicYearId') || '').trim() || null,
+        });
         results.success++;
 
         // Track Supabase account creation for auth modules
@@ -396,7 +379,7 @@ export const PATCH = withSchoolAccess(async function PATCH(req, { params }) {
 
     for (const record of records) {
       try {
-        const authResult = await createSupabaseAccount(record.email, record.password, record.recordId, module);
+        const authResult = await createSupabaseAccount(record.email, record.password, record.recordId, { role: module });
 
         if (authResult.success) {
           // Update the user record with Supabase ID
@@ -437,12 +420,14 @@ export const PATCH = withSchoolAccess(async function PATCH(req, { params }) {
 });
 
 // Create Supabase account
-async function createSupabaseAccount(email, password) {
+async function createSupabaseAccount(email, password, userId = undefined, metadata = {}) {
   try {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      ...(userId ? { id: userId } : {}),
       email,
       password,
-      email_confirm: true
+      email_confirm: true,
+      user_metadata: metadata,
     });
 
     if (authError) {
@@ -456,43 +441,14 @@ async function createSupabaseAccount(email, password) {
 }
 
 // Process individual row based on module
-export async function processRow(module, row, schoolId, fieldMap) {
-  // Helper function to normalize column names for flexible matching
-  const normalizeColumnName = (col) => {
-    return col.
-    replace(/\s*\*\s*/g, '') // Remove asterisks
-    .replace(/\s*\([^)]*\)\s*/g, '') // Remove anything in parentheses (format hints)
-    .trim() // Trim whitespace
-    .toLowerCase(); // Case insensitive
-  };
-
-  // Get all column keys from the row
-  const rowKeys = Object.keys(row);
-
+export async function processRow(module, row, schoolId, fieldMap, options = {}) {
   // Map Excel columns to database fields with type conversion using flexible matching
-  const mappedData = {};
-  for (const [excelCol, dbField] of Object.entries(fieldMap)) {
-    const normalizedExpected = normalizeColumnName(excelCol);
-
-    // Find the matching column in the row using flexible matching
-    const matchingKey = rowKeys.find((key) => normalizeColumnName(key) === normalizedExpected);
-
-    if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
-      let value = row[matchingKey];
-      // Convert numbers to strings for text fields (Excel reads "10" as number 10)
-      if (typeof value === 'number') {
-        value = String(value);
-      }
-      if (dbField === 'religion') {
-        value = normalizeStudentReligion(value) || value;
-      }
-      mappedData[dbField] = value;
-    }
-  }
+  const mappedData = mapImportRow(row, fieldMap);
+  if (mappedData.religion) mappedData.religion = normalizeStudentReligion(mappedData.religion) || mappedData.religion;
 
   switch (module) {
     case 'students':
-      return await importStudent(mappedData, schoolId);
+      return await importStudent(mappedData, schoolId, options);
     case 'teachers':
       return await importTeacher(mappedData, schoolId);
     case 'nonTeachingStaff':
@@ -509,7 +465,7 @@ export async function processRow(module, row, schoolId, fieldMap) {
 }
 
 // Import student with Supabase account
-async function importStudent(data, schoolId) {
+async function importStudent(data, schoolId, options = {}) {
   const { name, email, admissionNo, className, sectionName, gender, dob, ...rest } = data;
 
   if (!name || !className || !gender || !dob) {
@@ -558,15 +514,15 @@ async function importStudent(data, schoolId) {
     create: { name: 'STUDENT' }
   });
 
-  const defaultPassword = `Student@${studentId.split('-').pop() || '001'}`;
-  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+  const inactivePassword = require('crypto').randomBytes(24).toString('hex');
+  const hashedPassword = await bcrypt.hash(inactivePassword, 10);
 
   // Generate UUID for user
   const userId = require('crypto').randomUUID();
 
   // Get active academic year for session binding
   const activeYear = await prisma.academicYear.findFirst({
-    where: { schoolId, isActive: true },
+    where: options.academicYearId ? { id: options.academicYearId, schoolId } : { schoolId, isActive: true },
     select: { id: true }
   });
 
@@ -634,37 +590,79 @@ async function importStudent(data, schoolId) {
       });
     }
 
+    const parentRole = await tx.role.upsert({
+      where: { name: 'PARENT' },
+      update: {},
+      create: { name: 'PARENT' }
+    });
+
+    const parentName = rest.fatherName || rest.motherName || rest.guardianName || `Guardian of ${name}`;
+    const parentPhone = rest.fatherPhone || rest.motherPhone || '';
+    const parentPhoneNormalized = normalizePhoneNumber(parentPhone);
+    const parentPlaceholder = buildMissingContactPlaceholder({ schoolId, admissionNumber: studentId });
+    const school = await getSchoolIdentityContext(schoolId, tx);
+    const parentContactNumber = parentPhoneNormalized || parentPlaceholder;
+    const parentEmail = parentPhoneNormalized
+      ? buildParentAuthEmail({ phone: parentPhoneNormalized, school })
+      : buildParentPlaceholderAuthEmail({ schoolId, admissionNumber: studentId, school });
+
+    let parent = parentPhoneNormalized
+      ? await tx.parent.findFirst({
+        where: { schoolId, contactNumber: parentPhoneNormalized },
+        include: { user: true },
+      })
+      : null;
+
+    if (!parent) {
+      const parentUser = await tx.user.create({
+        data: {
+          id: require('crypto').randomUUID(),
+          name: parentName,
+          email: parentEmail,
+          password: await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 10),
+          roleId: parentRole.id,
+          gender: 'Unknown',
+          schoolId,
+          status: 'INACTIVE'
+        }
+      });
+
+      parent = await tx.parent.create({
+        data: {
+          userId: parentUser.id,
+          name: parentName,
+          email: parentEmail,
+          contactNumber: parentContactNumber,
+          alternateNumber: parentPhoneNormalized ? null : parentPhone || null,
+          schoolId,
+          address: rest.address || null
+        }
+      });
+    }
+
+    await tx.studentParentLink.create({
+      data: {
+        studentId: user.id,
+        parentId: parent.id,
+        relation: rest.fatherName ? 'FATHER' : rest.motherName ? 'MOTHER' : 'GUARDIAN',
+        isPrimary: true
+      }
+    });
+
     return user;
   });
 
-  // DB succeeded - now create Supabase account
-  let authSuccess = false;
-  let authError = null;
-
-  const authResult = await createSupabaseAccount(authEmail, defaultPassword);
-  if (authResult.success) {
-    authSuccess = true;
-    // Update user with Supabase ID if different
-    if (authResult.userId !== userId) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { id: authResult.userId }
-      }).catch(() => {}); // Ignore if update fails
-    }
-  } else {
-    authError = authResult.error;
-  }
-
   return {
-    authSuccess,
-    authError,
+    authSuccess: false,
+    authError: null,
+    appAccessPending: true,
     email: authEmail,
     deliveryEmail: externalEmail,
-    loginLabel: "Student ID",
+    loginLabel: "Admission Number",
     loginValue: studentId,
     recordId: result.id,
     name,
-    defaultPassword,
+    defaultPassword: null,
   };
 }
 
@@ -747,7 +745,7 @@ async function importTeacher(data, schoolId) {
   let authSuccess = false;
   let authError = null;
 
-  const authResult = await createSupabaseAccount(email, defaultPassword);
+  const authResult = await createSupabaseAccount(email, defaultPassword, userId, { name, role: 'teacher' });
   if (authResult.success) {
     authSuccess = true;
     // Update user with Supabase ID if different
@@ -867,7 +865,7 @@ async function importNonTeachingStaff(data, schoolId) {
   let authSuccess = false;
   let authError = null;
 
-  const authResult = await createSupabaseAccount(email, defaultPassword);
+  const authResult = await createSupabaseAccount(email, defaultPassword, userId, { name, role: 'staff' });
   if (authResult.success) {
     authSuccess = true;
     // Update user with Supabase ID if different
@@ -888,8 +886,8 @@ async function importNonTeachingStaff(data, schoolId) {
 async function importParent(data, schoolId) {
   const { name, email, phone, relation, studentAdmissionNo, ...rest } = data;
 
-  if (!name || !phone || !relation || !studentAdmissionNo) {
-    throw new Error('Missing required fields: name, phone, relation, studentAdmissionNo');
+  if (!name || !relation || !studentAdmissionNo) {
+    throw new Error('Missing required fields: name, relation, studentAdmissionNo');
   }
 
   // Find the student
@@ -902,33 +900,28 @@ async function importParent(data, schoolId) {
   }
 
   // Check if parent already exists
-  const { authEmail, externalEmail, phone: normalizedPhone } = await resolveParentAccountIdentity({
+  const { authEmail, externalEmail, phone: normalizedPhone, school } = await resolveParentAccountIdentity({
     schoolId,
+    admissionNumber: student.admissionNo,
     phone,
     externalEmail: email,
   });
-
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: authEmail },
-        ...(externalEmail ? [{ email: externalEmail }] : []),
-      ],
-    },
+  const storedContactNumber = normalizedPhone || buildMissingContactPlaceholder({
+    schoolId,
+    admissionNumber: student.admissionNo,
+    role: `parent-${relation || 'guardian'}`,
   });
+
   const existingParent = await prisma.parent.findFirst({
     where: {
       schoolId,
       OR: [
-        { contactNumber: normalizedPhone },
-        { email: authEmail },
+        ...(normalizedPhone ? [{ contactNumber: normalizedPhone }] : []),
         ...(externalEmail ? [{ email: externalEmail }] : []),
       ],
     },
+    include: { studentLinks: true },
   });
-  if (existingUser || existingParent) {
-    throw new Error(`Parent account with this mobile number already exists.`);
-  }
 
   // Get or create parent role (global table)
   const parentRole = await prisma.role.upsert({
@@ -951,78 +944,76 @@ async function importParent(data, schoolId) {
   };
   const relationEnum = relationMap[relation.toLowerCase()] || 'GUARDIAN';
 
-  const defaultPassword = `Parent@${normalizedPhone.slice(-4)}`;
-  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-  const userId = require('crypto').randomUUID();
-
   // Create DB records FIRST using transaction
   const result = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        id: userId,
-        name,
-        email: authEmail,
-        password: hashedPassword,
-        roleId: parentRole.id,
-        schoolId,
-        status: 'ACTIVE'
-      }
-    });
+    let parent = existingParent;
+    let userId = existingParent?.userId;
 
-    // Create parent record with required contactNumber field
-    const parent = await tx.parent.create({
-      data: {
-        userId: user.id,
-        name,
-        email: externalEmail || authEmail,
-        contactNumber: normalizedPhone,
-        schoolId,
-        address: rest.address || null,
-        occupation: rest.occupation || null
-      }
-    });
+    if (!parent) {
+      const user = await tx.user.create({
+        data: {
+          id: require('crypto').randomUUID(),
+          name,
+          email: normalizedPhone
+            ? buildParentAuthEmail({ phone: normalizedPhone, school })
+            : authEmail,
+          password: await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 10),
+          roleId: parentRole.id,
+          schoolId,
+          status: 'INACTIVE'
+        }
+      });
+      userId = user.id;
+
+      // Create parent record with required contactNumber field
+      parent = await tx.parent.create({
+        data: {
+          userId: user.id,
+          name,
+          email: externalEmail || user.email,
+          contactNumber: storedContactNumber,
+          alternateNumber: normalizedPhone ? null : phone || null,
+          schoolId,
+          address: rest.address || null,
+          occupation: rest.occupation || null
+        }
+      });
+    }
 
     // Create student-parent link using junction table
-    await tx.studentParentLink.create({
-      data: {
+    await tx.studentParentLink.upsert({
+      where: {
+        studentId_parentId: {
+          studentId: student.userId,
+          parentId: parent.id,
+        },
+      },
+      update: {
+        relation: relationEnum,
+        isActive: true,
+      },
+      create: {
         studentId: student.userId,
         parentId: parent.id,
         relation: relationEnum,
         isPrimary: true
-      }
+      },
     });
 
-    return user;
+    return { id: userId };
   });
 
-  // DB succeeded - now create Supabase account
-  let authSuccess = false;
-  let authError = null;
-
-  const authResult = await createSupabaseAccount(authEmail, defaultPassword);
-  if (authResult.success) {
-    authSuccess = true;
-    // Update user with Supabase ID if different
-    if (authResult.userId !== userId) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { id: authResult.userId }
-      }).catch(() => {}); // Ignore if update fails
-    }
-  } else {
-    authError = authResult.error;
-  }
-
   return {
-    authSuccess,
-    authError,
+    authSuccess: false,
+    authError: null,
+    appAccessPending: true,
     email: authEmail,
     deliveryEmail: externalEmail,
-    loginLabel: 'Mobile Number',
-    loginValue: normalizedPhone,
+    loginLabel: 'Phone Number',
+    loginValue: normalizedPhone || 'Pending phone',
     recordId: result.id,
     name,
-    defaultPassword,
+    defaultPassword: null,
   };
 }
 

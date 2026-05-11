@@ -38,6 +38,7 @@ import {
     Plus,
     RotateCcw,
     AlertTriangle,
+    Barcode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +96,8 @@ const ELEMENT_TYPES = {
     TEXT: 'text',
     IMAGE: 'image',
     QRCODE: 'qrcode',
+    BARCODE: 'barcode',
+    SIGNATURE: 'signature',
     SHAPE: 'shape',
     TABLE: 'table',
     GROUP: 'group',
@@ -136,6 +139,22 @@ const DEFAULT_ELEMENTS = {
         height: 100,
         color: '#000000',
         backgroundColor: '#ffffff',
+    },
+    [ELEMENT_TYPES.BARCODE]: {
+        type: ELEMENT_TYPES.BARCODE,
+        content: '{{admissionNo}}',
+        width: 180,
+        height: 56,
+        color: '#000000',
+        backgroundColor: '#ffffff',
+    },
+    [ELEMENT_TYPES.SIGNATURE]: {
+        type: ELEMENT_TYPES.SIGNATURE,
+        url: '{{principalSignature}}',
+        width: 120,
+        height: 48,
+        opacity: 1,
+        borderRadius: 0,
     },
     [ELEMENT_TYPES.SHAPE]: {
         type: ELEMENT_TYPES.SHAPE,
@@ -264,9 +283,14 @@ function getCurvedTextMinHeight(element) {
 }
 
 function normalizeElementLayout(element, previousElement) {
-    if (element.type !== ELEMENT_TYPES.TEXT) return element;
+    const withStableFields = {
+        rotation: 0,
+        ...element,
+    };
 
-    const next = { ...element };
+    if (withStableFields.type !== ELEMENT_TYPES.TEXT) return withStableFields;
+
+    const next = { ...withStableFields };
 
     if (next.curved) {
         next.width = Math.max(Number(next.width) || 0, CURVED_TEXT_MIN_WIDTH);
@@ -1247,6 +1271,8 @@ export default function CertificateDesignEditor({
                         <ToolButton icon={Type} label="Text" onClick={() => addElement(ELEMENT_TYPES.TEXT)} />
                         <ToolButton icon={ImageIcon} label="Image" onClick={() => addElement(ELEMENT_TYPES.IMAGE)} />
                         <ToolButton icon={QrCode} label="QR Code" onClick={() => addElement(ELEMENT_TYPES.QRCODE)} />
+                        <ToolButton icon={Barcode} label="Barcode" onClick={() => addElement(ELEMENT_TYPES.BARCODE)} />
+                        <ToolButton icon={Upload} label="Sign" onClick={() => addElement(ELEMENT_TYPES.SIGNATURE)} />
                         <ToolButton icon={Square} label="Shape" onClick={() => addElement(ELEMENT_TYPES.SHAPE)} />
                         <ToolButton icon={TableIcon} label="Table" onClick={() => addElement(ELEMENT_TYPES.TABLE)} />
                     </div>
@@ -1299,6 +1325,15 @@ export default function CertificateDesignEditor({
                                 <>
                                     <div ref={guideXRef} style={{ display: 'none', position: 'absolute', top: 0, width: 1, height: '100%', background: '#3b82f6', opacity: 0.8, zIndex: 9999, pointerEvents: 'none' }} />
                                     <div ref={guideYRef} style={{ display: 'none', position: 'absolute', left: 0, height: 1, width: '100%', background: '#3b82f6', opacity: 0.8, zIndex: 9999, pointerEvents: 'none' }} />
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            inset: 24,
+                                            border: '1px dashed rgba(16,185,129,0.55)',
+                                            zIndex: 1,
+                                            pointerEvents: 'none',
+                                        }}
+                                    />
                                 </>
                             )}
                             {backgroundAsset?.mimeType === 'application/pdf' && (
@@ -1595,7 +1630,8 @@ function ElementRenderer({ element, isSelected, isEditing, readOnly, onUpdate, o
                     onStopEditing={onStopEditing}
                 />
             );
-        case ELEMENT_TYPES.IMAGE: {
+        case ELEMENT_TYPES.IMAGE:
+        case ELEMENT_TYPES.SIGNATURE: {
             const isPlaceholder = !element.url || (element.url.includes('{{') && element.url.includes('}}'));
             const placeholderKey = isPlaceholder
                 ? normalizeSignaturePlaceholderKey(element.url?.replace(/[{}]/g, '').trim())
@@ -1637,6 +1673,26 @@ function ElementRenderer({ element, isSelected, isEditing, readOnly, onUpdate, o
                     />
                 </div>
             );
+        case ELEMENT_TYPES.BARCODE: {
+            const value = String(element.content || 'EDUBREEZY');
+            const bars = Array.from(value).flatMap((char, idx) => {
+                const code = char.charCodeAt(0) + idx;
+                return [code % 3 === 0 ? 3 : 1, code % 5 === 0 ? 2 : 1, code % 7 === 0 ? 2 : 1];
+            });
+            return (
+                <div style={style} className="flex flex-col items-center justify-center bg-white px-2">
+                    <div className="flex h-[70%] w-full items-stretch justify-center gap-[1px]">
+                        {bars.slice(0, 48).map((barWidth, idx) => (
+                            <span
+                                key={idx}
+                                style={{ width: `${barWidth}px`, backgroundColor: idx % 2 === 0 ? element.color || '#000' : 'transparent' }}
+                            />
+                        ))}
+                    </div>
+                    <span className="mt-1 max-w-full truncate text-[9px] tracking-[0.18em]">{value}</span>
+                </div>
+            );
+        }
         case ELEMENT_TYPES.GROUP:
             return (
                 <div style={{ ...style, position: 'relative', width: '100%', height: '100%' }}>
@@ -1937,6 +1993,8 @@ function CurvedTextElement({ element }) {
 function getElementStyle(element) {
     const base = {
         opacity: element.opacity,
+        transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+        transformOrigin: 'center center',
     };
 
     switch (element.type) {

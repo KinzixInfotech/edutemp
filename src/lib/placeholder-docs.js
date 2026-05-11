@@ -17,36 +17,35 @@
 export const PLACEHOLDER_CATEGORIES = [
     {
         id: 'student',
-        label: '👤 Student',
+        label: 'Student',
         icon: 'User',
         placeholders: [
-            { value: 'student_name', label: 'Student Name', type: 'text', description: 'Full name of the student', example: 'Rahul Sharma' },
-            { value: 'father_name', label: 'Father Name', type: 'text', description: "Student's father name", example: 'Rajesh Sharma' },
-            { value: 'mother_name', label: 'Mother Name', type: 'text', description: "Student's mother name", example: 'Priya Sharma' },
+            { value: 'studentName', label: 'Student Name', type: 'text', description: 'Full name of the student', example: 'Rahul Sharma' },
+            { value: 'admissionNo', label: 'Admission Number', type: 'text', description: 'Unique admission number', example: 'ADM-2024-0042' },
+            { value: 'class', label: 'Class', type: 'text', description: 'Current class/grade', example: '10th' },
+            { value: 'section', label: 'Section', type: 'text', description: 'Section name', example: 'A' },
+            { value: 'rollNumber', label: 'Roll Number', type: 'text', description: 'Class roll number', example: '25' },
             { value: 'dob', label: 'Date of Birth', type: 'text', description: 'Date of birth (formatted)', example: '15-Jan-2010' },
-            { value: 'gender', label: 'Gender', type: 'text', description: 'Male / Female / Other', example: 'Male' },
-            { value: 'roll_number', label: 'Roll Number', type: 'text', description: 'Class roll number', example: '25' },
-            { value: 'admission_number', label: 'Admission Number', type: 'text', description: 'Unique admission number', example: 'ADM-2024-0042' },
             { value: 'studentPhoto', label: 'Student Photo', type: 'image', description: 'Passport size photo of student', example: '' },
+            { value: 'studentId', label: 'Student ID', type: 'text', description: 'System student ID', example: 'STU-00042' },
+            { value: 'gender', label: 'Gender', type: 'text', description: 'Male / Female / Other', example: 'Male' },
             { value: 'address', label: 'Address', type: 'text', description: 'Full residential address', example: '123 MG Road, New Delhi' },
             { value: 'bloodGroup', label: 'Blood Group', type: 'text', description: 'Blood group', example: 'B+' },
-            { value: 'studentId', label: 'Student ID', type: 'text', description: 'System student ID', example: 'STU-00042' },
         ]
     },
     {
-        id: 'academic',
-        label: '🏫 Academic',
-        icon: 'BookOpen',
+        id: 'parent',
+        label: 'Parent',
+        icon: 'Users',
         placeholders: [
-            { value: 'class', label: 'Class', type: 'text', description: 'Current class/grade', example: '10th' },
-            { value: 'section', label: 'Section', type: 'text', description: 'Section name', example: 'A' },
-            { value: 'session', label: 'Session', type: 'text', description: 'Academic session/year', example: '2025-26' },
-            { value: 'stream', label: 'Stream', type: 'text', description: 'Academic stream (Science/Commerce/Arts)', example: 'Science' },
+            { value: 'fatherName', label: 'Father Name', type: 'text', description: "Student's father name", example: 'Rajesh Sharma' },
+            { value: 'motherName', label: 'Mother Name', type: 'text', description: "Student's mother name", example: 'Priya Sharma' },
+            { value: 'parentPhone', label: 'Parent Phone', type: 'text', description: 'Parent or guardian phone number', example: '+91 98765 43210' },
         ]
     },
     {
         id: 'certificate',
-        label: '🧾 Certificate',
+        label: 'Certificate',
         icon: 'Award',
         placeholders: [
             { value: 'certificate_id', label: 'Certificate ID', type: 'text', description: 'Unique certificate number', example: 'CERT-2026-00142' },
@@ -58,11 +57,11 @@ export const PLACEHOLDER_CATEGORIES = [
     },
     {
         id: 'school',
-        label: '🏫 School',
+        label: 'School',
         icon: 'School',
         placeholders: [
-            { value: 'school_name', label: 'School Name', type: 'text', description: 'Full school name', example: 'Bright Future School' },
-            { value: 'school_address', label: 'School Address', type: 'text', description: 'School address', example: '456 Education Lane, Mumbai' },
+            { value: 'schoolName', label: 'School Name', type: 'text', description: 'Full school name', example: 'Bright Future School' },
+            { value: 'schoolAddress', label: 'School Address', type: 'text', description: 'School address', example: '456 Education Lane, Mumbai' },
             { value: 'schoolLogo', label: 'School Logo', type: 'image', description: 'School logo image', example: '' },
             { value: 'schoolStamp', label: 'School Stamp', type: 'image', description: 'Official school stamp image', example: '' },
             { value: 'principalSignature', label: 'Principal Signature', type: 'image', description: "Principal's signature image", example: '' },
@@ -71,16 +70,26 @@ export const PLACEHOLDER_CATEGORIES = [
     },
     {
         id: 'exam',
-        label: '📝 Exam',
+        label: 'Exam',
         icon: 'ClipboardList',
         placeholders: [
-            { value: 'exam_name', label: 'Exam Name', type: 'text', description: 'Name of the exam', example: 'Annual Examination 2026' },
-            { value: 'exam_date', label: 'Exam Date', type: 'text', description: 'Date of exam', example: '15-Mar-2026' },
+            { value: 'examName', label: 'Exam Name', type: 'text', description: 'Name of the exam', example: 'Annual Examination 2026' },
+            { value: 'examDate', label: 'Exam Date', type: 'text', description: 'Date of exam', example: '15-Mar-2026' },
             { value: 'examCenter', label: 'Exam Center', type: 'text', description: 'Center / venue name', example: 'Main Hall' },
             { value: 'center_name', label: 'Center Name', type: 'text', description: 'Alternate center name field', example: 'Center A' },
             { value: 'room_number', label: 'Room Number', type: 'text', description: 'Room/hall number', example: 'Room 12' },
             { value: 'seatNumber', label: 'Seat Number', type: 'text', description: 'Assigned seat number', example: '42' },
             { value: 'examSchedule', label: 'Exam Schedule', type: 'text', description: 'Schedule description', example: '10:00 AM - 1:00 PM' },
+        ]
+    },
+    {
+        id: 'result',
+        label: 'Result',
+        icon: 'BarChart3',
+        placeholders: [
+            { value: 'marks', label: 'Marks', type: 'text', description: 'Marks obtained', example: '482/500' },
+            { value: 'grade', label: 'Grade', type: 'text', description: 'Grade or division', example: 'A+' },
+            { value: 'percentage', label: 'Percentage', type: 'text', description: 'Overall percentage', example: '96.4%' },
         ]
     },
 ];

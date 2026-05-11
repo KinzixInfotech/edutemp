@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { buildDocumentMappingContext, sharedFieldResolver, normalizeTemplateLayout } from '@/lib/shared-field-resolver';
 
 // Helper function to replace template variables with actual data
 function replaceVariables(text, data) {
@@ -11,7 +12,7 @@ function replaceVariables(text, data) {
     if (matches) {
         matches.forEach(match => {
             const key = match.replace(/[{}]/g, '');
-            const value = data[key] ?? match;
+            const value = typeof data.__resolver === 'function' ? data.__resolver(key) : data[key];
             result = result.replace(match, value);
         });
     }
@@ -29,14 +30,14 @@ function hexToRgb(hex) {
     } : { r: 0, g: 0, b: 0 };
 }
 
-// Convert pixels to mm (assuming 96 DPI)
+// Fixed template coordinates are stored in PDF points.
 function pxToMm(px) {
-    return px * 0.264583;
+    return Number(px) || 0;
 }
 
 export async function generateAdmitCardPDF({ template, student, exam, customFields = {} }) {
     try {
-        const layoutConfig = template.layoutConfig;
+        const layoutConfig = normalizeTemplateLayout(template.layoutConfig);
 
         // Check if template uses new element-based system
         if (!layoutConfig.elements) {
@@ -47,8 +48,8 @@ export async function generateAdmitCardPDF({ template, student, exam, customFiel
         // Create PDF with landscape orientation for admit cards
         const doc = new jsPDF({
             orientation: layoutConfig.orientation || 'landscape',
-            unit: 'mm',
-            format: 'a4',
+            unit: 'pt',
+            format: [layoutConfig.canvasWidth, layoutConfig.canvasHeight],
         });
 
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -100,6 +101,16 @@ export async function generateAdmitCardPDF({ template, student, exam, customFiel
             subject4: exam?.schedule?.[3]?.subject || '',
             opted4: exam?.schedule?.[3]?.opted || '',
         };
+        const mappingContext = buildDocumentMappingContext({
+            student,
+            exam,
+            formValues: customFields,
+            fullUser: { school: exam?.school || template.school || {} },
+            assets: {
+                studentPhoto: customFields.studentPhoto || student.user?.profilePicture || student.profilePicture,
+            },
+        });
+        data.__resolver = (key) => customFields?.[key] ?? data?.[key] ?? sharedFieldResolver(key, mappingContext);
 
         // Render each element
         for (const element of layoutConfig.elements) {

@@ -602,12 +602,14 @@ import { supabaseAdmin } from "@/lib/supbase-admin";
 import { verifyAdminAccess, withSchoolAccess } from "@/lib/api-auth";
 import { z } from "zod";
 import { differenceInYears } from "date-fns";
+import bcrypt from "bcryptjs";
 import {
   invalidateParentDirectoryCaches,
   invalidatePattern,
   invalidateStudentDirectoryCaches,
 } from "@/lib/cache";
 import {
+  buildMissingContactPlaceholder,
   generateNextStudentId,
   resolveParentAccountIdentity,
   resolveStudentAccountIdentity,
@@ -822,6 +824,9 @@ export const POST = withSchoolAccess(async function POST(req, context) {
     let loginValue = authEmail;
 
     if (mappedRole === "STUDENT") {
+      if (!parsed.password?.trim()) {
+        return NextResponse.json({ error: "Student password is required." }, { status: 400 });
+      }
       if (parsed.password?.trim() && parsed.password.trim().length < 6) {
         return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
       }
@@ -836,8 +841,8 @@ export const POST = withSchoolAccess(async function POST(req, context) {
       parsed.admissionNo = identity.studentId;
       authEmail = identity.authEmail;
       profileEmail = identity.externalEmail || identity.authEmail;
-      authPassword = parsed.password?.trim() || `Student@${identity.studentId.split("-").pop() || "001"}`;
-      loginLabel = "Student ID";
+      authPassword = parsed.password.trim();
+      loginLabel = "Admission Number";
       loginValue = identity.studentId;
 
       const existingStudent = await prisma.student.findFirst({
@@ -855,17 +860,36 @@ export const POST = withSchoolAccess(async function POST(req, context) {
         return NextResponse.json({ error: "A student with this student ID already exists." }, { status: 409 });
       }
     } else if (mappedRole === "PARENT") {
+      if (!parsed.linkedStudentIds?.length) {
+        return NextResponse.json({ error: "Link at least one student to this parent profile." }, { status: 400 });
+      }
+
+      const linkedStudent = await prisma.student.findFirst({
+        where: {
+          schoolId,
+          userId: parsed.linkedStudentIds[0],
+        },
+        select: {
+          userId: true,
+          admissionNo: true,
+        },
+      });
+
+      if (!linkedStudent?.admissionNo) {
+        return NextResponse.json({ error: "Linked student was not found or has no admission number." }, { status: 400 });
+      }
+
       const identity = await resolveParentAccountIdentity({
         schoolId,
         phone: parsed.contactNumber,
         externalEmail: parsed.email,
       });
 
-      parsed.contactNumber = identity.phone;
+      parsed.contactNumber = identity.phone || buildMissingContactPlaceholder({ schoolId, admissionNumber: linkedStudent.admissionNo });
       authEmail = identity.authEmail;
       profileEmail = identity.externalEmail || identity.authEmail;
       authPassword = parsed.password?.trim();
-      loginLabel = "Mobile Number";
+      loginLabel = "Phone Number";
       loginValue = identity.phone;
 
       if (!authPassword || authPassword.length < 6) {
@@ -876,15 +900,15 @@ export const POST = withSchoolAccess(async function POST(req, context) {
         where: {
           schoolId,
           OR: [
-            { contactNumber: identity.phone },
             { email: authEmail },
             ...(identity.externalEmail ? [{ email: identity.externalEmail }] : []),
+            ...(identity.phone ? [{ contactNumber: identity.phone }] : []),
           ],
         },
       });
 
       if (existingParent) {
-        return NextResponse.json({ error: "A parent with this mobile number already exists." }, { status: 409 });
+        return NextResponse.json({ error: "A parent login for this phone number already exists." }, { status: 409 });
       }
     } else {
       if (!authEmail) {
@@ -925,7 +949,7 @@ export const POST = withSchoolAccess(async function POST(req, context) {
       const user = await tx.user.create({
         data: {
           id: createdUserId,
-          password: authPassword,
+          password: await bcrypt.hash(authPassword, 10),
           profilePicture: parsed.profilePicture || "default.png",
           name: userName,
           email: authEmail,

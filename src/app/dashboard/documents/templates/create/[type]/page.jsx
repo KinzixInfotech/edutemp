@@ -44,7 +44,7 @@ import CropImageDialog from '@/app/components/CropImageDialog';
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
-import { extractTemplatePlaceholders } from '@/lib/certificate-template-mapping';
+import { extractTemplatePlaceholders, normalizeTemplateLayout } from '@/lib/certificate-template-mapping';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -239,13 +239,13 @@ export default function CreateTemplatePage() {
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
-            const layoutConfig = {
+            const layoutConfig = normalizeTemplateLayout({
                 elements: editorConfig.elements,
                 canvasSize: editorConfig.canvasSize,
                 backgroundImage: editorConfig.backgroundImage,
                 backgroundAsset: editorConfig.backgroundAsset || null,
                 mappingPlaceholders: extractTemplatePlaceholders(editorConfig.elements || []),
-            };
+            });
 
             const res = await fetch(`/api/documents/${schoolId}/${config.apiEndpoint}`, {
                 method: 'POST',

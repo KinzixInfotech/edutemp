@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import QRCode from 'qrcode';
+import { normalizeTemplateLayout } from '@/lib/shared-field-resolver';
+import { resolvePdfFontFamily } from '@/lib/template-rendering';
 
 function getPdfFormat(canvasSize = {}) {
     const width = Number(canvasSize?.width) || 794;
@@ -40,12 +42,7 @@ function applyTextStyles(pdf, element) {
         element?.fontStyle === 'italic' ? 'italic' : null,
     ].filter(Boolean).join('');
 
-    let family = 'helvetica';
-    if (fontFamily.includes('times') || fontFamily.includes('georgia') || fontFamily.includes('garamond')) {
-        family = 'times';
-    } else if (fontFamily.includes('courier')) {
-        family = 'courier';
-    }
+    const family = resolvePdfFontFamily(fontFamily);
 
     pdf.setFont(family, fontStyle || 'normal');
     pdf.setFontSize(Number(element?.fontSize) || 14);
@@ -155,7 +152,7 @@ function renderText(pdf, element) {
             let textX = x;
             if (align === 'center') textX = x + width / 2;
             if (align === 'right') textX = x + width;
-            pdf.text(line, textX, currentY, { align });
+            pdf.text(line, textX, currentY, { align, angle: Number(element?.rotation) || 0 });
             currentY += lineHeight;
         }
     });
@@ -179,7 +176,7 @@ async function renderImage(pdf, element) {
         }
     }
 
-    pdf.addImage(dataUrl, getImageFormat(dataUrl), x, y, width, height);
+    pdf.addImage(dataUrl, getImageFormat(dataUrl), x, y, width, height, undefined, undefined, Number(element?.rotation) || 0);
 }
 
 async function renderQr(pdf, element) {
@@ -191,7 +188,33 @@ async function renderQr(pdf, element) {
     if (!value) return;
 
     const qrDataUrl = await QRCode.toDataURL(value, { margin: 0 });
-    pdf.addImage(qrDataUrl, 'PNG', x, y, width, height);
+    pdf.addImage(qrDataUrl, 'PNG', x, y, width, height, undefined, undefined, Number(element?.rotation) || 0);
+}
+
+function renderBarcode(pdf, element) {
+    const x = Number(element?.x) || 0;
+    const y = Number(element?.y) || 0;
+    const width = Number(element?.width) || 180;
+    const height = Number(element?.height) || 56;
+    const value = String(element?.content || '').trim();
+    if (!value) return;
+
+    const color = toRgb(element?.color || '#000000');
+    if (color) pdf.setFillColor(color.r, color.g, color.b);
+    const bars = Array.from(value).flatMap((char, idx) => {
+        const code = char.charCodeAt(0) + idx;
+        return [code % 3 === 0 ? 3 : 1, code % 5 === 0 ? 2 : 1, code % 7 === 0 ? 2 : 1];
+    }).slice(0, 60);
+    const unit = width / bars.reduce((sum, bar) => sum + bar, 0);
+    let cursor = x;
+    bars.forEach((bar, idx) => {
+        const barWidth = Math.max(unit * bar, 0.5);
+        if (idx % 2 === 0) pdf.rect(cursor, y, barWidth, height * 0.76, 'F');
+        cursor += barWidth;
+    });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text(value, x + width / 2, y + height - 4, { align: 'center', charSpace: 1 });
 }
 
 function renderTable(pdf, element) {
@@ -244,18 +267,19 @@ function renderTable(pdf, element) {
 }
 
 export async function renderPdfFromLayout(layoutConfig = {}) {
-    const { width, height, orientation } = getPdfFormat(layoutConfig?.canvasSize);
+    const stableLayout = normalizeTemplateLayout(layoutConfig);
+    const { width, height, orientation } = getPdfFormat(stableLayout?.canvasSize);
     const pdf = new jsPDF({
         orientation,
         unit: 'pt',
         format: [width, height],
     });
 
-    renderBackground(pdf, layoutConfig, width, height);
+    renderBackground(pdf, stableLayout, width, height);
 
-    if (layoutConfig?.backgroundImage) {
+    if (stableLayout?.backgroundImage) {
         try {
-            const backgroundDataUrl = await toDataUrl(layoutConfig.backgroundImage);
+            const backgroundDataUrl = await toDataUrl(stableLayout.backgroundImage);
             if (backgroundDataUrl) {
                 pdf.addImage(backgroundDataUrl, getImageFormat(backgroundDataUrl), 0, 0, width, height);
             }
@@ -264,16 +288,15 @@ export async function renderPdfFromLayout(layoutConfig = {}) {
         }
     }
 
-    const elements = Array.isArray(layoutConfig?.elements)
-        ? [...layoutConfig.elements].sort((a, b) => (a?.zIndex || 0) - (b?.zIndex || 0))
-        : [];
+    const elements = [...stableLayout.elements].sort((a, b) => (a?.zIndex || 0) - (b?.zIndex || 0));
 
     for (const element of elements) {
         try {
             if (element?.type === 'shape') renderShape(pdf, element);
             if (element?.type === 'text') renderText(pdf, element);
-            if (element?.type === 'image') await renderImage(pdf, element);
+            if (element?.type === 'image' || element?.type === 'signature') await renderImage(pdf, element);
             if (element?.type === 'qrcode') await renderQr(pdf, element);
+            if (element?.type === 'barcode') renderBarcode(pdf, element);
             if (element?.type === 'table') renderTable(pdf, element);
         } catch (error) {
             console.warn(`Failed to render PDF element ${element?.id || element?.type}:`, error);

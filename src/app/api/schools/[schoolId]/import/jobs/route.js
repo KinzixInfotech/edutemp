@@ -6,17 +6,13 @@ import qstash from '@/lib/qstash';
 import { uploadToR2, generateFileKey } from '@/lib/r2';
 import { createJobId, listBulkJobs, setBulkJob } from '@/lib/bulk-job-store';
 import { FIELD_MAPPINGS } from '../route';
+import {
+  analyzeImportHeaders,
+  isIgnoredImportColumn,
+} from '@/lib/import-column-mapping';
 
 const CHUNK_SIZE = 500;
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
-
-function normalizeColumnName(col) {
-  return String(col || '').
-  replace(/\s*\*\s*/g, '').
-  replace(/\s*\([^)]*\)\s*/g, '').
-  trim().
-  toLowerCase();
-}
 
 function buildQueuedChunks(totalRows) {
   const chunks = [];
@@ -64,6 +60,7 @@ async function enqueueWorker(jobId) {
     const moduleKey = formData.get('module');
     const importedBy = formData.get('userId');
     const sendEmails = formData.get('sendEmails') === 'true';
+    const academicYearId = String(formData.get('academicYearId') || '').trim() || null;
 
     if (!file || !moduleKey || !importedBy) {
       return NextResponse.json({ error: 'File, module, and user are required' }, { status: 400 });
@@ -72,6 +69,17 @@ async function enqueueWorker(jobId) {
     const expectedFields = FIELD_MAPPINGS[moduleKey];
     if (!expectedFields) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
+    }
+
+    let academicYear = null;
+    if (academicYearId) {
+      academicYear = await prisma.academicYear.findFirst({
+        where: { id: academicYearId, schoolId },
+        select: { id: true, name: true, startDate: true, endDate: true, isActive: true }
+      });
+      if (!academicYear) {
+        return NextResponse.json({ error: 'Selected academic year was not found for this school' }, { status: 400 });
+      }
     }
 
     const bytes = await file.arrayBuffer();
@@ -85,30 +93,22 @@ async function enqueueWorker(jobId) {
       return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
     }
 
-    const uploadedColumns = Object.keys(rawData[0]).filter((col) => col !== 'S.No');
-    const expectedColumns = Object.keys(expectedFields);
-    const normalizedUploaded = uploadedColumns.map(normalizeColumnName).sort();
-    const normalizedExpected = expectedColumns.map(normalizeColumnName).sort();
-    const missingColumns = expectedColumns.filter((col) => !normalizedUploaded.includes(normalizeColumnName(col)));
-    const unexpectedColumns = uploadedColumns.filter((col) => !normalizedExpected.includes(normalizeColumnName(col)));
+    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
 
-    if (missingColumns.length || unexpectedColumns.length) {
+    if (!headerAnalysis.isValid) {
       return NextResponse.json({
         error: 'Template mapping not matched',
         details: {
           message: 'The uploaded file does not match the expected template format.',
-          missingColumns,
-          unexpectedColumns,
-          expectedColumns,
-          uploadedColumns,
-          suggestion: 'Please download the latest template. Header names are matched strictly after normalization.'
+          ...headerAnalysis,
+          suggestion: 'Fix the missing or unrecognized headers shown above, or download the latest template for this module.'
         }
       }, { status: 400 });
     }
 
     const dataRows = rawData.filter((row) => {
       const meaningfulValues = Object.entries(row).
-      filter(([key]) => key !== 'S.No').
+      filter(([key]) => !isIgnoredImportColumn(key)).
       map(([, value]) => String(value ?? '').trim()).
       filter(Boolean);
       return meaningfulValues.length > 0;
@@ -155,6 +155,8 @@ async function enqueueWorker(jobId) {
       fileUrl,
       importedBy,
       sendEmails,
+      academicYearId,
+      academicYearName: academicYear?.name || null,
       historyId: history.id,
       status: 'queued',
       chunkSize: CHUNK_SIZE,

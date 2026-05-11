@@ -206,12 +206,20 @@ export default function ParentListPage() {
                         {total} {total === 1 ? 'Parent' : 'Parents'} registered
                     </p>
                 </div>
-                <Link href={`/dashboard/schools/${schoolId}/profiles/parents/new`}>
-                    <Button className="w-full sm:w-auto dark:text-white" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Parent
-                    </Button>
-                </Link>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <Link href="/dashboard/schools/manage-parent/pending-phone">
+                        <Button variant="outline" className="w-full sm:w-auto" size="sm">
+                            <Phone className="mr-2 h-4 w-4" />
+                            Pending Phone
+                        </Button>
+                    </Link>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/parents/new`}>
+                        <Button className="w-full sm:w-auto dark:text-white" size="sm">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Parent
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Cards */}

@@ -2,6 +2,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from '@/lib/prisma';
+import { isMissingContactPlaceholder } from '@/lib/profile-auth';
 
 // Export configurations for each module
 export const EXPORT_CONFIGS = {
@@ -27,9 +28,17 @@ export const EXPORT_CONFIGS = {
     { key: 'bloodGroup', label: 'Blood Group' },
     { key: 'admissionDate', label: 'Admission Date' }],
 
-    fetchFn: async (schoolId) => {
+    fetchFn: async (schoolId, { academicYearId } = {}) => {
       const students = await prisma.student.findMany({
-        where: { schoolId },
+        where: {
+          schoolId,
+          ...(academicYearId ? {
+            OR: [
+              { academicYearId },
+              { sessions: { some: { academicYearId } } }
+            ]
+          } : {})
+        },
         include: {
           section: { include: { class: true } }
         },
@@ -55,9 +64,9 @@ export const EXPORT_CONFIGS = {
     { key: 'joiningDate', label: 'Joining Date' },
     { key: 'salary', label: 'Salary' }],
 
-    fetchFn: async (schoolId) => {
+    fetchFn: async (schoolId, { academicYearId } = {}) => {
       const teachers = await prisma.teachingStaff.findMany({
-        where: { schoolId },
+        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
         include: { user: true },
         orderBy: { user: { name: 'asc' } }
       });
@@ -67,7 +76,7 @@ export const EXPORT_CONFIGS = {
         email: t.user?.email || '',
         gender: t.user?.gender || '',
         designation: t.designation,
-        phone: t.phone,
+        phone: t.contactNumber,
         qualification: t.qualification,
         joiningDate: t.joiningDate,
         salary: t.salary
@@ -86,10 +95,10 @@ export const EXPORT_CONFIGS = {
     { key: 'phone', label: 'Phone' },
     { key: 'joiningDate', label: 'Joining Date' }],
 
-    fetchFn: async (schoolId) => {
+    fetchFn: async (schoolId, { academicYearId } = {}) => {
       const staff = await prisma.nonTeachingStaff.findMany({
-        where: { schoolId },
-        include: { user: true },
+        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
+        include: { user: true, department: true },
         orderBy: { user: { name: 'asc' } }
       });
       return staff.map((s) => ({
@@ -98,8 +107,8 @@ export const EXPORT_CONFIGS = {
         email: s.user?.email || '',
         gender: s.user?.gender || '',
         designation: s.designation,
-        department: s.department,
-        phone: s.phone,
+        department: s.department?.name || '',
+        phone: s.contactNumber,
         joiningDate: s.dateOfJoining
       }));
     }
@@ -110,27 +119,45 @@ export const EXPORT_CONFIGS = {
     { key: 'name', label: 'Full Name' },
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
+    { key: 'authStatus', label: 'Parent Auth Status' },
     { key: 'relation', label: 'Relation' },
     { key: 'studentName', label: 'Student Name' },
     { key: 'studentAdmissionNo', label: 'Student Admission No' },
     { key: 'occupation', label: 'Occupation' }],
 
-    fetchFn: async (schoolId) => {
+    fetchFn: async (schoolId, { academicYearId } = {}) => {
       const parents = await prisma.parent.findMany({
-        where: { schoolId },
+        where: {
+          schoolId,
+          ...(academicYearId ? {
+            studentLinks: {
+              some: {
+                student: {
+                  OR: [
+                    { academicYearId },
+                    { sessions: { some: { academicYearId } } }
+                  ]
+                }
+              }
+            }
+          } : {})
+        },
         include: {
           user: true,
-          students: true
+          studentLinks: {
+            include: { student: true }
+          }
         },
         orderBy: { user: { name: 'asc' } }
       });
       return parents.map((p) => ({
         name: p.user?.name || p.name || '',
         email: p.user?.email || p.email || '',
-        phone: p.phone,
-        relation: p.relation,
-        studentName: p.students?.[0]?.name || '',
-        studentAdmissionNo: p.students?.[0]?.admissionNo || '',
+        phone: isMissingContactPlaceholder(p.contactNumber) ? '' : p.contactNumber,
+        authStatus: isMissingContactPlaceholder(p.contactNumber) ? 'pending_phone' : p.user?.status === 'ACTIVE' ? 'active' : 'inactive',
+        relation: p.studentLinks?.[0]?.relation || '',
+        studentName: p.studentLinks?.[0]?.student?.name || '',
+        studentAdmissionNo: p.studentLinks?.[0]?.student?.admissionNo || '',
         occupation: p.occupation
       }));
     }
@@ -142,9 +169,9 @@ export const EXPORT_CONFIGS = {
     { key: 'sections', label: 'Sections' },
     { key: 'studentCount', label: 'Student Count' }],
 
-    fetchFn: async (schoolId) => {
+    fetchFn: async (schoolId, { academicYearId } = {}) => {
       const classes = await prisma.class.findMany({
-        where: { schoolId },
+        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
         include: {
           sections: {
             include: { _count: { select: { students: true } } }
@@ -206,7 +233,7 @@ export const EXPORT_CONFIGS = {
       return books.map((b) => ({
         title: b.title,
         author: b.author,
-        isbn: b.isbn,
+        isbn: b.ISBN,
         category: b.category,
         publishedYear: b.publishedYear,
         copies: b.totalCopies,
@@ -238,7 +265,7 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
 export const POST = withSchoolAccess(async function POST(req, { params }) {
   try {
     const { schoolId } = await params;
-    const { modules: selectedModules, format = 'xlsx' } = await req.json();
+    const { modules: selectedModules, format = 'xlsx', academicYearId } = await req.json();
 
     if (!selectedModules || selectedModules.length === 0) {
       return NextResponse.json({ error: 'No modules selected' }, { status: 400 });
@@ -254,7 +281,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
       try {
         // Fetch data
-        const data = await config.fetchFn(schoolId);
+        const data = await config.fetchFn(schoolId, { academicYearId: academicYearId || null });
 
         // Create worksheet data with headers
         const headers = config.fields.map((f) => f.label);

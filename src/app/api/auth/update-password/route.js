@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request) {
     try {
@@ -43,13 +44,11 @@ export async function POST(request) {
         const userId = session.user.id;
         const email = session.user.email;
 
-        // Update Prisma User
-        // NOTE: Storing plain text password as requested to match existing system pattern (create-user)
-        // WARN: This is not recommended practice but follows consistency with current codebase
+        // Update Prisma User with a bcrypt hash; Supabase owns the usable auth secret.
         await prisma.user.update({
             where: { id: userId },
             data: {
-                password: password
+                password: await bcrypt.hash(password, 10)
             }
         });
 

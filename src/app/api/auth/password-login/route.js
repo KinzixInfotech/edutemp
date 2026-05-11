@@ -20,15 +20,17 @@ const loginSchema = z.object({
 
 async function resolveAuthEmail({ schoolId, role, identifier }) {
     if (role === "parent") {
-        const normalizedPhone = normalizePhoneNumber(identifier);
-        if (!/^\d{10}$/.test(normalizedPhone)) {
-            return { error: "Use a valid 10-digit mobile number." };
+        const phone = normalizePhoneNumber(identifier);
+        if (!phone || phone.length !== 10) {
+            return { error: "Use the parent's 10-digit phone number." };
         }
 
         const parent = await prisma.parent.findFirst({
             where: {
                 schoolId,
-                contactNumber: normalizedPhone,
+                contactNumber: phone,
+                status: "ACTIVE",
+                user: { status: "ACTIVE" },
             },
             include: {
                 user: {
@@ -36,11 +38,19 @@ async function resolveAuthEmail({ schoolId, role, identifier }) {
                         role: true,
                     },
                 },
+                studentLinks: {
+                    where: { isActive: true },
+                    select: { id: true },
+                }
             },
         });
 
         if (!parent?.user) {
             return { error: "No account found for this school." };
+        }
+
+        if (!parent.studentLinks?.length) {
+            return { error: "Parent account is not linked to any student yet." };
         }
 
         return {

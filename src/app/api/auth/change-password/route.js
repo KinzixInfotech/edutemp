@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { compareStoredPassword } from "@/lib/profile-auth";
 
 const changePasswordSchema = z.object({
     userId: z.string(),
@@ -17,7 +19,7 @@ export async function POST(req) {
         // Verify current password in Prisma if provided
         if (currentPassword) {
             const user = await prisma.user.findUnique({ where: { id: userId } });
-            if (!user || user.password !== currentPassword) {
+            if (!user || !(await compareStoredPassword(user.password, currentPassword))) {
                 return NextResponse.json({ error: "Current password incorrect" }, { status: 401 });
             }
         }
@@ -33,7 +35,7 @@ export async function POST(req) {
         // Update password in Prisma
         await prisma.user.update({
             where: { id: userId },
-            data: { password: newPassword, updatedAt: new Date() },
+            data: { password: await bcrypt.hash(newPassword, 10), updatedAt: new Date() },
         });
         return NextResponse.json({ success: true });
     } catch (err) {

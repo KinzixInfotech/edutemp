@@ -262,6 +262,11 @@ export const SidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
+                        label: "Marketplace",
+                        url: "/dashboard/documents/templates/marketplace",
+                        roles: ["ADMIN"],
+                    },
+                    {
                         label: "Certificate Templates",
                         url: "/dashboard/documents/templates/certificate",
                         roles: ["ADMIN"],
@@ -336,7 +341,7 @@ export const SidebarData = [
     {
         title: "Academics & Operations",
         items: [
-            { label: "Inventory", url: "/dashboard/schools/inventory", icon: Blocks, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Inventory", url: "/dashboard/schools/inventory", icon: Blocks, roles: ["STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: ScrollText, roles: ["ADMIN"] },
             { label: "Homework", url: "/dashboard/schools/homework/", icon: BookA, roles: ["ADMIN"] },
         ]
@@ -635,6 +640,7 @@ export const SidebarData = [
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Contact Submissions", url: "/dashboard/super-admin/contact-submissions", icon: Inbox, roles: ['SUPER_ADMIN'] },
             { label: "Email Configuration", url: "/dashboard/super-admin/email-configuration", icon: Mail, roles: ['SUPER_ADMIN'] },
+            { label: "Template Studio", url: "/dashboard/edubreezy/template-studio", icon: BookCopy, roles: ["SUPER_ADMIN"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
             { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },

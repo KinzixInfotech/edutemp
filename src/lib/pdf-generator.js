@@ -1,10 +1,12 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { toBase64 } from '@/lib/utils';
+import { buildDocumentMappingContext, sharedFieldResolver, PLACEHOLDER_REGEX, normalizeTemplateLayout } from '@/lib/shared-field-resolver';
+import { resolvePdfFontFamily } from '@/lib/template-rendering';
 
 export async function generatePDF({ template, student, certificateNumber, issueDate, customFields, verificationUrl }) {
     try {
-        const layoutConfig = template.layoutConfig || {};
+        const layoutConfig = normalizeTemplateLayout(template.layoutConfig || {});
         const elements = layoutConfig.elements || [];
         const canvasSize = layoutConfig.canvasSize || { width: 800, height: 600 };
         const orientation = canvasSize.width > canvasSize.height ? 'landscape' : 'portrait';
@@ -13,7 +15,7 @@ export async function generatePDF({ template, student, certificateNumber, issueD
         const doc = new jsPDF({
             orientation,
             unit: 'pt',
-            format: 'a4',
+            format: [canvasSize.width, canvasSize.height],
         });
 
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -53,21 +55,15 @@ export async function generatePDF({ template, student, certificateNumber, issueD
         }
 
         // Prepare data for placeholders
-        const data = {
-            '{{studentName}}': student.name || '',
-            '{{studentId}}': student.studentId || '',
-            '{{rollNumber}}': student.rollNumber || '',
-            '{{class}}': student.class?.className || '',
-            '{{section}}': student.section?.sectionName || '',
-            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
-            '{{fatherName}}': student.fatherName || '',
-            '{{motherName}}': student.motherName || '',
-            '{{schoolName}}': template.school?.name || '', // Assuming template includes school
-            '{{issueDate}}': new Date(issueDate).toLocaleDateString(),
-            '{{certificateNumber}}': certificateNumber,
-            '{{verificationUrl}}': verificationUrl || '',
-            ...customFields
-        };
+        const context = buildDocumentMappingContext({
+            student,
+            fullUser: { school: template.school || {} },
+            formValues: { issueDate },
+            certificateMeta: { certificateNumber, verificationUrl },
+        });
+        const replaceTemplateFields = (value) => String(value || '').replace(PLACEHOLDER_REGEX, (_, key) => (
+            customFields?.[key.trim()] ?? sharedFieldResolver(key, context)
+        ));
 
         // Render Elements
         for (const el of elements) {
@@ -79,18 +75,14 @@ export async function generatePDF({ template, student, certificateNumber, issueD
 
                 switch (el.type) {
                     case 'text': {
-                        let content = el.content || '';
-                        // Replace placeholders
-                        Object.entries(data).forEach(([key, value]) => {
-                            content = content.replace(new RegExp(key, 'g'), value);
-                        });
+                        let content = replaceTemplateFields(el.content || '');
 
                         doc.setFontSize(s(el.fontSize));
                         doc.setTextColor(el.color || '#000000');
 
                         // Font handling (basic mapping)
                         const fontStyle = el.fontWeight === 'bold' ? 'bold' : 'normal';
-                        const fontName = el.fontFamily === 'Times New Roman' ? 'times' : 'helvetica';
+                        const fontName = resolvePdfFontFamily(el.fontFamily);
                         doc.setFont(fontName, fontStyle);
 
                         // Alignment
@@ -107,10 +99,7 @@ export async function generatePDF({ template, student, certificateNumber, issueD
                     }
                     case 'image': {
                         if (el.url) {
-                            let imgUrl = el.url;
-                            Object.entries(data).forEach(([key, value]) => {
-                                imgUrl = imgUrl.replace(new RegExp(key, 'g'), value || '');
-                            });
+                            let imgUrl = replaceTemplateFields(el.url);
 
                             if (!imgUrl) break;
                             if (!imgUrl.startsWith('data:')) {

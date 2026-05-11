@@ -5,9 +5,14 @@ import { verifyRoleAccess, withSchoolAccess } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { z } from "zod";
 import { differenceInYears } from "date-fns";
+import bcrypt from "bcryptjs";
+import {
+  resolveParentAccountIdentity,
+  resolveStudentAccountIdentity,
+} from "@/lib/profile-auth";
 
 const studentSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional().or(z.literal('')),
   password: z.string().min(6),
   studentName: z.string(),
   admissionNo: z.string(),
@@ -257,8 +262,14 @@ export const POST = withSchoolAccess(async function POST(req, props) {
     }
 
     // 2. Additional Validations (Duplicate check, Age)
+    const studentIdentity = await resolveStudentAccountIdentity({
+      schoolId,
+      studentId: parsed.admissionNo,
+      externalEmail: parsed.email,
+    });
+
     const existingUser = await prisma.user.findUnique({
-      where: { email: parsed.email }
+      where: { email: studentIdentity.authEmail }
     });
     if (existingUser) {
       return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
@@ -293,23 +304,30 @@ export const POST = withSchoolAccess(async function POST(req, props) {
 
     // 4. Handle Parent Profile Creation in Supabase (if needed)
     if (parsed.createParentProfile) {
-      if (!parsed.parentName || !parsed.parentEmail || !parsed.parentPassword || !parsed.parentContactNumber) {
+      if (!parsed.parentName || !parsed.parentPassword) {
         return NextResponse.json({ error: "Missing parent profile details" }, { status: 400 });
       }
+      if (!parsed.parentContactNumber || parsed.parentContactNumber.replace(/\D/g, '').length < 10) {
+        return NextResponse.json({ error: "Parent phone number is required to activate parent app login." }, { status: 400 });
+      }
+      if (parsed.parentPassword === parsed.password) {
+        return NextResponse.json({ error: "Parent and student passwords must be different" }, { status: 400 });
+      }
 
-      const existingParentUser = await prisma.user.findUnique({ where: { email: parsed.parentEmail } });
+      const parentIdentity = await resolveParentAccountIdentity({
+        schoolId,
+        phone: parsed.parentContactNumber,
+        externalEmail: parsed.parentEmail,
+      });
+
+      const existingParentUser = await prisma.user.findUnique({ where: { email: parentIdentity.authEmail } });
       if (existingParentUser) {
         return NextResponse.json({ error: "A user with this parent email already exists" }, { status: 409 });
       }
 
-      const existingParentPhone = await prisma.parent.findFirst({ where: { schoolId, contactNumber: parsed.parentContactNumber } });
-      if (existingParentPhone) {
-        return NextResponse.json({ error: "A parent with this contact number already exists" }, { status: 409 });
-      }
-
       const { data: parentAuth, error: parentAuthError } = await supabaseAdmin.auth.admin.createUser({
         user_metadata: { name: parsed.parentName },
-        email: parsed.parentEmail,
+        email: parentIdentity.authEmail,
         password: parsed.parentPassword,
         email_confirm: true
       });
@@ -324,7 +342,7 @@ export const POST = withSchoolAccess(async function POST(req, props) {
     // 5. Create Student in Supabase
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       user_metadata: { name: parsed.studentName },
-      email: parsed.email,
+      email: studentIdentity.authEmail,
       password: parsed.password,
       email_confirm: true
     });
@@ -346,10 +364,10 @@ export const POST = withSchoolAccess(async function POST(req, props) {
       const user = await tx.user.create({
         data: {
           id: createdUserId,
-          password: parsed.password,
+          password: await bcrypt.hash(parsed.password, 10),
           profilePicture: parsed.profilePicture || "default.png",
           name: parsed.studentName,
-          email: parsed.email,
+          email: studentIdentity.authEmail,
           school: { connect: { id: schoolId } },
           role: { connect: { id: role.id } }
         }
@@ -358,7 +376,7 @@ export const POST = withSchoolAccess(async function POST(req, props) {
       const profile = await tx.student.create({
         data: {
           name: parsed.studentName,
-          admissionNo: parsed.admissionNo,
+          admissionNo: studentIdentity.studentId,
           AcademicYear: { connect: { id: activeAcademicYear.id } },
           school: { connect: { id: schoolId } },
           user: { connect: { id: user.id } },
@@ -373,7 +391,7 @@ export const POST = withSchoolAccess(async function POST(req, props) {
           MotherNumber: parsed.motherMobileNumber || "",
           bloodGroup: parsed.bloodGroup || "",
           contactNumber: parsed.contactNumber || "",
-          email: parsed.email,
+          email: studentIdentity.externalEmail || studentIdentity.authEmail,
           admissionDate: parsed.admissionDate?.toISOString() || new Date().toISOString(),
           rollNumber: parsed.rollNumber || "",
           city: parsed.city || "",
@@ -416,10 +434,15 @@ export const POST = withSchoolAccess(async function POST(req, props) {
         await tx.user.create({
           data: {
             id: createdParentUserId,
-            password: parsed.parentPassword,
+            password: await bcrypt.hash(parsed.parentPassword, 10),
             profilePicture: "default.png",
             name: parsed.parentName,
-            email: parsed.parentEmail,
+            email: (await resolveParentAccountIdentity({
+              schoolId,
+              phone: parsed.parentContactNumber,
+              externalEmail: parsed.parentEmail,
+              tx,
+            })).authEmail,
             school: { connect: { id: schoolId } },
             role: { connect: { id: parentRole.id } }
           }
@@ -430,8 +453,19 @@ export const POST = withSchoolAccess(async function POST(req, props) {
             userId: createdParentUserId,
             schoolId: schoolId,
             name: parsed.parentName,
-            email: parsed.parentEmail,
-            contactNumber: parsed.parentContactNumber
+            email: parsed.parentEmail || (await resolveParentAccountIdentity({
+              schoolId,
+              phone: parsed.parentContactNumber,
+              externalEmail: parsed.parentEmail,
+              tx,
+            })).authEmail,
+            contactNumber: (await resolveParentAccountIdentity({
+              schoolId,
+              phone: parsed.parentContactNumber,
+              externalEmail: parsed.parentEmail,
+              tx,
+            })).phone,
+            alternateNumber: null
           }
         });
 

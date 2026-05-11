@@ -9,17 +9,10 @@ import { generateFileKey, uploadToR2 } from '@/lib/r2';
 import { FIELD_MAPPINGS, processRow } from '../../[schoolId]/import/route';
 import { getAccountCredentialsEmailTemplate } from '@/lib/email';
 import { sendResendEmail } from '@/lib/resend';
+import { isIgnoredImportColumn, mapImportRow } from '@/lib/import-column-mapping';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 const IS_DEV = process.env.NODE_ENV === 'development';
-
-function normalizeColumnName(col) {
-  return String(col || '').
-  replace(/\s*\*\s*/g, '').
-  replace(/\s*\([^)]*\)\s*/g, '').
-  trim().
-  toLowerCase();
-}
 
 function toEtaSeconds(processedRows, totalRows, startedAt) {
   if (!processedRows || processedRows >= totalRows) return 0;
@@ -125,7 +118,7 @@ async function parseWorkbookRows(job) {
 
   return rawData.filter((row) => {
     const meaningfulValues = Object.entries(row).
-    filter(([key]) => key !== 'S.No').
+    filter(([key]) => !isIgnoredImportColumn(key)).
     map(([, value]) => String(value ?? '').trim()).
     filter(Boolean);
     return meaningfulValues.length > 0;
@@ -133,21 +126,7 @@ async function parseWorkbookRows(job) {
 }
 
 function mapRow(row, fieldMap) {
-  const rowKeys = Object.keys(row);
-  const mappedData = {};
-
-  for (const [excelCol, dbField] of Object.entries(fieldMap)) {
-    const normalizedExpected = normalizeColumnName(excelCol);
-    const matchingKey = rowKeys.find((key) => normalizeColumnName(key) === normalizedExpected);
-
-    if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
-      let value = row[matchingKey];
-      if (typeof value === 'number') value = String(value);
-      mappedData[dbField] = value;
-    }
-  }
-
-  return mappedData;
+  return mapImportRow(row, fieldMap);
 }
 
 async function handleWorker(req) {
@@ -193,7 +172,9 @@ async function handleWorker(req) {
       const rowNumber = row['S.No'] || nextChunk.startRow + index + 2;
 
       try {
-        const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap);
+        const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap, {
+          academicYearId: job.academicYearId || null,
+        });
         success += 1;
 
         if (result?.authSuccess) {

@@ -43,6 +43,10 @@ export function normalizeStudentIdentifier(studentId) {
         .replace(/\s+/g, "");
 }
 
+export function normalizeAdmissionNumber(admissionNumber) {
+    return normalizeStudentIdentifier(admissionNumber);
+}
+
 export function normalizeOptionalEmail(email) {
     const normalized = String(email || "").trim().toLowerCase();
     return normalized || null;
@@ -63,7 +67,7 @@ export function getSchoolAuthNamespace(school) {
     return sanitizeNamespacePart(school?.name) || "school";
 }
 
-export function buildParentAuthEmail({ phone, school }) {
+export function buildParentAuthEmail({ phone, admissionNumber, school }) {
     const normalizedPhone = normalizePhoneNumber(phone);
     const namespace = getSchoolAuthNamespace(school);
 
@@ -71,7 +75,16 @@ export function buildParentAuthEmail({ phone, school }) {
         return "";
     }
 
-    return `${normalizedPhone}@${INTERNAL_PARENT_DOMAIN_PREFIX}.${namespace}.local`;
+    const localPart = normalizedPhone.toLowerCase().replace(/[^a-z0-9-]+/g, "");
+    return `${localPart}@${INTERNAL_PARENT_DOMAIN_PREFIX}.${namespace}.local`;
+}
+
+export function buildParentPlaceholderAuthEmail({ schoolId, admissionNumber, school }) {
+    const namespace = getSchoolAuthNamespace(school);
+    const safeSchoolId = String(schoolId || school?.id || "school").toLowerCase().replace(/[^a-z0-9-]+/g, "");
+    const safeAdmissionNumber = normalizeAdmissionNumber(admissionNumber) || "unknown";
+    const localPart = `pending-${safeSchoolId}-${safeAdmissionNumber.toLowerCase()}`.replace(/[^a-z0-9-]+/g, "");
+    return `${localPart}@${INTERNAL_PARENT_DOMAIN_PREFIX}.${namespace}.local`;
 }
 
 export function buildStudentAuthEmail({ studentId, school }) {
@@ -100,4 +113,3 @@ export function getVisibleContactEmail(...emails) {
 
     return null;
 }
-

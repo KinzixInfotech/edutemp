@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -87,6 +88,7 @@ const MODULE_COLORS = {
 
 export default function ImportDataPage() {
     const { fullUser } = useAuth();
+    const { allYears = [], switchableYears = [], selectedYear, activeYear, isLoading: yearsLoading } = useAcademicYear() || {};
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
     const [selectedModule, setSelectedModule] = useState(null);
@@ -116,6 +118,11 @@ export default function ImportDataPage() {
 
     // Export credentials state (auto-export after import)
     const [exportCredentials, setExportCredentials] = useState(true);
+    const [selectedAcademicYearId, setSelectedAcademicYearId] = useState("");
+
+    const academicYearOptions = allYears.length > 0 ? allYears : switchableYears;
+    const effectiveAcademicYearId = selectedAcademicYearId || selectedYear?.id || activeYear?.id || academicYearOptions[0]?.id || "";
+    const selectedAcademicYear = academicYearOptions.find((year) => year.id === effectiveAcademicYearId) || selectedYear || activeYear;
 
     // Fetch import history
     const { data: historyData } = useQuery({
@@ -213,10 +220,55 @@ export default function ImportDataPage() {
         )
         : exportProgress;
 
+    function handleExportCredentials(credentials, moduleType) {
+        if (!credentials || credentials.length === 0) return;
+
+        try {
+            const exportData = credentials.map((cred, index) => ({
+                'S.No': index + 1,
+                'Name': cred.name,
+                'User Type': cred.userType === 'student' ? 'Student' :
+                    cred.userType === 'teacher' ? 'Teacher' :
+                        cred.userType === 'staff' ? 'Non-Teaching Staff' : 'Parent',
+                'Login Type': cred.loginLabel || 'Login',
+                'Login ID': cred.loginValue || '',
+                'Temporary Auth Email': cred.internalEmail || cred.email || '',
+                'Visible Email': cred.visibleEmail || '',
+                'Password': cred.password,
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            ws['!cols'] = [
+                { wch: 6 },
+                { wch: 28 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 24 },
+                { wch: 34 },
+                { wch: 32 },
+                { wch: 20 },
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
+
+            const date = new Date().toISOString().split('T')[0];
+            const fileName = `${moduleType}_credentials_${date}.xlsx`;
+
+            XLSX.writeFile(wb, fileName);
+
+            toast.success(`Credentials exported to ${fileName}`);
+        } catch (error) {
+            console.error('Failed to export credentials:', error);
+            toast.error('Failed to export credentials file');
+        }
+    }
+
     useEffect(() => {
         if (!activeImportJob?.id || activeImportJob.status !== "completed") return;
 
-        setImportResults(activeImportJob);
+        queueMicrotask(() => setImportResults(activeImportJob));
         queryClient.invalidateQueries({ queryKey: ['importHistory', schoolId] });
         queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
 
@@ -394,6 +446,9 @@ export default function ImportDataPage() {
             }
             formData.append("sendEmails", sendEmails.toString());
             formData.append("skipDuplicates", skipDuplicates.toString());
+            if (effectiveAcademicYearId) {
+                formData.append("academicYearId", effectiveAcademicYearId);
+            }
 
             const res = await fetch(`/api/schools/${schoolId}/import/jobs`, {
                 method: "POST",
@@ -426,54 +481,6 @@ export default function ImportDataPage() {
         setUploadedFile(null);
     };
 
-    // Export credentials to Excel file
-    const handleExportCredentials = (credentials, moduleType) => {
-        if (!credentials || credentials.length === 0) return;
-
-        try {
-            const exportData = credentials.map((cred, index) => ({
-                'S.No': index + 1,
-                'Name': cred.name,
-                'User Type': cred.userType === 'student' ? 'Student' :
-                    cred.userType === 'teacher' ? 'Teacher' :
-                        cred.userType === 'staff' ? 'Non-Teaching Staff' : 'Parent',
-                'Login Type': cred.loginLabel || 'Login',
-                'Login ID': cred.loginValue || '',
-                'Temporary Auth Email': cred.internalEmail || cred.email || '',
-                'Visible Email': cred.visibleEmail || '',
-                'Password': cred.password,
-            }));
-
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.json_to_sheet(exportData);
-
-            ws['!cols'] = [
-                { wch: 6 },
-                { wch: 28 },
-                { wch: 18 },
-                { wch: 18 },
-                { wch: 24 },
-                { wch: 34 },
-                { wch: 32 },
-                { wch: 20 },
-            ];
-
-            XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
-
-            // Generate filename with date
-            const date = new Date().toISOString().split('T')[0];
-            const fileName = `${moduleType}_credentials_${date}.xlsx`;
-
-            // Download file
-            XLSX.writeFile(wb, fileName);
-
-            toast.success(`Credentials exported to ${fileName}`);
-        } catch (error) {
-            console.error('Failed to export credentials:', error);
-            toast.error('Failed to export credentials file');
-        }
-    };
-
     // Handle export
     const handleExport = async () => {
         if (selectedExportModules.length === 0) {
@@ -488,7 +495,7 @@ export default function ImportDataPage() {
             const res = await fetch(`/api/schools/${schoolId}/export/jobs`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modules: selectedExportModules, userId: fullUser?.id })
+                body: JSON.stringify({ modules: selectedExportModules, userId: fullUser?.id, academicYearId: effectiveAcademicYearId || undefined })
             });
 
             const data = await res.json();
@@ -583,7 +590,9 @@ export default function ImportDataPage() {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <div className="font-medium">{job.fileName}</div>
-                                            <div className="text-sm text-muted-foreground">{job.moduleKey} · {job.processedRows || 0}/{job.totalRows || 0} rows</div>
+                                            <div className="text-sm text-muted-foreground">
+                                                {job.moduleKey} · {job.academicYearName || "Selected year"} · {job.processedRows || 0}/{job.totalRows || 0} rows
+                                            </div>
                                         </div>
                                         <Badge variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
                                             {job.status}
@@ -633,7 +642,9 @@ export default function ImportDataPage() {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <div className="font-medium">{job.modules?.join(", ")}</div>
-                                            <div className="text-sm text-muted-foreground">{job.processedModules || 0}/{job.totalModules || 0} modules</div>
+                                            <div className="text-sm text-muted-foreground">
+                                                {job.academicYearName || "Selected year"} · {job.processedModules || 0}/{job.totalModules || 0} modules
+                                            </div>
                                         </div>
                                         <Badge variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
                                             {job.status}
@@ -661,6 +672,45 @@ export default function ImportDataPage() {
                         Your existing system remains untouched. You can verify data before finalizing import.
                     </AlertDescription>
                 </Alert>
+            )}
+
+            {(activeTab === "import" || activeTab === "export") && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Calendar className="h-4 w-4" />
+                            Academic Year
+                        </CardTitle>
+                        <CardDescription>
+                            Choose the academic year for this {activeTab === "import" ? "upload" : "export"}.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-3 md:grid-cols-[minmax(240px,360px)_1fr] md:items-center">
+                            <select
+                                value={effectiveAcademicYearId}
+                                onChange={(event) => setSelectedAcademicYearId(event.target.value)}
+                                disabled={yearsLoading || academicYearOptions.length === 0}
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                            >
+                                {academicYearOptions.length === 0 ? (
+                                    <option value="">No academic year available</option>
+                                ) : (
+                                    academicYearOptions.map((year) => (
+                                        <option key={year.id} value={year.id}>
+                                            {year.name || year.year || `${year.startDate || ""} - ${year.endDate || ""}`}{year.isActive ? " (Active)" : " (Archived)"}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                            <p className="text-sm text-muted-foreground">
+                                {activeTab === "import"
+                                    ? `New academic records and student sessions will be attached to ${selectedAcademicYear?.name || "the selected year"}.`
+                                    : `Year-scoped exports will use ${selectedAcademicYear?.name || "the selected year"} where the module supports academic-year filtering.`}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
             {/* Migration Guidance - Only show on import tab */}
@@ -706,7 +756,7 @@ export default function ImportDataPage() {
                             <AlertTriangle className="h-4 w-4 text-amber-600" />
                             <AlertTitle className="text-amber-800 dark:text-amber-300">Before Exporting</AlertTitle>
                             <AlertDescription className="text-amber-700 dark:text-amber-400">
-                                Exports will include data from the current academic year. Make sure you&apos;ve selected the correct year in settings.
+                                Exports will include data from the academic year selected above. Change it before queueing the export if needed.
                             </AlertDescription>
                         </Alert>
 
@@ -1173,6 +1223,7 @@ export default function ImportDataPage() {
                                                             <TableRow>
                                                                 <TableHead className="w-12">#</TableHead>
                                                                 <TableHead>Status</TableHead>
+                                                                <TableHead>Reason</TableHead>
                                                                 {previewData.columns?.slice(0, 4).map((col) => (
                                                                     <TableHead key={col} className="capitalize">{col}</TableHead>
                                                                 ))}
@@ -1190,7 +1241,18 @@ export default function ImportDataPage() {
                                                                         ) : row.isValid ? (
                                                                             <CheckCircle2 className="h-4 w-4 text-green-600" />
                                                                         ) : (
-                                                                            <XCircle className="h-4 w-4 text-red-600" />
+                                                                            <Badge variant="outline" className="bg-red-100 text-red-700 text-xs">
+                                                                                Invalid
+                                                                            </Badge>
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs max-w-[240px] whitespace-normal">
+                                                                        {row.isDuplicate ? (
+                                                                            <span className="text-yellow-700 dark:text-yellow-400">{row.duplicateReason || "Duplicate record already exists"}</span>
+                                                                        ) : row.errors?.length > 0 ? (
+                                                                            <span className="text-red-600 dark:text-red-400">{row.errors.join("; ")}</span>
+                                                                        ) : (
+                                                                            <span className="text-muted-foreground">Ready</span>
                                                                         )}
                                                                     </TableCell>
                                                                     {previewData.columns?.slice(0, 4).map((col) => (
@@ -1337,10 +1399,40 @@ export default function ImportDataPage() {
                                                                 </div>
                                                             )}
 
+                                                            {previewData.details.unexpectedColumns?.length > 0 && (
+                                                                <div className="p-3 bg-amber-100 dark:bg-amber-950 rounded-lg">
+                                                                    <p className="font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                                                                        Unrecognized Columns:
+                                                                    </p>
+                                                                    <ul className="list-disc list-inside space-y-1">
+                                                                        {previewData.details.unexpectedColumns.map((col, i) => (
+                                                                            <li key={i} className="text-amber-700 dark:text-amber-300">
+                                                                                {col} is not used by the {selectedModule} import template.
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+
+                                                            {previewData.details.matchedColumns?.length > 0 && (
+                                                                <div className="p-3 bg-green-100 dark:bg-green-950 rounded-lg">
+                                                                    <p className="font-semibold text-green-700 dark:text-green-400 mb-2">
+                                                                        Headers Detected:
+                                                                    </p>
+                                                                    <ul className="space-y-1 max-h-32 overflow-y-auto">
+                                                                        {previewData.details.matchedColumns.map((match, i) => (
+                                                                            <li key={i} className="text-green-700 dark:text-green-300">
+                                                                                {match.uploaded} → {match.expected}
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+
                                                             {/* Expected vs Uploaded columns comparison */}
                                                             <div className="grid grid-cols-2 gap-3 text-xs">
                                                                 <div className="p-3 bg-muted rounded-lg">
-                                                                    <p className="font-semibold mb-2">Expected Columns:</p>
+                                                                    <p className="font-semibold mb-2">Expected Headers:</p>
                                                                     <ul className="space-y-1 max-h-40 overflow-y-auto">
                                                                         {previewData.details.expectedColumns?.map((col, i) => (
                                                                             <li key={i} className={col.includes('*') ? 'font-medium text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}>
@@ -1350,10 +1442,15 @@ export default function ImportDataPage() {
                                                                     </ul>
                                                                 </div>
                                                                 <div className="p-3 bg-muted rounded-lg">
-                                                                    <p className="font-semibold mb-2">Your Columns:</p>
+                                                                    <p className="font-semibold mb-2">Your Headers:</p>
                                                                     <ul className="space-y-1 max-h-40 overflow-y-auto">
                                                                         {previewData.details.uploadedColumns?.map((col, i) => (
                                                                             <li key={i} className="text-muted-foreground">{col}</li>
+                                                                        ))}
+                                                                        {previewData.details.ignoredColumns?.map((col, i) => (
+                                                                            <li key={`ignored-${i}`} className="text-muted-foreground/70">
+                                                                                {col} (ignored serial column)
+                                                                            </li>
                                                                         ))}
                                                                     </ul>
                                                                 </div>
@@ -1549,6 +1646,29 @@ export default function ImportDataPage() {
                                                                             </Badge>
                                                                         ))}
                                                                     </div>
+                                                                </div>
+                                                            )}
+
+                                                            {importResults.details.unexpectedColumns?.length > 0 && (
+                                                                <div>
+                                                                    <p className="text-xs font-medium mt-2">Unrecognized Columns:</p>
+                                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                                        {importResults.details.unexpectedColumns.map((col, i) => (
+                                                                            <Badge key={i} variant="outline" className="text-xs border-amber-300 text-amber-700">
+                                                                                {col}
+                                                                            </Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {importResults.details.matchedColumns?.length > 0 && (
+                                                                <div>
+                                                                    <p className="text-xs font-medium mt-2">Detected Headers:</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {importResults.details.matchedColumns.slice(0, 5).map(match => `${match.uploaded} → ${match.expected}`).join(', ')}
+                                                                        {importResults.details.matchedColumns.length > 5 ? '...' : ''}
+                                                                    </p>
                                                                 </div>
                                                             )}
 

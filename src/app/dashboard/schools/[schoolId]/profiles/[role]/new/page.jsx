@@ -347,6 +347,8 @@ export default function NewProfilePage() {
             if (!form.classId) newErrors.classId = "Class is required"
             if (!form.sectionId) newErrors.sectionId = "Section is required"
             if (!form.gender) newErrors.gender = "Gender is required"
+            if (!form.password) newErrors.password = "Student password is required"
+            else if (form.password.length < 6) newErrors.password = "At least 6 characters"
             if (form.guardianType === "PARENTS") {
                 if (!form.fatherName) newErrors.fatherName = "Father's name is required"
                 if (!form.fatherMobileNumber) newErrors.fatherMobileNumber = "Father's mobile is required"
@@ -360,7 +362,8 @@ export default function NewProfilePage() {
         }
         if (roleType === "parents") {
             if (!form.guardianName) newErrors.guardianName = "Name is required"
-            if (!form.contactNumber) newErrors.contactNumber = newErrors.contactNumber || "Contact is required"
+            if (selectedStudents.length === 0) newErrors.linkedStudentIds = "Link at least one student"
+            if (!form.contactNumber) newErrors.contactNumber = "Parent phone is required"
             else if (!/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Must be 10 digits"
             if (!form.gender) newErrors.gender = "Gender is required"
             if (!form.password) newErrors.password = "Password is required"
@@ -422,12 +425,12 @@ export default function NewProfilePage() {
     const loginIdentityValue = roleType === "students"
         ? (form.admissionNo || "Auto-generate on create")
         : roleType === "parents"
-            ? (form.contactNumber || "Uses mobile number")
+            ? (form.contactNumber || "Enter parent phone")
             : (form.email || "Uses email address")
     const loginIdentityHint = roleType === "students"
-        ? "Students will sign in with Student ID plus password."
+        ? "Students will sign in with Admission Number plus student password."
         : roleType === "parents"
-            ? "Parents will sign in with mobile number plus password."
+            ? "Parents will sign in with phone number plus parent password. One parent can be linked to multiple children."
             : "Staff continue using email plus password."
     const linkSummary = roleType === "students"
         ? `${selectedParents.length} linked parent${selectedParents.length === 1 ? "" : "s"}`
@@ -804,7 +807,7 @@ export default function NewProfilePage() {
                                         </Field>
 
                                         <SectionHeader icon={Lock} title="Account Credentials" />
-                                        <Field label="Email Address" error={errors.email} hint="Optional. Mobile number will be used for login.">
+                                        <Field label="Email Address" error={errors.email} hint="Optional contact email. Parent login uses phone number.">
                                             <Input type="email" value={form.email} onChange={e => updateForm("email", e.target.value)} onBlur={e => setEmailToCheck(e.target.value)} placeholder="Optional contact email" className={errors.email ? "border-red-500" : ""} />
                                         </Field>
                                         <Field label="Password" required error={errors.password}>
@@ -812,7 +815,7 @@ export default function NewProfilePage() {
                                         </Field>
 
                                         <SectionHeader icon={Phone} title="Contact Details" />
-                                        <Field label="Contact Number" required error={errors.contactNumber} hint="This mobile number becomes the parent login ID.">
+                                        <Field label="Contact Number" required error={errors.contactNumber} hint="Required for parent app login and sibling merging.">
                                             <Input value={form.contactNumber} onChange={e => updateForm("contactNumber", e.target.value.replace(/\D/g, "").slice(0, 10))} onBlur={e => setPhoneToCheck(e.target.value)} placeholder="10-digit mobile number" maxLength={10} className={errors.contactNumber ? "border-red-500" : ""} />
                                         </Field>
                                         <Field label="Alternate Number" error={errors.alternateNumber}>
@@ -873,6 +876,11 @@ export default function NewProfilePage() {
                                                     </Command>
                                                 </PopoverContent>
                                             </Popover>
+                                            {errors.linkedStudentIds && (
+                                                <p className="text-xs text-red-500 flex items-center gap-1">
+                                                    <AlertCircle className="h-3 w-3 flex-shrink-0" />{errors.linkedStudentIds}
+                                                </p>
+                                            )}
                                             {selectedStudents.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedStudents.map(s => {

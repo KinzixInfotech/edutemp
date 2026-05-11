@@ -26,7 +26,6 @@ export default function AboutPage() {
             </div>
 
             <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
-
                 {/* Hero Section */}
                 <motion.div
                     initial="hidden"

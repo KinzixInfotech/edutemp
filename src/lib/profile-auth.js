@@ -2,7 +2,9 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import {
     buildParentAuthEmail,
+    buildParentPlaceholderAuthEmail,
     buildStudentAuthEmail,
+    normalizeAdmissionNumber,
     normalizeOptionalEmail,
     normalizePhoneNumber,
     normalizeStudentIdentifier,
@@ -58,19 +60,32 @@ export async function resolveStudentAccountIdentity({ schoolId, studentId, exter
     };
 }
 
-export async function resolveParentAccountIdentity({ schoolId, phone, externalEmail, tx = prisma }) {
+export async function resolveParentAccountIdentity({ schoolId, phone, admissionNumber, externalEmail, tx = prisma }) {
     const school = await getSchoolIdentityContext(schoolId, tx);
     if (!school) {
         throw new Error("School not found");
     }
 
     const normalizedPhone = normalizePhoneNumber(phone);
+    const normalizedAdmissionNumber = normalizeAdmissionNumber(admissionNumber);
     return {
         school,
         phone: normalizedPhone,
-        authEmail: buildParentAuthEmail({ phone: normalizedPhone, school }),
+        admissionNumber: normalizedAdmissionNumber,
+        authEmail: normalizedPhone
+            ? buildParentAuthEmail({ phone: normalizedPhone, school })
+            : buildParentPlaceholderAuthEmail({ schoolId, admissionNumber: normalizedAdmissionNumber, school }),
         externalEmail: normalizeOptionalEmail(externalEmail),
     };
+}
+
+export function buildMissingContactPlaceholder({ schoolId, admissionNumber, role = "parent" }) {
+    const safeAdmissionNumber = normalizeAdmissionNumber(admissionNumber) || "UNKNOWN";
+    return `missing:${role}:${schoolId}:${safeAdmissionNumber}`.slice(0, 191);
+}
+
+export function isMissingContactPlaceholder(value) {
+    return String(value || "").startsWith("missing:");
 }
 
 export async function compareStoredPassword(storedPassword, password) {

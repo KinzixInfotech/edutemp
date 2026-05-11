@@ -48,7 +48,7 @@ const MODULE_CONFIGS = {
     fields: [
     { name: 'name', label: 'Full Name', required: true, example: 'Robert Smith' },
     { name: 'email', label: 'Email (Optional)', required: false, example: 'robert@email.com' },
-    { name: 'phone', label: 'Phone Number', required: true, example: '9876543210' },
+    { name: 'phone', label: 'Phone Number', required: false, example: '9876543210' },
     { name: 'relation', label: 'Relation (Father/Mother/Guardian)', required: true, example: 'Father' },
     { name: 'studentAdmissionNo', label: 'Student ID', required: true, example: 'SCH-2026-001' },
     { name: 'address', label: 'Address', required: false, example: '789 Pine Road' },

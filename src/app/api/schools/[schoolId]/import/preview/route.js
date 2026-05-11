@@ -2,13 +2,20 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from '@/lib/prisma';
+import {
+  analyzeImportHeaders,
+  getImportRequiredFieldLabels,
+  mapImportRow,
+} from '@/lib/import-column-mapping';
 
 // Field mappings for each module - MUST match labels from template/route.js exactly
 const FIELD_MAPPINGS = {
   students: {
     'Full Name *': 'name',
-    'Email *': 'email',
-    'Admission Number *': 'admissionNo',
+    'Email': 'email',
+    'Email (Optional)': 'email',
+    'Admission Number': 'admissionNo',
+    'Student ID': 'admissionNo',
     'Class Name *': 'className',
     'Section *': 'sectionName',
     'Gender *': 'gender',
@@ -52,10 +59,12 @@ const FIELD_MAPPINGS = {
   },
   parents: {
     'Full Name *': 'name',
-    'Email *': 'email',
-    'Phone Number *': 'phone',
+    'Email': 'email',
+    'Email (Optional)': 'email',
+    'Phone Number': 'phone',
     'Relation (Father/Mother/Guardian) *': 'relation',
     'Student Admission No *': 'studentAdmissionNo',
+    'Student ID *': 'studentAdmissionNo',
     'Address': 'address',
     'Occupation': 'occupation'
   },
@@ -81,7 +90,7 @@ const FIELD_MAPPINGS = {
 };
 
 // Modules that require authentication accounts
-const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff', 'parents'];
+const AUTH_MODULES = ['teachers', 'nonTeachingStaff'];
 
 function normalizeStudentReligion(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -142,38 +151,16 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    // Helper function to normalize column names for flexible matching
-    // Removes: asterisks (*), format hints in parentheses like (YYYY-MM-DD), extra spaces
-    // Makes comparison case-insensitive
-    const normalizeColumnName = (col) => {
-      return col.
-      replace(/\s*\*\s*/g, '') // Remove asterisks
-      .replace(/\s*\([^)]*\)\s*/g, '') // Remove anything in parentheses (format hints)
-      .trim() // Trim whitespace
-      .toLowerCase(); // Case insensitive
-    };
-
     // Validate template columns using flexible matching
-    const uploadedColumns = Object.keys(rawData[0]).filter((col) => col !== 'S.No');
-    const expectedColumns = Object.keys(expectedFields);
-    const requiredColumns = expectedColumns.filter((col) => col.includes('*'));
-    const unexpectedColumns = uploadedColumns.filter((col) => !expectedColumns.some((exp) => normalizeColumnName(exp) === normalizeColumnName(col)));
+    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
 
-    const missingRequired = requiredColumns.filter((reqCol) => {
-      const normalizedReq = normalizeColumnName(reqCol);
-      return !uploadedColumns.some((upCol) => normalizeColumnName(upCol) === normalizedReq);
-    });
-
-    if (missingRequired.length > 0 || unexpectedColumns.length > 0) {
+    if (!headerAnalysis.isValid) {
       return NextResponse.json({
         error: 'Template mapping not matched',
         details: {
           message: 'The uploaded file does not match the expected template format.',
-          missingColumns: missingRequired.map((c) => c.replace(' *', '')),
-          unexpectedColumns,
-          expectedColumns: expectedColumns,
-          uploadedColumns: uploadedColumns,
-          suggestion: 'Please download the correct template. Header names are matched strictly after normalization.'
+          ...headerAnalysis,
+          suggestion: 'Fix the missing or unrecognized headers shown above, or download the latest template for this module.'
         }
       }, { status: 400 });
     }
@@ -193,31 +180,17 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     // Process each row for preview with validation
     const previewRows = data.map((row, index) => {
-      const rowKeys = Object.keys(row);
-
       // Map Excel columns to database fields using flexible matching
-      const mappedData = {};
-      for (const [excelCol, dbField] of Object.entries(expectedFields)) {
-        const normalizedExpected = normalizeColumnName(excelCol);
-        const matchingKey = rowKeys.find((key) => normalizeColumnName(key) === normalizedExpected);
-
-        if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
-          let value = row[matchingKey];
-          if (typeof value === 'number') value = String(value);
-          if (dbField === 'religion') value = normalizeStudentReligion(value) || value;
-          mappedData[dbField] = value;
-        }
-      }
+      const mappedData = mapImportRow(row, expectedFields);
+      if (mappedData.religion) mappedData.religion = normalizeStudentReligion(mappedData.religion) || mappedData.religion;
 
       // Validate required fields
       const errors = [];
-      const requiredFieldKeys = Object.entries(expectedFields).
-      filter(([col]) => col.includes('*')).
-      map(([, field]) => field);
+      const requiredFields = getImportRequiredFieldLabels(expectedFields);
 
-      for (const field of requiredFieldKeys) {
+      for (const { field, label } of requiredFields) {
         if (!mappedData[field] || mappedData[field] === '') {
-          errors.push(`Missing required field: ${field}`);
+          errors.push(`Missing required field: ${label}`);
         }
       }
 
@@ -250,7 +223,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       duplicateRows: duplicateCount,
       requiresAuth: AUTH_MODULES.includes(moduleKey),
       rows: previewRows,
-      columns: Object.values(expectedFields)
+      columns: Array.from(new Set(Object.values(expectedFields)))
     });
 
   } catch (error) {
@@ -280,30 +253,9 @@ async function checkForDuplicates(module, data, schoolId, fieldMap) {
   const duplicates = [];
 
   // Helper function to normalize column names for flexible matching
-  const normalizeColumnName = (col) => {
-    return col.
-    replace(/\s*\*\s*/g, '') // Remove asterisks
-    .replace(/\s*\([^)]*\)\s*/g, '') // Remove anything in parentheses
-    .trim().
-    toLowerCase();
-  };
-
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
-    const rowKeys = Object.keys(row);
-
-    // Map row to fields using flexible matching
-    const mappedData = {};
-    for (const [excelCol, dbField] of Object.entries(fieldMap)) {
-      const normalizedExpected = normalizeColumnName(excelCol);
-      const matchingKey = rowKeys.find((key) => normalizeColumnName(key) === normalizedExpected);
-
-      if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
-        let value = row[matchingKey];
-        if (typeof value === 'number') value = String(value);
-        mappedData[dbField] = value;
-      }
-    }
+    const mappedData = mapImportRow(row, fieldMap);
 
     let existingRecord = null;
     let reason = '';
@@ -331,11 +283,21 @@ async function checkForDuplicates(module, data, schoolId, fieldMap) {
         break;
 
       case 'parents':
-        if (mappedData.email) {
+        if (mappedData.phone || mappedData.email) {
           existingRecord = await prisma.parent.findFirst({
-            where: { schoolId, email: mappedData.email }
+            where: {
+              schoolId,
+              OR: [
+                ...(mappedData.phone ? [{ contactNumber: mappedData.phone }] : []),
+                ...(mappedData.email ? [{ email: mappedData.email }] : []),
+              ],
+            }
           });
-          if (existingRecord) reason = `Parent email already exists: ${mappedData.email}`;
+          if (existingRecord) {
+            reason = mappedData.phone && existingRecord.contactNumber === mappedData.phone
+              ? `Parent phone already exists: ${mappedData.phone}`
+              : `Parent email already exists: ${mappedData.email}`;
+          }
         }
         break;
 

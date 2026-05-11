@@ -34,7 +34,7 @@ async function handleWorker(req) {
       const config = EXPORT_CONFIGS[moduleId];
       if (!config) continue;
 
-      const data = await config.fetchFn(job.schoolId);
+      const data = await config.fetchFn(job.schoolId, { academicYearId: job.academicYearId || null });
       const headers = config.fields.map((field) => field.label);
       const rows = data.map((item) => config.fields.map((field) => {
         const value = item[field.key];
