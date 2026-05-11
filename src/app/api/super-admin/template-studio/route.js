@@ -4,6 +4,23 @@ import { verifyRoleAccess } from '@/lib/api-auth';
 import { createTemplateVersion, ensureDefaultTemplateCategories, mapMarketplaceTemplate, normalizeMarketplaceLayout } from '@/lib/template-marketplace';
 import { TEMPLATE_RENDERER_VERSION, validateTemplateLayout } from '@/lib/template-rendering';
 
+async function getStudioTemplateById(templateId) {
+    const [row] = await prisma.$queryRaw`
+        SELECT t."id", t."name", t."description", t."categoryId", c."name" AS "categoryName",
+               c."slug" AS "categorySlug", t."documentType", t."status", t."visibility",
+               t."pricing", t."pricePaise", t."isFeatured", t."orientation", t."canvasWidth",
+               t."canvasHeight", t."previewImage", t."backgroundAsset", t."layoutConfig",
+               t."fieldPlaceholders", t."rendererVersion", t."currentVersionId",
+               v."versionNumber" AS "currentVersionNumber", t."publishedAt", t."createdAt", t."updatedAt"
+        FROM "MarketplaceTemplate" t
+        LEFT JOIN "MarketplaceTemplateCategory" c ON c."id" = t."categoryId"
+        LEFT JOIN "TemplateVersion" v ON v."id" = t."currentVersionId"
+        WHERE t."id" = ${templateId}::uuid
+        LIMIT 1
+    `;
+    return row ? mapMarketplaceTemplate(row) : null;
+}
+
 export async function GET(request) {
     const auth = await verifyRoleAccess(request, ['SUPER_ADMIN']);
     if (auth.error) return auth.response;
@@ -69,5 +86,6 @@ export async function POST(request) {
         template.currentVersionId = version.id;
         template.currentVersionNumber = version.versionNumber;
     }
-    return NextResponse.json(template, { status: 201 });
+    const mappedTemplate = await getStudioTemplateById(template.id);
+    return NextResponse.json(mappedTemplate || template, { status: 201 });
 }

@@ -3,7 +3,22 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, Save, Upload, Send, Star, FileText, Tags, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import {
+    Loader2,
+    Plus,
+    Save,
+    Upload,
+    Send,
+    Star,
+    FileText,
+    Tags,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
+    Trash2,
+    Search,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
@@ -25,6 +40,7 @@ const BLANK_LAYOUT = {
     backgroundImage: '',
     backgroundAsset: null,
 };
+const UNTITLED_TEMPLATE_NAME = 'Untitled Marketplace Template';
 
 export default function SuperAdminTemplateStudioPage() {
     const { user, loading: authLoading } = useAuth();
@@ -33,18 +49,22 @@ export default function SuperAdminTemplateStudioPage() {
     const [selectedTemplateId, setSelectedTemplateId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [templateSearch, setTemplateSearch] = useState('');
     const [previewMode, setPreviewMode] = useState(false);
     const [templatePanelCollapsed, setTemplatePanelCollapsed] = useState(false);
     const [publishPanelCollapsed, setPublishPanelCollapsed] = useState(false);
     const [details, setDetails] = useState({
-        name: 'Untitled Marketplace Template',
+        name: UNTITLED_TEMPLATE_NAME,
         description: '',
         categoryId: '',
         documentType: 'school-document',
         pricing: 'free',
         pricePaise: 0,
+        status: 'draft',
         visibility: 'draft',
         isFeatured: false,
     });
@@ -54,11 +74,36 @@ export default function SuperAdminTemplateStudioPage() {
         () => templates.find((template) => template.id === selectedTemplateId),
         [templates, selectedTemplateId],
     );
+    const filteredTemplates = useMemo(() => {
+        const search = templateSearch.trim().toLowerCase();
+        if (!search) return templates;
+        return templates.filter((template) => {
+            const haystack = [
+                template.name,
+                template.description,
+                template.documentType,
+                template.status,
+                template.category?.name,
+            ].filter(Boolean).join(' ').toLowerCase();
+            return haystack.includes(search);
+        });
+    }, [templates, templateSearch]);
     const validation = useMemo(() => validateTemplateLayout(layoutConfig), [layoutConfig]);
     const samplePreviewLayout = useMemo(() => buildSamplePreviewLayout(layoutConfig), [layoutConfig]);
 
-    const loadData = async () => {
-        setLoading(true);
+    const upsertTemplate = (template) => {
+        setTemplates((current) => {
+            const exists = current.some((item) => item.id === template.id);
+            if (exists) {
+                return current.map((item) => (item.id === template.id ? { ...item, ...template } : item));
+            }
+            return [template, ...current];
+        });
+    };
+
+    const loadData = async (preferredTemplateId = selectedTemplateId, options = {}) => {
+        const { showLoading = true } = options;
+        if (showLoading) setLoading(true);
         try {
             const [templateRes, categoryRes] = await Promise.all([
                 fetchWithAuth('/api/super-admin/template-studio'),
@@ -68,13 +113,15 @@ export default function SuperAdminTemplateStudioPage() {
                 throw new Error(templateRes.status === 401 || categoryRes.status === 401 ? 'Unauthorized' : 'Failed to load');
             }
             const [templateData, categoryData] = await Promise.all([templateRes.json(), categoryRes.json()]);
-            setTemplates(Array.isArray(templateData) ? templateData : []);
+            const nextTemplates = Array.isArray(templateData) ? templateData : [];
+            setTemplates(nextTemplates);
             setCategories(Array.isArray(categoryData) ? categoryData : []);
-            if (!selectedTemplateId && templateData?.[0]) setSelectedTemplateId(templateData[0].id);
+            const nextSelectedTemplate = nextTemplates.find((template) => template.id === preferredTemplateId) || nextTemplates[0];
+            setSelectedTemplateId(nextSelectedTemplate?.id || null);
         } catch (error) {
             toast.error('Failed to load template studio');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     };
     const hasFetched = useRef(false);
@@ -94,25 +141,120 @@ export default function SuperAdminTemplateStudioPage() {
             documentType: selectedTemplate.documentType || 'school-document',
             pricing: selectedTemplate.pricing || 'free',
             pricePaise: selectedTemplate.pricePaise || 0,
+            status: selectedTemplate.status || 'draft',
             visibility: selectedTemplate.visibility || 'draft',
             isFeatured: Boolean(selectedTemplate.isFeatured),
         });
         setLayoutConfig(selectedTemplate.layoutConfig || BLANK_LAYOUT);
     }, [selectedTemplate]);
 
-    const resetDraft = () => {
-        setSelectedTemplateId(null);
-        setDetails({
-            name: 'Untitled Marketplace Template',
+    const createTemplateDraft = async () => {
+        const previousTemplateId = selectedTemplateId;
+        const category = categories.find((item) => item.id === details.categoryId) || categories[0];
+        const tempId = `draft-${Date.now()}`;
+        const draftTemplate = {
+            id: tempId,
+            name: UNTITLED_TEMPLATE_NAME,
             description: '',
-            categoryId: categories[0]?.id || '',
-            documentType: categories[0]?.slug || 'school-document',
+            categoryId: category?.id || '',
+            category: category ? { id: category.id, name: category.name, slug: category.slug } : null,
+            documentType: category?.slug || 'school-document',
+            status: 'draft',
+            visibility: 'draft',
             pricing: 'free',
             pricePaise: 0,
+            isFeatured: false,
+            orientation: 'portrait',
+            canvasWidth: 794,
+            canvasHeight: 1123,
+            previewImage: '',
+            backgroundAsset: null,
+            layoutConfig: BLANK_LAYOUT,
+            fieldPlaceholders: [],
+            rendererVersion: 'fixed-layout-v1',
+            currentVersionId: null,
+            currentVersionNumber: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isOptimistic: true,
+        };
+
+        setTemplateSearch('');
+        setPreviewMode(false);
+        setSelectedTemplateId(tempId);
+        setDetails({
+            name: UNTITLED_TEMPLATE_NAME,
+            description: '',
+            categoryId: category?.id || '',
+            documentType: category?.slug || 'school-document',
+            pricing: 'free',
+            pricePaise: 0,
+            status: 'draft',
             visibility: 'draft',
             isFeatured: false,
         });
         setLayoutConfig(BLANK_LAYOUT);
+        setTemplates((current) => [draftTemplate, ...current]);
+
+        try {
+            setCreating(true);
+            const res = await fetchWithAuth('/api/super-admin/template-studio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: UNTITLED_TEMPLATE_NAME,
+                    description: '',
+                    categoryId: category?.id || '',
+                    documentType: category?.slug || 'school-document',
+                    pricing: 'free',
+                    pricePaise: 0,
+                    visibility: 'draft',
+                    status: 'draft',
+                    isFeatured: false,
+                    layoutConfig: BLANK_LAYOUT,
+                    publish: false,
+                }),
+            });
+            if (!res.ok) throw new Error((await res.json())?.error || 'Could not create template');
+            const template = await res.json();
+            setTemplates((current) => current.map((item) => (item.id === tempId ? template : item)));
+            setSelectedTemplateId(template.id);
+            toast.success('New untitled template created');
+        } catch (error) {
+            setTemplates((current) => current.filter((item) => item.id !== tempId));
+            setSelectedTemplateId(previousTemplateId || templates[0]?.id || null);
+            toast.error(error.message || 'Could not create template');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const deleteTemplate = async (template) => {
+        if (!template?.id) return;
+        const confirmed = window.confirm(`Delete "${template.name}"?\n\nPublished templates already used by schools will be hidden instead of permanently deleted.`);
+        if (!confirmed) return;
+        try {
+            setDeletingId(template.id);
+            const res = await fetchWithAuth(`/api/super-admin/template-studio/${template.id}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) throw new Error((await res.json())?.error || 'Could not delete template');
+            const result = await res.json();
+            toast.success(result.archived ? 'Template hidden because it already has usage' : 'Template deleted');
+            const remaining = templates.filter((item) => item.id !== template.id);
+            const nextSelected = selectedTemplateId === template.id ? remaining[0]?.id : selectedTemplateId;
+            if (result.archived && result.template) {
+                upsertTemplate(result.template);
+                setSelectedTemplateId(result.template.id);
+            } else {
+                setTemplates(remaining);
+                setSelectedTemplateId(nextSelected || null);
+            }
+        } catch (error) {
+            toast.error(error.message || 'Could not delete template');
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     const uploadBackground = async (event) => {
@@ -176,11 +318,21 @@ export default function SuperAdminTemplateStudioPage() {
             const res = await fetchWithAuth(url, {
                 method: selectedTemplateId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...details, layoutConfig: stableLayout, publish }),
+                body: JSON.stringify({
+                    ...details,
+                    status: publish ? 'published' : (details.status || selectedTemplate?.status || 'draft'),
+                    visibility: publish ? 'published' : details.visibility,
+                    layoutConfig: stableLayout,
+                    publish,
+                }),
             });
             if (!res.ok) throw new Error((await res.json())?.error || 'Save failed');
+            const savedTemplate = await res.json();
             toast.success(publish ? 'Template published to marketplace' : 'Draft saved');
-            await loadData();
+            if (savedTemplate?.id) {
+                upsertTemplate(savedTemplate);
+                setSelectedTemplateId(savedTemplate.id);
+            }
         } catch (error) {
             toast.error(error.message || 'Save failed');
         } finally {
@@ -215,30 +367,81 @@ export default function SuperAdminTemplateStudioPage() {
                                 <Button size="icon" variant="ghost" onClick={() => setTemplatePanelCollapsed(true)} title="Collapse templates">
                                     <PanelLeftClose className="h-4 w-4" />
                                 </Button>
-                                <Button size="icon" variant="outline" onClick={resetDraft}><Plus className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="outline" onClick={createTemplateDraft} disabled={creating} title="Create new template">
+                                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
                             </div>
                         </>
                     )}
                 </div>
                 {templatePanelCollapsed ? (
                     <div className="flex flex-col items-center gap-2 p-2">
-                        <Button size="icon" variant="outline" onClick={resetDraft} title="New template"><Plus className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="outline" onClick={createTemplateDraft} disabled={creating} title="New template">
+                            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </Button>
                     </div>
                 ) : (
-                    <div className="space-y-2 overflow-auto p-3">
-                        {templates.map((template) => (
-                            <button
-                                key={template.id}
-                                onClick={() => setSelectedTemplateId(template.id)}
-                                className={`w-full rounded-md border p-3 text-left text-sm ${selectedTemplateId === template.id ? 'border-primary bg-primary/5' : 'bg-background'}`}
-                            >
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium line-clamp-1">{template.name}</span>
-                                    <Badge variant={template.status === 'published' ? 'default' : 'secondary'}>{template.status}</Badge>
+                    <div className="flex h-[calc(100%-3.5rem)] flex-col">
+                        <div className="border-b p-3">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={templateSearch}
+                                    onChange={(event) => setTemplateSearch(event.target.value)}
+                                    placeholder="Search templates..."
+                                    className="h-9 pl-9"
+                                />
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{templates.length} total templates</span>
+                                <span>{filteredTemplates.length} shown</span>
+                            </div>
+                        </div>
+                        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+                            {filteredTemplates.length === 0 ? (
+                                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                                    No templates found. Use the plus button to create a draft.
                                 </div>
-                                <p className="mt-1 text-xs text-muted-foreground">{template.category?.name || template.documentType}</p>
-                            </button>
-                        ))}
+                            ) : filteredTemplates.map((template) => (
+                                <div
+                                    key={template.id}
+                                    className={`group rounded-md border text-sm ${selectedTemplateId === template.id ? 'border-primary bg-primary/5' : 'bg-background hover:bg-muted/40'}`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedTemplateId(template.id)}
+                                        className="w-full p-3 text-left"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <span className="min-w-0 flex-1 font-medium line-clamp-1">{template.name}</span>
+                                            <Badge variant={template.status === 'published' ? 'default' : template.status === 'hidden' ? 'destructive' : 'secondary'}>
+                                                {template.status}
+                                            </Badge>
+                                        </div>
+                                        <p className="mt-1 text-xs text-muted-foreground line-clamp-1">{template.category?.name || template.documentType}</p>
+                                        <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                                            <span>{template.orientation || 'portrait'} · {template.canvasWidth || 794} x {template.canvasHeight || 1123}</span>
+                                            <span>{template.pricing === 'premium' ? 'Premium' : 'Free'}</span>
+                                        </div>
+                                    </button>
+                                    <div className="flex items-center justify-between border-t px-3 py-2">
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {template.currentVersionNumber ? `v${template.currentVersionNumber}` : 'Draft only'}
+                                        </span>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            onClick={() => deleteTemplate(template)}
+                                            disabled={deletingId === template.id}
+                                            title="Delete template"
+                                        >
+                                            {deletingId === template.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </aside>
@@ -261,10 +464,10 @@ export default function SuperAdminTemplateStudioPage() {
                         <Button variant={previewMode ? 'default' : 'outline'} onClick={() => setPreviewMode((value) => !value)}>
                             {previewMode ? 'Design Mode' : 'Sample Preview'}
                         </Button>
-                        <Button variant="outline" onClick={() => saveTemplate(false)} disabled={saving}>
+                        <Button variant="outline" onClick={() => saveTemplate(false)} disabled={saving || creating}>
                             <Save className="mr-2 h-4 w-4" /> Save Draft
                         </Button>
-                        <Button onClick={() => saveTemplate(true)} disabled={saving}>
+                        <Button onClick={() => saveTemplate(true)} disabled={saving || creating}>
                             <Send className="mr-2 h-4 w-4" /> Publish
                         </Button>
                     </div>

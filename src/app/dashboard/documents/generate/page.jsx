@@ -145,6 +145,7 @@ export default function UnifiedDocumentGeneratePage() {
         observer.observe(previewContainerRef.current);
         return () => { cancelAnimationFrame(raf); observer.disconnect(); };
     }, [resolvedLayout]);
+
     const chooseTemplate = (nextTemplateId) => {
         setTemplateId(nextTemplateId);
         router.replace(`/dashboard/documents/generate?templateId=${nextTemplateId}`);

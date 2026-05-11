@@ -33,10 +33,6 @@ export default function ClientProduct({ children }) {
         (isAtlasDomain || pathname.startsWith("/atlas")) ||
         (isTeacherDomain || pathname.startsWith("/teacher"))
 
-
-
-
-
     return (
         <>
             {!hideHeader && <Header />}
