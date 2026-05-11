@@ -2,17 +2,44 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { PaymentGatewayFactory } from "@/lib/payment/PaymentGatewayFactory";
+import crypto from "node:crypto";
+
+const PENDING_PAYMENT_TTL_MINUTES = 30;
 
 export const POST = withSchoolAccess(async function POST(req) {
+  let paymentIdForFailure = null;
   try {
     const body = await req.json();
-    const { studentFeeId, amount, paymentMode, studentId, schoolId } = body;
+    const { studentFeeId, amount, studentId, schoolId } = body;
+    const amountValue = Number(amount);
 
-    if (!studentFeeId || !amount || !schoolId) {
+    if (!studentFeeId || !amountValue || !schoolId || !studentId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // 1. Fetch School Payment Settings
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      return NextResponse.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
+    }
+
+    const studentFee = await prisma.studentFee.findFirst({
+      where: { id: studentFeeId, studentId, schoolId },
+      select: {
+        id: true,
+        studentId: true,
+        schoolId: true,
+        academicYearId: true,
+        balanceAmount: true,
+      },
+    });
+
+    if (!studentFee) {
+      return NextResponse.json({ error: "Student fee record not found" }, { status: 404 });
+    }
+
+    if (amountValue > studentFee.balanceAmount + 0.01) {
+      return NextResponse.json({ error: "Payment amount exceeds outstanding balance" }, { status: 400 });
+    }
+
     const settings = await prisma.schoolPaymentSettings.findUnique({
       where: { schoolId }
     });
@@ -22,54 +49,85 @@ export const POST = withSchoolAccess(async function POST(req) {
     }
 
     const provider = settings.provider;
+    const expiredBefore = new Date(Date.now() - PENDING_PAYMENT_TTL_MINUTES * 60 * 1000);
 
-    // 2. Create FeePayment record (PENDING)
-    // We generate a receipt Number or use a temporary one? 
-    // Usually we generate a temporary reference like "ORD_..."
-    const orderId = `ORD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    await prisma.feePayment.updateMany({
+      where: {
+        studentFeeId,
+        schoolId,
+        status: "PENDING",
+        paymentMode: "ONLINE",
+        paymentDate: { lt: expiredBefore },
+      },
+      data: {
+        status: "CANCELLED",
+        failureReason: "Payment session expired before completion",
+      },
+    });
+
+    const reusablePendingPayment = await prisma.feePayment.findFirst({
+      where: {
+        studentFeeId,
+        studentId,
+        schoolId,
+        status: "PENDING",
+        paymentMode: "ONLINE",
+        amount: amountValue,
+        gatewayName: provider,
+        paymentDate: { gte: expiredBefore },
+      },
+      orderBy: { paymentDate: "desc" },
+    });
+
+    if (reusablePendingPayment) {
+      return NextResponse.json({
+        success: false,
+        pending: true,
+        orderId: reusablePendingPayment.gatewayOrderId,
+        error: "A payment for this amount is already pending. Please check its status before starting another payment.",
+      }, { status: 409 });
+    }
+
+    const orderId = `ORD_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const payment = await prisma.feePayment.create({
       data: {
         studentFeeId,
         studentId,
         schoolId,
-        academicYearId: (await prisma.studentFee.findUnique({ where: { id: studentFeeId }, select: { academicYearId: true } })).academicYearId,
-        amount: parseFloat(amount),
+        academicYearId: studentFee.academicYearId,
+        amount: amountValue,
         paymentMode: "ONLINE",
-        paymentMethod: "NET_BANKING", // Default to NET_BANKING for online initiation
+        paymentMethod: "NET_BANKING",
         status: "PENDING",
         gatewayName: provider,
         gatewayOrderId: orderId,
-        receiptNumber: orderId // Temporary, will be updated to real receipt prefix on success
+        receiptNumber: orderId
       }
     });
+    paymentIdForFailure = payment.id;
 
-    // 3. Initiate Payment via Adapter
     const adapter = PaymentGatewayFactory.getAdapter(provider, settings);
 
-    // In Dev mode, force pay.localhost:3000 as requested
     const baseUrl = process.env.NODE_ENV === 'development' ?
     'http://pay.localhost:3000' :
     process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const returnUrl = `${baseUrl}/api/payment/callback/${provider}`; // Callback to our API
+    const returnUrl = `${baseUrl}/api/payment/callback/${provider}`;
 
     const result = await adapter.initiatePayment({
-      amount: parseFloat(amount),
-      orderId: orderId, // Our internal ID
-      studentName: "Student", // Fetch real name if needed
-      email: "parent@example.com", // Fetch if needed
-      phone: "9999999999", // Fetch if needed
-      upiId: body.upiId, // For ICICI UPI collection
+      amount: amountValue,
+      orderId,
+      studentName: body.studentName || "Student",
+      email: body.email || "parent@example.com",
+      phone: body.phone || "9999999999",
+      upiId: body.upiId,
       returnUrl: returnUrl,
       studentId,
       schoolId
     });
 
-    // Check if this is a redirect-based flow (old adapters) or API-based flow (ICICI)
     if (result.type === 'RAZORPAY') {
 
-      // CRITICAL FIX: Update the internal 'ORD_...' with the actual Razorpay Order ID ('order_...')
-      // This ensures the verify route (which looks up by razorpay_order_id) can find the record.
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: { gatewayOrderId: result.order.id }
@@ -83,18 +141,14 @@ export const POST = withSchoolAccess(async function POST(req) {
         orderId: orderId
       });
     } else if (result.type === 'UPI_COLLECT') {
-      // UPI Collection Flow (ICICI Collect Pay)
-      // Payment request sent to UPI app, no browser redirect needed
       return NextResponse.json({
         success: true,
         type: 'UPI_COLLECT',
         orderId: orderId,
         merchantTranId: result.merchantTranId,
         message: result.statusMessage
-        // Frontend should show message and poll for status or wait for webhook
       });
     } else {
-      // Redirect-based flow (form POST to bank page)
       const { url, params, method } = result;
       return NextResponse.json({
         success: true,
@@ -108,6 +162,17 @@ export const POST = withSchoolAccess(async function POST(req) {
 
   } catch (error) {
     console.error("Payment initiation error:", error);
+    if (paymentIdForFailure) {
+      await prisma.feePayment.update({
+        where: { id: paymentIdForFailure },
+        data: {
+          status: "FAILED",
+          failureReason: error.message || "Gateway initiation failed",
+        },
+      }).catch((updateError) => {
+        console.error("Failed to mark payment initiation as failed:", updateError);
+      });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }, { allowPastDueWrite: true });

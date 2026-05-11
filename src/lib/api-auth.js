@@ -26,10 +26,8 @@ async function resolveSchoolIdByLookup(kind, value) {
         case 'userId':
             return (await prisma.user.findUnique({ where: { id: value }, select: { schoolId: true } }))?.schoolId ?? null;
         case 'studentId': {
-            const student = await prisma.student.findFirst({
-                where: {
-                    OR: [{ id: value }, { userId: value }],
-                },
+            const student = await prisma.student.findUnique({
+                where: { userId: value },
                 select: { schoolId: true },
             });
             return student?.schoolId ?? null;

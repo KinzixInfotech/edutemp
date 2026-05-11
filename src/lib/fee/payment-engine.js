@@ -408,6 +408,32 @@ export async function processPayment({
         if (!session) throw new Error("Fee session not found");
         if (session.isClosed) throw new Error("Fee session is closed. No payments allowed.");
 
+        if (existingPaymentId) {
+            const lockedPaymentRows = await tx.$queryRaw`
+                SELECT id, status FROM "FeePayment"
+                WHERE id = ${existingPaymentId}::uuid FOR UPDATE
+            `;
+            const lockedPayment = lockedPaymentRows[0];
+            if (!lockedPayment) throw new Error("Payment record not found");
+            if (lockedPayment.status === "SUCCESS") {
+                const receipt = await tx.receipt.findFirst({
+                    where: { feePaymentId: existingPaymentId },
+                    orderBy: { createdAt: "desc" },
+                });
+                return {
+                    paymentId: existingPaymentId,
+                    receiptId: receipt?.id,
+                    receiptNumber: receipt?.receiptNumber,
+                    allocatedToItems: 0,
+                    walletCredited: 0,
+                    alreadyProcessed: true,
+                };
+            }
+            if (lockedPayment.status !== "PENDING") {
+                throw new Error(`Payment is ${String(lockedPayment.status).toLowerCase()}`);
+            }
+        }
+
         // ── Pessimistic lock on wallet to prevent race conditions ────────────────
         const existingWallet = await tx.$queryRaw`
             SELECT id, balance FROM "StudentWallet"
@@ -639,6 +665,11 @@ export async function processPayment({
                 receiptNumber,
                 receiptData: receiptSnapshot,
             },
+        });
+
+        await tx.feePayment.update({
+            where: { id: payment.id },
+            data: { receiptNumber },
         });
 
         return {

@@ -1,7 +1,4 @@
-import { withSchoolAccess } from "@/lib/api-auth"; // ============================================
-// API: /api/fee/parent/payment-history/route.js
-// Parent view payment history
-// ============================================
+import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
@@ -11,12 +8,7 @@ export const GET = withSchoolAccess(async function GET(req) {
     const parentId = searchParams.get("parentId");
     const studentId = searchParams.get("studentId");
     const academicYearId = searchParams.get("academicYearId");
-    console.log(`
-🧩 Query Params:
-- Parent ID: ${parentId}
-- Student ID: ${studentId}
-- Academic Year ID: ${academicYearId}
-`);
+
     if (!parentId) {
       return NextResponse.json(
         { error: "parentId required" },
@@ -37,8 +29,6 @@ export const GET = withSchoolAccess(async function GET(req) {
       }
     }) :
     null;
-
-    // console.log(student, studentId)
 
     if (studentId && !student) {
       return NextResponse.json(
@@ -79,11 +69,24 @@ export const GET = withSchoolAccess(async function GET(req) {
               }
             }
           }
+        },
+        paymentAllocations: {
+          include: {
+            ledgerEntry: {
+              select: {
+                id: true,
+                month: true,
+                monthLabel: true,
+                feeComponent: {
+                  select: { name: true, type: true, category: true }
+                }
+              }
+            }
+          }
         }
       },
       orderBy: { paymentDate: "desc" }
     });
-    console.log(payments);
 
     return NextResponse.json(payments);
   } catch (error) {

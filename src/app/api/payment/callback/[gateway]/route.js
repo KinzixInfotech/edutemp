@@ -2,6 +2,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { PaymentGatewayFactory } from "@/lib/payment/PaymentGatewayFactory";
+import { processPayment } from "@/lib/fee/payment-engine";
 
 export const POST = withSchoolAccess(async function POST(req, { params }) {
   try {
@@ -30,7 +31,6 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: "Could not identify Order ID" }, { status: 400 });
     }
 
-    // 2. Find Pending Payment
     const payment = await prisma.feePayment.findFirst({
       where: { gatewayOrderId: orderId },
       include: { school: { include: { paymentSettings: true } } }
@@ -40,73 +40,56 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: "Payment record not found" }, { status: 404 });
     }
 
-    // 3. Get Adapter & Verify
+    const baseUrl = process.env.NODE_ENV === 'development' ?
+    'http://pay.localhost:3000' :
+    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    if (payment.status === 'SUCCESS') {
+      return NextResponse.redirect(`${baseUrl}/pay/success?receipt=${payment.receiptNumber}`);
+    }
+
+    if (payment.status !== 'PENDING') {
+      return NextResponse.redirect(`${baseUrl}/pay/failure?orderId=${orderId}`);
+    }
+
     const adapter = PaymentGatewayFactory.getAdapter(gateway, payment.school.paymentSettings);
     const verificationResult = await adapter.verifyPayment(responseParams);
 
-    // 4. Update Payment Status
     if (verificationResult.status === 'SUCCESS') {
-      // Update FeePayment record
+      const session = await prisma.feeSession.findFirst({
+        where: { schoolId: payment.schoolId, isClosed: false },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!session) {
+        return NextResponse.json({ error: "Payment session unavailable" }, { status: 503 });
+      }
+
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
-          status: 'SUCCESS',
-          transactionId: verificationResult.transactionId,
-          gatewayPaymentId: verificationResult.transactionId,
-          amount: verificationResult.amount,
+          transactionId: verificationResult.transactionId || null,
+          gatewayPaymentId: verificationResult.transactionId || null,
           gatewayResponse: verificationResult.rawResponse,
-          clearedDate: new Date()
-        }
+          webhookVerified: true,
+          reconciledAt: new Date(),
+          settlementStatus: 'verified',
+        },
       });
 
-      // 5. Update Installments and StudentFee
-      // Fetch the linked installment payments to know which installments were paid
-      const installmentPayments = await prisma.feePaymentInstallment.findMany({
-        where: { paymentId: payment.id },
-        include: { installment: true }
+      const allocationResult = await processPayment({
+        studentId: payment.studentId,
+        schoolId: payment.schoolId,
+        academicYearId: payment.academicYearId,
+        feeSessionId: session.id,
+        amountPaid: payment.amount,
+        paymentMode: payment.paymentMode,
+        paymentMethod: payment.paymentMethod || "NET_BANKING",
+        existingPaymentId: payment.id,
+        remarks: `${gateway} payment callback`,
       });
 
-      // Update each installment's paidAmount and status
-      for (const ip of installmentPayments) {
-        const installment = ip.installment;
-        const newPaidAmount = (installment.paidAmount || 0) + ip.amount;
-        const isPaidInFull = newPaidAmount >= installment.amount;
-
-        await prisma.studentFeeInstallment.update({
-          where: { id: installment.id },
-          data: {
-            paidAmount: newPaidAmount,
-            status: isPaidInFull ? 'PAID' : 'PARTIAL',
-            paidDate: isPaidInFull ? new Date() : undefined
-          }
-        });
-      }
-
-      // Update the parent StudentFee record
-      const studentFee = await prisma.studentFee.findUnique({
-        where: { id: payment.studentFeeId }
-      });
-
-      if (studentFee) {
-        const newPaidAmount = (studentFee.paidAmount || 0) + verificationResult.amount;
-        const newBalanceAmount = (studentFee.finalAmount || 0) - newPaidAmount;
-        const isFullyPaid = newBalanceAmount <= 0;
-
-        await prisma.studentFee.update({
-          where: { id: payment.studentFeeId },
-          data: {
-            paidAmount: newPaidAmount,
-            balanceAmount: Math.max(0, newBalanceAmount),
-            status: isFullyPaid ? 'PAID' : 'PARTIAL'
-          }
-        });
-      }
-
-      // Redirect to Success Page
-      const baseUrl = process.env.NODE_ENV === 'development' ?
-      'http://pay.localhost:3000' :
-      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      return NextResponse.redirect(`${baseUrl}/pay/success?receipt=${payment.receiptNumber}`);
+      return NextResponse.redirect(`${baseUrl}/pay/success?receipt=${allocationResult.receiptNumber || payment.receiptNumber}`);
 
     } else {
       await prisma.feePayment.update({
@@ -118,10 +101,6 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         }
       });
 
-      // Redirect to Failure Page
-      const baseUrl = process.env.NODE_ENV === 'development' ?
-      'http://pay.localhost:3000' :
-      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       return NextResponse.redirect(`${baseUrl}/pay/failure?orderId=${orderId}`);
     }
 

@@ -214,7 +214,124 @@ function buildInstallmentSummary(installments) {
       progress: totalAmount > 0 ? Math.min(100, Math.round(paidAmount / totalAmount * 100)) : 0
     };
   });
-}export const GET = withSchoolAccess(async function GET(req, props) {
+}
+
+async function reconcileSuccessfulUnallocatedPayments({ studentId, schoolId, academicYearId, feeSessionId }) {
+  if (!studentId || !schoolId || !academicYearId || !feeSessionId) return { repaired: 0 };
+
+  return prisma.$transaction(async (tx) => {
+    const payments = await tx.feePayment.findMany({
+      where: {
+        studentId,
+        schoolId,
+        academicYearId,
+        status: "SUCCESS",
+        paymentAllocations: { none: {} },
+      },
+      orderBy: { paymentDate: "asc" },
+    });
+
+    let repaired = 0;
+
+    for (const payment of payments) {
+      let remainingAmount = payment.amount || 0;
+      if (remainingAmount <= 0) continue;
+
+      const entries = await tx.studentFeeLedger.findMany({
+        where: {
+          studentId,
+          schoolId,
+          academicYearId,
+          feeSessionId,
+          status: { in: ["LEDGER_UNPAID", "LEDGER_PARTIAL"] },
+          balanceAmount: { gt: 0 },
+        },
+        include: { feeComponent: true },
+        orderBy: [
+          { month: "asc" },
+          { dueDate: "asc" },
+          { feeComponent: { displayOrder: "asc" } },
+        ],
+      });
+
+      const allocations = [];
+      const auditLogs = [];
+
+      for (const entry of entries) {
+        if (remainingAmount <= 0) break;
+
+        const allocateAmount = Math.min(entry.balanceAmount || 0, remainingAmount);
+        if (allocateAmount <= 0) continue;
+
+        const newPaidAmount = (entry.paidAmount || 0) + allocateAmount;
+        const newBalanceAmount = Math.max(0, (entry.netAmount || 0) - newPaidAmount);
+        const newStatus = newBalanceAmount <= 0 ? "LEDGER_PAID" : "LEDGER_PARTIAL";
+
+        allocations.push({
+          paymentId: payment.id,
+          ledgerEntryId: entry.id,
+          amount: allocateAmount,
+        });
+
+        await tx.studentFeeLedger.update({
+          where: { id: entry.id },
+          data: {
+            paidAmount: newPaidAmount,
+            balanceAmount: newBalanceAmount,
+            status: newStatus,
+            isFrozen: true,
+            paidDate: newStatus === "LEDGER_PAID" ? payment.paymentDate : entry.paidDate,
+          },
+        });
+
+        auditLogs.push({
+          ledgerEntryId: entry.id,
+          action: "LEDGER_PAID",
+          oldValue: { balance: Number(entry.balanceAmount), status: entry.status },
+          newValue: { balance: Number(newBalanceAmount), status: newStatus, allocated: Number(allocateAmount) },
+          remarks: `Auto-reconciled successful payment ${payment.receiptNumber || payment.id}`,
+        });
+
+        remainingAmount -= allocateAmount;
+      }
+
+      if (allocations.length > 0) {
+        await tx.paymentAllocation.createMany({ data: allocations });
+        if (auditLogs.length > 0) {
+          await tx.ledgerAuditLog.createMany({ data: auditLogs });
+        }
+        repaired += 1;
+      }
+    }
+
+    if (repaired > 0) {
+      const totals = await tx.studentFeeLedger.aggregate({
+        where: { studentId, schoolId, academicYearId, feeSessionId },
+        _sum: {
+          netAmount: true,
+          paidAmount: true,
+          balanceAmount: true,
+        },
+      });
+
+      await tx.studentFee.updateMany({
+        where: { studentId, schoolId, academicYearId },
+        data: {
+          originalAmount: totals._sum.netAmount || 0,
+          finalAmount: totals._sum.netAmount || 0,
+          paidAmount: totals._sum.paidAmount || 0,
+          balanceAmount: totals._sum.balanceAmount || 0,
+          lastPaymentDate: new Date(),
+          status: (totals._sum.balanceAmount || 0) <= 0 ? "PAID" : (totals._sum.paidAmount || 0) > 0 ? "PARTIAL" : "UNPAID",
+        },
+      });
+    }
+
+    return { repaired };
+  });
+}
+
+export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   try {
     const { studentId } = params;
@@ -352,6 +469,12 @@ function buildInstallmentSummary(installments) {
       }
 
       await calculateLateFees(studentId, feeSessionId, false);
+      await reconcileSuccessfulUnallocatedPayments({
+        studentId,
+        schoolId: resolvedSession.schoolId,
+        academicYearId: resolvedSession.academicYearId,
+        feeSessionId: resolvedSession.id,
+      });
 
       // Fetch fresh ledger entries
       ledgerEntries = await prisma.studentFeeLedger.findMany({
@@ -403,6 +526,14 @@ function buildInstallmentSummary(installments) {
     } else if (feeSessionId) {
       // No fee structure assigned — just fetch existing entries
       await calculateLateFees(studentId, feeSessionId, false);
+      if (student?.schoolId) {
+        await reconcileSuccessfulUnallocatedPayments({
+          studentId,
+          schoolId: student.schoolId,
+          academicYearId,
+          feeSessionId,
+        });
+      }
       ledgerEntries = await prisma.studentFeeLedger.findMany({
         where: { studentId, feeSessionId },
         include: {

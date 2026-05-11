@@ -15,9 +15,8 @@ export const POST = withSchoolAccess(async function POST(req) {
       return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
     }
 
-    // 1. Fetch Payment Record
     const payment = await prisma.feePayment.findFirst({
-      where: { gatewayOrderId: razorpay_order_id, status: { not: 'SUCCESS' } }
+      where: { gatewayOrderId: razorpay_order_id }
     });
 
     if (!payment) {
@@ -25,7 +24,24 @@ export const POST = withSchoolAccess(async function POST(req) {
     }
 
     if (payment.status === 'SUCCESS') {
-      return NextResponse.json({ success: true, message: "Payment already verified" });
+      const receipt = await prisma.receipt.findFirst({
+        where: { feePaymentId: payment.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      return NextResponse.json({
+        success: true,
+        message: "Payment already verified",
+        payment: {
+          id: payment.id,
+          receiptNumber: receipt?.receiptNumber || payment.receiptNumber,
+          amount: payment.amount,
+          date: payment.paymentDate,
+        },
+      });
+    }
+
+    if (payment.status !== 'PENDING') {
+      return NextResponse.json({ error: `Payment is ${payment.status.toLowerCase()}` }, { status: 409 });
     }
 
     // 2. Fetch School Settings (to get secret)
@@ -48,7 +64,6 @@ export const POST = withSchoolAccess(async function POST(req) {
     });
 
     if (verification.status !== 'SUCCESS') {
-      // Record failure
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
@@ -61,9 +76,6 @@ export const POST = withSchoolAccess(async function POST(req) {
       return NextResponse.json({ error: "Invalid Signature" }, { status: 400 });
     }
 
-    // 4. Update Payment Status / Run new ledger logic
-
-    // Find active fee session for the school
     const session = await prisma.feeSession.findFirst({
       where: { schoolId: payment.schoolId, isClosed: false },
       orderBy: { createdAt: 'desc' }
@@ -72,6 +84,18 @@ export const POST = withSchoolAccess(async function POST(req) {
     if (!session) {
       return NextResponse.json({ error: "Payment session unavailable" }, { status: 503 });
     }
+
+    await prisma.feePayment.update({
+      where: { id: payment.id },
+      data: {
+        gatewayPaymentId: razorpay_payment_id,
+        transactionId: razorpay_payment_id,
+        webhookVerified: true,
+        reconciledAt: new Date(),
+        gatewayResponse: verification.rawResponse,
+        settlementStatus: 'verified',
+      },
+    });
 
     const allocationResult = await processPayment({
       studentId: payment.studentId,
@@ -85,8 +109,6 @@ export const POST = withSchoolAccess(async function POST(req) {
       remarks: "Online Razorpay Payment"
     });
 
-    // 5. Update extra gateway response fields outside the strict processPayment envelope 
-    // to record webhook data
     await prisma.feePayment.update({
       where: { id: payment.id },
       data: {
