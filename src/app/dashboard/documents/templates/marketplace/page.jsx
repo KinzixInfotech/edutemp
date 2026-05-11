@@ -1,9 +1,9 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect */
-
-import { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, Lock, Search, Sparkles } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, Loader2, Lock, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,34 +11,61 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
 export default function TemplateMarketplacePage() {
-    const [templates, setTemplates] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const router = useRouter();
+    const queryClient = useQueryClient();
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState('all');
     const [pricing, setPricing] = useState('all');
+    const [orientation, setOrientation] = useState('all');
+    const [featured, setFeatured] = useState('all');
     const [busyId, setBusyId] = useState(null);
 
-    const loadMarketplace = async () => {
-        setLoading(true);
-        try {
-            const [templateRes, categoryRes] = await Promise.all([
-                fetchWithAuth('/api/templates/marketplace'),
-                fetchWithAuth('/api/templates/marketplace/categories'),
-            ]);
-            const [templateData, categoryData] = await Promise.all([templateRes.json(), categoryRes.json()]);
-            setTemplates(Array.isArray(templateData) ? templateData : []);
-            setCategories(Array.isArray(categoryData) ? categoryData : []);
-        } catch (error) {
-            toast.error('Failed to load marketplace');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const templatesQuery = useQuery({
+        queryKey: ['template-marketplace'],
+        queryFn: async () => {
+            const res = await fetchWithAuth('/api/templates/marketplace');
+            if (!res.ok) throw new Error('Failed to load marketplace');
+            return res.json();
+        },
+        staleTime: 60_000,
+    });
 
-    useEffect(() => {
-        loadMarketplace();
-    }, []);
+    const categoriesQuery = useQuery({
+        queryKey: ['marketplace-template-categories'],
+        queryFn: async () => {
+            const res = await fetchWithAuth('/api/templates/marketplace/categories');
+            if (!res.ok) throw new Error('Failed to load categories');
+            return res.json();
+        },
+        staleTime: 5 * 60_000,
+    });
+
+    const templates = useMemo(() => templatesQuery.data || [], [templatesQuery.data]);
+    const categories = useMemo(() => categoriesQuery.data || [], [categoriesQuery.data]);
+
+    if (templatesQuery.error) {
+        toast.error('Failed to load marketplace');
+    }
+
+    const ensureUsableTemplate = async (template) => {
+        if (!template.isUnlocked) {
+            const purchaseRes = await fetchWithAuth(`/api/templates/marketplace/${template.id}/purchase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            const purchase = await purchaseRes.json();
+            if (!purchaseRes.ok) throw new Error(purchase.error || 'Payment could not start');
+            if (purchase.orderId) {
+                await openRazorpayCheckout(template, purchase);
+            }
+        }
+
+        const res = await fetchWithAuth(`/api/templates/marketplace/${template.id}/use`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not use template');
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['template-marketplace'] }),
+            queryClient.invalidateQueries({ queryKey: ['my-document-templates'] }),
+        ]);
+        return data.copy?.id || template.id;
+    };
 
     const filteredTemplates = useMemo(() => {
         const normalizedQuery = query.trim().toLowerCase();
@@ -48,26 +75,18 @@ export default function TemplateMarketplacePage() {
                 .some((value) => value.toLowerCase().includes(normalizedQuery));
             const matchesCategory = category === 'all' || template.category?.slug === category;
             const matchesPricing = pricing === 'all' || template.pricing === pricing;
-            return matchesQuery && matchesCategory && matchesPricing;
+            const matchesOrientation = orientation === 'all' || template.orientation === orientation;
+            const matchesFeatured = featured === 'all' || (featured === 'featured' ? template.isFeatured : !template.isFeatured);
+            return matchesQuery && matchesCategory && matchesPricing && matchesOrientation && matchesFeatured;
         });
-    }, [templates, query, category, pricing]);
+    }, [templates, query, category, pricing, orientation, featured]);
 
     const handleUseTemplate = async (template) => {
         try {
             setBusyId(template.id);
-            if (!template.isUnlocked) {
-                const purchaseRes = await fetchWithAuth(`/api/templates/marketplace/${template.id}/purchase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-                const purchase = await purchaseRes.json();
-                if (!purchaseRes.ok) throw new Error(purchase.error || 'Payment could not start');
-                if (purchase.orderId) {
-                    await openRazorpayCheckout(template, purchase);
-                }
-            }
-            const res = await fetchWithAuth(`/api/templates/marketplace/${template.id}/use`, { method: 'POST' });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Could not use template');
-            toast.success(template.hasSchoolCopy ? 'Template copy refreshed' : 'Template copied for your school');
-            await loadMarketplace();
+            const usableTemplateId = await ensureUsableTemplate(template);
+            toast.success(template.hasSchoolCopy ? 'Template copy ready' : 'Template copied for your school');
+            router.push(`/dashboard/documents/generate?templateId=${usableTemplateId}`);
         } catch (error) {
             toast.error(error.message || 'Could not use template');
         } finally {
@@ -118,7 +137,7 @@ export default function TemplateMarketplacePage() {
         document.body.appendChild(script);
     });
 
-    if (loading) {
+    if (templatesQuery.isLoading) {
         return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
 
@@ -133,7 +152,7 @@ export default function TemplateMarketplacePage() {
                         </div>
                         <Badge variant="outline">{filteredTemplates.length} templates</Badge>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-[1fr_220px_180px]">
+                    <div className="grid gap-3 md:grid-cols-[1fr_200px_170px_170px_160px]">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input className="pl-9" placeholder="Search templates..." value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -151,6 +170,22 @@ export default function TemplateMarketplacePage() {
                                 <SelectItem value="all">Free and premium</SelectItem>
                                 <SelectItem value="free">Free</SelectItem>
                                 <SelectItem value="premium">Premium</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={orientation} onValueChange={setOrientation}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All orientations</SelectItem>
+                                <SelectItem value="portrait">Portrait</SelectItem>
+                                <SelectItem value="landscape">Landscape</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={featured} onValueChange={setFeatured}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Featured and regular</SelectItem>
+                                <SelectItem value="featured">Featured only</SelectItem>
+                                <SelectItem value="regular">Regular only</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -199,8 +234,8 @@ export default function TemplateMarketplacePage() {
                                         )}
                                     </div>
                                     <Button size="sm" onClick={() => handleUseTemplate(template)} disabled={busyId === template.id}>
-                                        {busyId === template.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : template.isUnlocked ? <Download className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
-                                        {template.hasSchoolCopy ? 'Use Copy' : template.isUnlocked ? 'Use Template' : 'Unlock'}
+                                        {busyId === template.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : template.isUnlocked ? <FileText className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
+                                        {template.hasSchoolCopy ? 'Generate' : template.isUnlocked ? 'Use Template' : 'Unlock'}
                                     </Button>
                                 </div>
                             </div>

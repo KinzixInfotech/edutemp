@@ -1,475 +1,332 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import {
-    Save,
-    Loader2,
-    FileText,
-    Users,
-    Calendar,
-    ArrowLeft,
-    Download,
-    AlertCircle,
-    Award
-} from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, Download, FileArchive, Loader2, Search, Users } from 'lucide-react';
 
+import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuth } from '@/context/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useAcademicYear } from '@/context/AcademicYearContext';
+import { useAuth } from '@/context/AuthContext';
 import { useR2Upload } from '@/hooks/useR2Upload';
-import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
-import {
-    buildResolvedTemplateConfig,
-    buildCertificateMappingContext,
-} from '@/lib/certificate-template-mapping';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
+import { buildDocumentMappingContext, buildResolvedTemplateConfig } from '@/lib/shared-field-resolver';
 import { createPdfBlobFromLayout } from '@/lib/client-document-pdf';
 
-const formSchema = z.object({
-    classId: z.string().min(1, 'Class is required'),
-    sectionId: z.string().optional(),
-    templateId: z.string().min(1, 'Template is required'),
-    issueDate: z.string().default(() => new Date().toISOString().split('T')[0]),
-    startingNumber: z.number().min(1).default(1),
-    showToParent: z.boolean().default(false),
-});
-
-export default function BulkGenerateCertificatesPage() {
+export default function UnifiedBulkDocumentPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
     const { fullUser } = useAuth();
     const { selectedYear } = useAcademicYear();
-    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
+    const [templateId, setTemplateId] = useState(searchParams.get('templateId') || '');
+    const [classId, setClassId] = useState('');
+    const [sectionId, setSectionId] = useState('ALL');
+    const [templateSearch, setTemplateSearch] = useState('');
+    const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+    const [showToParent, setShowToParent] = useState(false);
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
     const [statusMessage, setStatusMessage] = useState('');
-    const [previewConfig, setPreviewConfig] = useState(null);
-    const [studentCount, setStudentCount] = useState(0);
-    const [loadingCount, setLoadingCount] = useState(false);
-    const [templateSearch, setTemplateSearch] = useState('');
+    const { startUpload } = useR2Upload({ folder: 'documents/generated' });
 
-    // Error Reporting State
-    const [failedStudents, setFailedStudents] = useState([]);
-    const [showReport, setShowReport] = useState(false);
-
-    const {
-        handleSubmit,
-        watch,
-        register,
-        setValue,
-        formState: { errors },
-    } = useForm({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            classId: '',
-            sectionId: '',
-            templateId: '',
-            issueDate: new Date().toISOString().split('T')[0],
-            startingNumber: 1,
-            showToParent: false,
-        },
-    });
-
-    const watchedValues = watch();
-    // Reusing the ZIP uploader - accepts blob up to 32MB
-    const { startUpload } = useR2Upload({ folder: 'documents' });
-
-    // Fetch classes
-    const { data: classes, isLoading: loadingClasses } = useQuery({
-        queryKey: ['classes', schoolId, academicYearId],
+    const templatesQuery = useQuery({
+        queryKey: ['my-document-templates'],
         queryFn: async () => {
-            if (!schoolId) throw new Error('No school ID');
-            const params = new URLSearchParams();
-            if (academicYearId) params.append('academicYearId', academicYearId);
-            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch classes');
-            const data = await res.json();
-            return data.data || data;
-        },
-        enabled: !!schoolId,
-    });
-
-    // Fetch sections
-    const { data: sections, isLoading: loadingSections } = useQuery({
-        queryKey: ['sections', schoolId, watchedValues.classId],
-        queryFn: async () => {
-            if (!watchedValues.classId) return [];
-            const res = await fetch(`/api/schools/${schoolId}/classes/${watchedValues.classId}/sections`);
-            if (!res.ok) throw new Error('Failed to fetch sections');
-            const data = await res.json();
-            return data.data || data;
-        },
-        enabled: !!schoolId && !!watchedValues.classId,
-    });
-
-    // Fetch templates
-    const { data: templates, isLoading: loadingTemplates } = useQuery({
-        queryKey: ['certificate-templates-all', schoolId],
-        queryFn: async () => {
-            if (!schoolId) throw new Error('Invalid configuration');
-            const res = await fetch(`/api/documents/${schoolId}/certificate-templates?all=true`);
-            if (!res.ok) throw new Error('Failed to fetch templates');
+            const res = await fetchWithAuth('/api/templates/my');
+            if (!res.ok) throw new Error('Failed to load templates');
             return res.json();
         },
+        staleTime: 60_000,
+    });
+
+    const templateQuery = useQuery({
+        queryKey: ['generation-template', templateId],
+        queryFn: async () => {
+            const res = await fetchWithAuth(`/api/templates/generation/${templateId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Template is not available');
+            return data;
+        },
+        enabled: !!templateId,
+        staleTime: 60_000,
+    });
+
+    const classesQuery = useQuery({
+        queryKey: ['classes', schoolId, selectedYear?.id],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (selectedYear?.id) params.set('academicYearId', selectedYear.id);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
+            if (!res.ok) throw new Error('Failed to load classes');
+            const data = await res.json();
+            return data.data || data;
+        },
         enabled: !!schoolId,
+        staleTime: 60_000,
+    });
+
+    const sectionsQuery = useQuery({
+        queryKey: ['sections', schoolId, classId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/classes/${classId}/sections`);
+            if (!res.ok) throw new Error('Failed to load sections');
+            const data = await res.json();
+            return data.data || data;
+        },
+        enabled: !!schoolId && !!classId,
+        staleTime: 60_000,
+    });
+
+    const studentsQuery = useQuery({
+        queryKey: ['bulk-document-students', schoolId, classId, sectionId],
+        queryFn: async () => {
+            const params = new URLSearchParams({ classId, limit: '500' });
+            if (sectionId && sectionId !== 'ALL') params.set('sectionId', sectionId);
+            const res = await fetch(`/api/schools/${schoolId}/students?${params}`);
+            if (!res.ok) throw new Error('Failed to load students');
+            const data = await res.json();
+            return data.data || data;
+        },
+        enabled: !!schoolId && !!templateId && !!classId,
+        staleTime: 30_000,
     });
 
     const filteredTemplates = useMemo(() => {
-        if (!templateSearch.trim()) return templates || [];
-        const search = templateSearch.toLowerCase();
-        return (templates || []).filter((template) =>
-            [template.name, template.description, template.type]
-                .filter(Boolean)
-                .some((value) => String(value).toLowerCase().includes(search))
-        );
-    }, [templateSearch, templates]);
+        const search = templateSearch.trim().toLowerCase();
+        return (templatesQuery.data || []).filter((template) => !search || [template.name, template.category?.name, template.documentType]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(search)));
+    }, [templatesQuery.data, templateSearch]);
 
-    // Fetch Student Count
-    useEffect(() => {
-        const fetchCount = async () => {
-            if (!watchedValues.classId || !schoolId) {
-                setStudentCount(0);
-                return;
-            }
-            try {
-                setLoadingCount(true);
-                const queryParams = new URLSearchParams({
-                    classId: watchedValues.classId,
-                    limit: '1',
-                });
-                if (watchedValues.sectionId && watchedValues.sectionId !== 'ALL') {
-                    queryParams.append('sectionId', watchedValues.sectionId);
-                }
-                const res = await fetch(`/api/schools/${schoolId}/students?${queryParams.toString()}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setStudentCount(data.total || 0);
-                }
-            } catch (err) {
-                console.error('Failed to fetch student count:', err);
-            } finally {
-                setLoadingCount(false);
-            }
+    const previewLayout = useMemo(() => {
+        const template = templateQuery.data;
+        const student = studentsQuery.data?.[0] || {
+            name: 'Sample Student',
+            rollNumber: 'ROLL-001',
+            admissionNo: 'ADM-001',
+            class: { className: 'Class X' },
+            section: { name: 'A' },
+            FatherName: 'Father Name',
+            MotherName: 'Mother Name',
         };
-        fetchCount();
-    }, [watchedValues.classId, watchedValues.sectionId, schoolId]);
-
-    // Update preview
-    useEffect(() => {
-        if (!templates || !watchedValues.templateId) {
-            setPreviewConfig(null);
-            return;
-        }
-
-        const template = templates.find(t => t.id === watchedValues.templateId);
-        if (!template || !template.layoutConfig) {
-            setPreviewConfig(null);
-            return;
-        }
-
-        const cls = classes?.find(c => c.id.toString() === watchedValues.classId) || {};
-        const section = sections?.find(s => s.id.toString() === watchedValues.sectionId) || {};
-
-        const sampleStudent = {
-            name: 'John Doe (Sample)',
-            rollNumber: '12345',
-            admissionNo: 'ADM001',
-            className: cls.className || 'Class X',
-            section: section.name || 'A',
-            dob: '2010-01-01',
-            fatherName: 'Robert Doe',
-            motherName: 'Jane Doe',
-            photo: 'https://placehold.co/100x100?text=Photo',
-        };
-        const mappingContext = buildCertificateMappingContext({
-            student: sampleStudent,
-            formValues: {
-                ...watchedValues,
-                conductLabel: 'Good',
-                conduct: 'Good',
-                reason: watchedValues.reason || 'Completed Studies',
-                academicYear: watchedValues.academicYear || '2023-2024',
-            },
+        if (!template?.layoutConfig) return null;
+        const context = buildDocumentMappingContext({
+            student,
             fullUser,
             selectedYear,
-            certificateMeta: {
-                certificateNumber: 'CERT-SAMPLE-001',
-                tcNumber: 'TC-SAMPLE-001',
-                verificationUrl: 'https://example.com/verify/sample',
-            },
+            formValues: { issueDate },
+            certificateMeta: { certificateNumber: 'DOC-SAMPLE-001', verificationUrl: 'https://edubreezy.com/verify/sample' },
         });
-        const resolvedLayout = buildResolvedTemplateConfig({
-            layoutConfig: template.layoutConfig,
-            context: mappingContext,
-        });
+        return buildResolvedTemplateConfig({ layoutConfig: template.layoutConfig, context });
+    }, [templateQuery.data, studentsQuery.data, fullUser, selectedYear, issueDate]);
 
-        setPreviewConfig({
-            ...resolvedLayout,
-            canvasSize: resolvedLayout.canvasSize,
-            backgroundImage: resolvedLayout.backgroundImage,
-            backgroundAsset: resolvedLayout.backgroundAsset || null,
-            backgroundColor: resolvedLayout.backgroundColor || '#ffffff',
-            customFonts: resolvedLayout.customFonts || [],
-        });
-
-    }, [templates, classes, sections, watchedValues, fullUser, selectedYear]);
-
-
-    const generateCertificates = async (data) => {
-        const failures = [];
-        const generatedCertificates = [];
-        setFailedStudents([]);
-        setShowReport(false);
+    const generateZip = async () => {
+        const template = templateQuery.data;
+        const students = studentsQuery.data || [];
+        if (!template) return toast.error('Choose a template first');
+        if (!classId) return toast.error('Choose a class');
+        if (students.length === 0) return toast.error('No students found for this filter');
 
         try {
             setGenerating(true);
             setProgress(0);
-            setStatusMessage('Fetching student data...');
-
-            const res = await fetch(`/api/documents/${schoolId}/certificates/bulk-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-
-            if (!res.ok) throw new Error('Failed to fetch data');
-            const { students, template, count } = await res.json();
-
-            if (!students || students.length === 0) {
-                toast.error('No students found');
-                setGenerating(false);
-                return;
-            }
-
-            setStatusMessage(`Preparing ${count} certificates...`);
+            setStatusMessage(`Generating ${students.length} documents...`);
 
             const zip = new JSZip();
-            const dateStr = new Date().toISOString().split('T')[0];
-            const folder = zip.folder(`Certificates-${template.name}-${dateStr}`);
+            const folder = zip.folder(`${template.name}-${new Date().toISOString().slice(0, 10)}`);
+            const historyRecords = [];
 
-            for (let i = 0; i < students.length; i++) {
-                try {
-                    const student = students[i];
-                    const mappingContext = buildCertificateMappingContext({
-                        student,
-                        formValues: {
-                            ...data,
-                            conductLabel: data.conduct || 'Good',
-                            academicYear: data.academicYear || `${new Date().getFullYear() - 1}-${new Date().getFullYear()}`,
-                        },
-                        fullUser,
-                        selectedYear,
-                        certificateMeta: {
-                            certificateNumber: `CERT-${Date.now()}-${i + 1}`,
-                            tcNumber: `TC-${Date.now()}-${i + 1}`,
-                            verificationUrl: '',
-                        },
-                    });
-                    const studentConfig = buildResolvedTemplateConfig({
-                        layoutConfig: template.layoutConfig,
-                        context: mappingContext,
-                    });
-
-                    const pdfBlob = await createPdfBlobFromLayout(studentConfig);
-                    folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
-
-                    generatedCertificates.push({
-                        studentId: student.id,
-                        customFields: {
-                            layoutConfig: studentConfig
-                        },
-                    });
-                } catch (err) {
-                    console.error('Err:', err);
-                    failures.push({ name: students[i].name, reason: err.message });
-                }
-                setProgress(Math.round(((i + 1) / students.length) * 100));
+            for (let index = 0; index < students.length; index += 1) {
+                const student = students[index];
+                const documentNumber = `DOC-${Date.now()}-${index + 1}`;
+                const context = buildDocumentMappingContext({
+                    student,
+                    fullUser,
+                    selectedYear,
+                    formValues: { issueDate },
+                    certificateMeta: {
+                        certificateNumber: documentNumber,
+                        verificationUrl: '',
+                    },
+                });
+                const layout = buildResolvedTemplateConfig({ layoutConfig: template.layoutConfig, context });
+                const pdfBlob = await createPdfBlobFromLayout(layout);
+                const studentName = student.name || student.user?.name || `student-${index + 1}`;
+                folder.file(`${student.rollNumber || index + 1}-${studentName}.pdf`, pdfBlob);
+                historyRecords.push({
+                    studentId: student.userId || student.id,
+                    classId: student.classId,
+                    sectionId: student.sectionId,
+                    certificateNumber: documentNumber,
+                    metadata: {
+                        showToParent,
+                        placeholderKeys: layout.placeholderKeys,
+                    },
+                });
+                setProgress(Math.round(((index + 1) / students.length) * 100));
             }
 
-            setStatusMessage('Compressing...');
-            const zipContent = await zip.generateAsync({ type: 'blob' });
-            saveAs(zipContent, `Certificates-${template.name}.zip`);
-
-            // Upload
-            if (generatedCertificates.length > 0) {
-                setStatusMessage('Uploading history...');
-                const zipFile = new File([zipContent], `Certificates-${template.name}-${Date.now()}.zip`, { type: "application/zip" });
-                const uploadRes = await startUpload([zipFile]);
-
-                if (uploadRes && uploadRes[0]) {
-                    const histRes = await fetch(`/api/documents/${schoolId}/certificates/history`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            templateId: data.templateId,
-                            zipUrl: uploadRes[0].url,
-                            students: generatedCertificates
-                        })
-                    });
-
-                    if (!histRes.ok) {
-                        const errData = await histRes.json();
-                        console.error("History Save Error:", errData);
-                        throw new Error(errData.message || errData.error || 'Failed to save to history');
-                    }
-                    toast.success('Saved to history');
-                }
+            setStatusMessage('Compressing ZIP...');
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipName = `${template.name}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+            const zipFile = new File([zipBlob], `${zipName}-${Date.now()}.zip`, { type: 'application/zip' });
+            let zipUrl = null;
+            try {
+                const upload = await startUpload([zipFile]);
+                zipUrl = upload?.[0]?.url || null;
+            } catch (error) {
+                console.warn('ZIP upload failed; local download will still work.', error);
             }
+            saveAs(zipBlob, `${zipName}.zip`);
 
-            if (failures.length > 0) {
-                setFailedStudents(failures);
-                setShowReport(true);
-            } else {
-                toast.success('All generated!');
-            }
-
+            await fetchWithAuth(`/api/documents/${schoolId}/generation-history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template,
+                    generatedById: fullUser?.id,
+                    generationMode: 'bulk',
+                    issueDate,
+                    classId,
+                    sectionId: sectionId === 'ALL' ? null : sectionId,
+                    zipUrl,
+                    metadata: { showToParent },
+                    records: historyRecords,
+                }),
+            });
+            queryClient.invalidateQueries({ queryKey: ['document-generation-history'] });
+            toast.success('Bulk documents generated and added to history');
         } catch (error) {
-            console.error(error);
-            toast.error('Error: ' + error.message);
+            toast.error(error.message || 'Bulk generation failed');
         } finally {
             setGenerating(false);
             setProgress(0);
+            setStatusMessage('');
         }
     };
 
-    if (!schoolId || loadingClasses || loadingTemplates) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
-
     return (
-        <div className="h-screen flex flex-col bg-background overflow-hidden relative">
-            {/* Same Error/Loading Overlays as Admit Card (simplified) */}
+        <div className="relative flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
             {generating && (
-                <div className="absolute inset-0 z-50 bg-background/80 flex flex-col items-center justify-center p-4">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
                     <Card className="w-full max-w-md">
                         <CardHeader className="text-center">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
+                            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-primary" />
                             <CardTitle>{statusMessage}</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <Progress value={progress} className="h-2" />
-                        </CardContent>
+                        <CardContent><Progress value={progress} /></CardContent>
                     </Card>
                 </div>
             )}
 
-            {/* Header */}
-            <div className="h-14 border-b bg-background flex items-center justify-between px-4">
+            <div className="flex h-14 items-center justify-between border-b px-4">
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/documents/certificates/history')}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <h1 className="font-semibold text-lg flex items-center gap-2">
-                        <Award className="h-5 w-5" />
-                        Bulk Generate Certificates
+                    <h1 className="flex items-center gap-2 text-lg font-semibold">
+                        <FileArchive className="h-5 w-5 text-primary" />
+                        Bulk Generate Documents
                     </h1>
+                    {studentsQuery.data && <Badge variant="outline">{studentsQuery.data.length} students</Badge>}
                 </div>
-                <Button onClick={handleSubmit(generateCertificates)} disabled={generating}>
+                <Button onClick={generateZip} disabled={generating || !templateId || !classId}>
                     <Download className="mr-2 h-4 w-4" />
                     Generate ZIP
                 </Button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 flex overflow-hidden">
-                <div className="w-80 border-r bg-background flex-shrink-0 p-4 space-y-4">
-                    {/* Form Inputs */}
+            <div className="flex min-h-0 flex-1">
+                <aside className="w-80 shrink-0 space-y-4 overflow-auto border-r bg-background p-4">
                     <div className="space-y-1.5">
-                        <Label>Select Template *</Label>
-                        <Input
-                            value={templateSearch}
-                            onChange={(e) => setTemplateSearch(e.target.value)}
-                            placeholder="Search templates..."
-                        />
-                        <Select value={watchedValues.templateId} onValueChange={(v) => setValue('templateId', v)}>
+                        <Label>Template</Label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input className="pl-9" value={templateSearch} onChange={(event) => setTemplateSearch(event.target.value)} placeholder="Search templates..." />
+                        </div>
+                        <Select value={templateId} onValueChange={setTemplateId}>
                             <SelectTrigger><SelectValue placeholder="Select template" /></SelectTrigger>
                             <SelectContent>
-                                {filteredTemplates?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                {filteredTemplates.map((template) => (
+                                    <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Select Class *</Label>
-                        <Select value={watchedValues.classId} onValueChange={(v) => setValue('classId', v)}>
+                        <Label>Class</Label>
+                        <Select value={classId} onValueChange={setClassId}>
                             <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                             <SelectContent>
-                                {classes?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.className}</SelectItem>)}
+                                {(classesQuery.data || []).map((item) => (
+                                    <SelectItem key={item.id} value={String(item.id)}>{item.className}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Select Section</Label>
-                        <Select value={watchedValues.sectionId} onValueChange={(v) => setValue('sectionId', v)}>
-                            <SelectTrigger><SelectValue placeholder="All Sections" /></SelectTrigger>
+                        <Label>Section</Label>
+                        <Select value={sectionId} onValueChange={setSectionId}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">All Sections</SelectItem>
-                                {sections?.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
+                                <SelectItem value="ALL">All sections</SelectItem>
+                                {(sectionsQuery.data || []).map((item) => (
+                                    <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Issue Date</Label>
-                        <Input type="date" {...register("issueDate")} />
+                        <Label>Issue date</Label>
+                        <Input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} />
                     </div>
 
-                    <div className="h-px bg-border my-2" />
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                            <Label>Push to parents</Label>
+                            <p className="text-xs text-muted-foreground">Record this batch as parent-visible.</p>
+                        </div>
+                        <Switch checked={showToParent} onCheckedChange={setShowToParent} />
+                    </div>
+                </aside>
 
-                    {/* Parent Sharing */}
-                    <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</Label>
-                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <div className="space-y-0.5">
-                                <Label className="text-sm font-medium">Push to Parents</Label>
-                                <p className="text-[10px] text-muted-foreground">
-                                    Send notification & make visible in parent app
-                                </p>
+                <main className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-center justify-between border-b px-4 py-3">
+                        <div>
+                            <div className="text-sm font-medium">{templateQuery.data?.name || 'Choose a template'}</div>
+                            <div className="text-xs text-muted-foreground">{templateQuery.data?.category?.name || templateQuery.data?.documentType || 'Marketplace-driven generation'}</div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                            {studentsQuery.isLoading ? 'Loading students...' : `${studentsQuery.data?.length || 0} matched`}
+                        </div>
+                    </div>
+                    <div className="flex-1 overflow-auto bg-muted/30 p-8">
+                        {previewLayout ? (
+                            <div className="mx-auto w-fit">
+                                <CertificateDesignEditor initialConfig={previewLayout} readOnly templateType="marketplace" />
                             </div>
-                            <input
-                                type="checkbox"
-                                checked={watchedValues.showToParent || false}
-                                onChange={(e) => setValue('showToParent', e.target.checked)}
-                                className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                        </div>
+                        ) : (
+                            <div className="flex h-full items-center justify-center text-muted-foreground">Select a template and class to preview</div>
+                        )}
                     </div>
-                </div>
-
-                <div className="flex-1 bg-muted/30 p-8 flex justify-center overflow-auto">
-                    {previewConfig ? (
-                        <div className="scale-75 origin-top">
-                            <CertificateDesignEditor initialConfig={previewConfig} readOnly={true} templateType="certificate" />
-                        </div>
-                    ) : (
-                        <div className="text-center text-muted-foreground mt-20">Select options to preview</div>
-                    )}
-                </div>
+                </main>
             </div>
         </div>
     );

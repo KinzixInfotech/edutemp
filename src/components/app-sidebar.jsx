@@ -267,58 +267,30 @@ export const SidebarData = [
                         roles: ["ADMIN"],
                     },
                     {
-                        label: "Certificate Templates",
-                        url: "/dashboard/documents/templates/certificate",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "Admit Card Templates",
-                        url: "/dashboard/documents/templates/admit-cards",
+                        label: "My Templates",
+                        url: "/dashboard/documents/templates/my",
                         roles: ["ADMIN"],
                     },
                 ],
             },
             {
-                label: "Certificates",
-                icon: FileBadge,
+                label: "Documents",
+                icon: FileText,
                 roles: ["ADMIN", "TEACHER"],
                 submenu: [
                     {
-                        label: "Generate Certificates",
+                        label: "Generate",
                         url: "/dashboard/documents/generate",
                         roles: ["ADMIN", "TEACHER"],
                     },
                     {
-                        label: "Bulk Generation",
+                        label: "Bulk Generate",
                         url: "/dashboard/documents/certificates/bulk",
                         roles: ["ADMIN"],
                     },
                     {
-                        label: "History / Downloads",
+                        label: "History",
                         url: "/dashboard/documents/certificates/history",
-                        roles: ["ADMIN"],
-                    },
-                ],
-            },
-            {
-                label: "Admit Cards",
-                icon: IdCard,
-
-                roles: ["ADMIN"],
-                submenu: [
-                    {
-                        label: "Generate Admit Cards",
-                        url: "/dashboard/documents/admitcards/generate",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "Bulk Generation",
-                        url: "/dashboard/documents/admitcards/bulk",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "Download / Print History",
-                        url: "/dashboard/documents/admitcards/history",
                         roles: ["ADMIN"],
                     },
                 ],

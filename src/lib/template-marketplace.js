@@ -155,12 +155,40 @@ export async function ensureTemplateMarketplaceTables() {
         )
     `);
 
+    await executeMarketplaceSchema(`
+        CREATE TABLE IF NOT EXISTS "DocumentGenerationHistory" (
+            "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "schoolId" UUID NOT NULL REFERENCES "School"("id") ON DELETE CASCADE,
+            "marketplaceTemplateId" UUID REFERENCES "MarketplaceTemplate"("id") ON DELETE SET NULL,
+            "schoolTemplateCopyId" UUID REFERENCES "SchoolTemplateCopy"("id") ON DELETE SET NULL,
+            "templateVersionId" UUID REFERENCES "TemplateVersion"("id") ON DELETE SET NULL,
+            "templateName" TEXT NOT NULL,
+            "documentType" TEXT NOT NULL DEFAULT 'school-document',
+            "categoryName" TEXT,
+            "generationMode" TEXT NOT NULL DEFAULT 'single',
+            "studentId" UUID REFERENCES "Student"("userId") ON DELETE SET NULL,
+            "classId" INTEGER,
+            "sectionId" INTEGER,
+            "generatedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+            "issueDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "fileUrl" TEXT,
+            "zipUrl" TEXT,
+            "status" TEXT NOT NULL DEFAULT 'generated',
+            "metadata" JSONB NOT NULL DEFAULT '{}'::jsonb,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
     await executeMarketplaceSchema('CREATE UNIQUE INDEX IF NOT EXISTS "MarketplaceTemplateCategory_slug_key" ON "MarketplaceTemplateCategory"("slug")');
     await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "MarketplaceTemplate_status_visibility_idx" ON "MarketplaceTemplate"("status", "visibility")');
     await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "MarketplaceTemplate_categoryId_idx" ON "MarketplaceTemplate"("categoryId")');
     await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "TemplateVersion_marketplaceTemplateId_idx" ON "TemplateVersion"("marketplaceTemplateId")');
     await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "SchoolTemplateCopy_schoolId_idx" ON "SchoolTemplateCopy"("schoolId")');
     await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "PurchasedTemplate_schoolId_idx" ON "PurchasedTemplate"("schoolId")');
+    await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "DocumentGenerationHistory_school_created_idx" ON "DocumentGenerationHistory"("schoolId", "createdAt" DESC)');
+    await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "DocumentGenerationHistory_template_idx" ON "DocumentGenerationHistory"("marketplaceTemplateId", "schoolTemplateCopyId")');
+    await executeMarketplaceSchema('CREATE INDEX IF NOT EXISTS "DocumentGenerationHistory_student_idx" ON "DocumentGenerationHistory"("studentId")');
 
     marketplaceSchemaReady = true;
 }
