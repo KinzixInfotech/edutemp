@@ -36,35 +36,35 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       };
 
       const [transactions, total] = await Promise.all([
-      prisma.libraryTransaction.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          copy: {
-            select: {
-              id: true,
-              accessionNumber: true,
-              barcode: true,
-              condition: true,
-              book: {
-                select: {
-                  id: true,
-                  title: true,
-                  author: true,
-                  ISBN: true,
-                  category: true,
-                  coverImage: true
+        prisma.libraryTransaction.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            copy: {
+              select: {
+                id: true,
+                accessionNumber: true,
+                barcode: true,
+                condition: true,
+                book: {
+                  select: {
+                    id: true,
+                    title: true,
+                    author: true,
+                    ISBN: true,
+                    category: true,
+                    coverImage: true
+                  }
                 }
               }
             }
+          },
+          orderBy: {
+            issueDate: "desc"
           }
-        },
-        orderBy: {
-          issueDate: "desc"
-        }
-      }),
-      prisma.libraryTransaction.count({ where })]
+        }),
+        prisma.libraryTransaction.count({ where })]
       );
 
       // Fetch user details manually since there's no direct relation in schema for userId in LibraryTransaction
