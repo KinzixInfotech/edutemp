@@ -174,6 +174,7 @@ async function handleWorker(req) {
       try {
         const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap, {
           academicYearId: job.academicYearId || null,
+          classMappings: job.classMappings || {},
         });
         success += 1;
 

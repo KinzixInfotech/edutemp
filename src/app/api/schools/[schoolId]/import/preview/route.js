@@ -7,6 +7,10 @@ import {
   getImportRequiredFieldLabels,
   mapImportRow,
 } from '@/lib/import-column-mapping';
+import {
+  resolveStudentImportRow,
+  summarizeUnresolvedClasses,
+} from '@/lib/student-import-normalization';
 
 // Field mappings for each module - MUST match labels from template/route.js exactly
 const FIELD_MAPPINGS = {
@@ -175,22 +179,42 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: 'No valid data rows found' }, { status: 400 });
     }
 
+    const classes = moduleKey === 'students'
+      ? await prisma.class.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          className: true,
+          sections: { select: { id: true, name: true } }
+        },
+        orderBy: { id: 'asc' }
+      })
+      : [];
+
     // Check for duplicates in database
     const duplicateInfo = await checkForDuplicates(moduleKey, data, schoolId, expectedFields);
 
     // Process each row for preview with validation
     const previewRows = data.map((row, index) => {
       // Map Excel columns to database fields using flexible matching
-      const mappedData = mapImportRow(row, expectedFields);
+      let mappedData = mapImportRow(row, expectedFields);
       if (mappedData.religion) mappedData.religion = normalizeStudentReligion(mappedData.religion) || mappedData.religion;
 
       // Validate required fields
       const errors = [];
+      const warnings = [];
       const requiredFields = getImportRequiredFieldLabels(expectedFields);
 
-      for (const { field, label } of requiredFields) {
-        if (!mappedData[field] || mappedData[field] === '') {
+      if (moduleKey === 'students') {
+        const resolved = resolveStudentImportRow(mappedData, classes);
+        mappedData = resolved.data;
+        errors.push(...resolved.errors);
+        warnings.push(...resolved.warnings);
+      } else {
+        for (const { field, label } of requiredFields) {
+          if (!mappedData[field] || mappedData[field] === '') {
           errors.push(`Missing required field: ${label}`);
+          }
         }
       }
 
@@ -204,8 +228,10 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         rawData: row,
         isValid: errors.length === 0,
         errors,
+        warnings,
         isDuplicate,
-        duplicateReason
+        duplicateReason,
+        rawClassName: moduleKey === 'students' ? (mapImportRow(row, expectedFields).className || '') : undefined
       };
     });
 
@@ -223,7 +249,11 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       duplicateRows: duplicateCount,
       requiresAuth: AUTH_MODULES.includes(moduleKey),
       rows: previewRows,
-      columns: Array.from(new Set(Object.values(expectedFields)))
+      columns: Array.from(new Set(Object.values(expectedFields))),
+      classResolution: moduleKey === 'students' ? {
+        unresolved: summarizeUnresolvedClasses(previewRows),
+        options: classes.map((cls) => ({ id: cls.id, className: cls.className }))
+      } : null
     });
 
   } catch (error) {

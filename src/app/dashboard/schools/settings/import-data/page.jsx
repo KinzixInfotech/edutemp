@@ -106,6 +106,7 @@ export default function ImportDataPage() {
     const [activeTab, setActiveTab] = useState("import"); // "import", "history", or "export"
     const [uploadedFile, setUploadedFile] = useState(null);
     const [previewPage, setPreviewPage] = useState(1);
+    const [classMappings, setClassMappings] = useState({});
     const previewPageSize = 10;
 
     // Export states
@@ -399,6 +400,7 @@ export default function ImportDataPage() {
         setIsPreviewing(true);
         setPreviewData(null);
         setPreviewPage(1);
+        setClassMappings({});
         setImportResults(null);
 
         try {
@@ -446,6 +448,9 @@ export default function ImportDataPage() {
             }
             formData.append("sendEmails", sendEmails.toString());
             formData.append("skipDuplicates", skipDuplicates.toString());
+            if (selectedModule === "students") {
+                formData.append("classMappings", JSON.stringify(classMappings));
+            }
             if (effectiveAcademicYearId) {
                 formData.append("academicYearId", effectiveAcademicYearId);
             }
@@ -479,6 +484,7 @@ export default function ImportDataPage() {
     const handleCancelPreview = () => {
         setPreviewData(null);
         setUploadedFile(null);
+        setClassMappings({});
     };
 
     // Handle export
@@ -536,6 +542,14 @@ export default function ImportDataPage() {
 
     const modules = modulesData?.modules || [];
     const exportModules = exportModulesData?.modules || [];
+    const canImportPreviewRow = (row) => {
+        if (!row || row.isDuplicate) return false;
+        const errors = row.errors || [];
+        if (errors.length === 0) return true;
+        const hasOnlyClassMappingErrors = errors.every((error) => String(error).startsWith("Unrecognized class"));
+        return hasOnlyClassMappingErrors && !!classMappings[row.rawClassName || row.data?.className];
+    };
+    const effectiveValidRows = previewData?.rows?.filter(canImportPreviewRow).length || previewData?.validRows || 0;
 
     return (
         <div className="py-6 px-4 md:px-6 lg:px-8 space-y-6">
@@ -1201,7 +1215,7 @@ export default function ImportDataPage() {
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <Badge variant="outline" className="bg-green-100 text-green-700">
-                                                            {previewData.validRows} valid
+                                                            {effectiveValidRows} valid
                                                         </Badge>
                                                         {previewData.duplicateRows > 0 && (
                                                             <Badge variant="outline" className="bg-yellow-100 text-yellow-700">
@@ -1249,8 +1263,12 @@ export default function ImportDataPage() {
                                                                     <TableCell className="text-xs max-w-[240px] whitespace-normal">
                                                                         {row.isDuplicate ? (
                                                                             <span className="text-yellow-700 dark:text-yellow-400">{row.duplicateReason || "Duplicate record already exists"}</span>
+                                                                        ) : canImportPreviewRow(row) && row.errors?.length > 0 ? (
+                                                                            <span className="text-green-700 dark:text-green-400">Ready with class mapping</span>
                                                                         ) : row.errors?.length > 0 ? (
                                                                             <span className="text-red-600 dark:text-red-400">{row.errors.join("; ")}</span>
+                                                                        ) : row.warnings?.length > 0 ? (
+                                                                            <span className="text-amber-700 dark:text-amber-400">{row.warnings.join("; ")}</span>
                                                                         ) : (
                                                                             <span className="text-muted-foreground">Ready</span>
                                                                         )}
@@ -1294,6 +1312,39 @@ export default function ImportDataPage() {
                                                                 Next
                                                                 <ChevronRight className="h-4 w-4" />
                                                             </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {selectedModule === "students" && previewData.classResolution?.unresolved?.length > 0 && (
+                                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3 dark:border-amber-900 dark:bg-amber-950/30">
+                                                        <div>
+                                                            <p className="font-medium text-amber-900 dark:text-amber-200">Resolve class names</p>
+                                                            <p className="text-sm text-amber-800/80 dark:text-amber-300/80">
+                                                                Map uploaded class labels to existing classes before confirming import.
+                                                            </p>
+                                                        </div>
+                                                        <div className="grid gap-3 md:grid-cols-2">
+                                                            {previewData.classResolution.unresolved.map((item) => (
+                                                                <label key={item.value} className="space-y-1 text-sm">
+                                                                    <span className="block font-medium">
+                                                                        {item.value} <span className="text-xs text-muted-foreground">rows {item.rows.join(", ")}</span>
+                                                                    </span>
+                                                                    <select
+                                                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                                                        value={classMappings[item.value] || ""}
+                                                                        onChange={(event) => setClassMappings((prev) => ({
+                                                                            ...prev,
+                                                                            [item.value]: event.target.value,
+                                                                        }))}
+                                                                    >
+                                                                        <option value="">Choose class</option>
+                                                                        {previewData.classResolution.options?.map((option) => (
+                                                                            <option key={option.id} value={option.id}>{option.className}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </label>
+                                                            ))}
                                                         </div>
                                                     </div>
                                                 )}
@@ -1354,7 +1405,7 @@ export default function ImportDataPage() {
                                                     <Button
                                                         className="flex-1"
                                                         onClick={handleConfirmImport}
-                                                        disabled={isUploading || previewData.validRows === 0}
+                                                        disabled={isUploading || effectiveValidRows === 0}
                                                     >
                                                         {isUploading ? (
                                                             <>
@@ -1364,7 +1415,7 @@ export default function ImportDataPage() {
                                                         ) : (
                                                             <>
                                                                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                                Confirm Import ({previewData.validRows})
+                                                                Confirm Import ({effectiveValidRows})
                                                             </>
                                                         )}
                                                     </Button>

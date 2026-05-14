@@ -14,6 +14,16 @@ import {
 const CHUNK_SIZE = 500;
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 
+function parseClassMappings(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function buildQueuedChunks(totalRows) {
   const chunks = [];
   const totalChunks = Math.ceil(totalRows / CHUNK_SIZE);
@@ -61,6 +71,7 @@ async function enqueueWorker(jobId) {
     const importedBy = formData.get('userId');
     const sendEmails = formData.get('sendEmails') === 'true';
     const academicYearId = String(formData.get('academicYearId') || '').trim() || null;
+    const classMappings = parseClassMappings(formData.get('classMappings'));
 
     if (!file || !moduleKey || !importedBy) {
       return NextResponse.json({ error: 'File, module, and user are required' }, { status: 400 });
@@ -155,6 +166,7 @@ async function enqueueWorker(jobId) {
       fileUrl,
       importedBy,
       sendEmails,
+      classMappings,
       academicYearId,
       academicYearName: academicYear?.name || null,
       historyId: history.id,

@@ -18,6 +18,7 @@ import {
   isIgnoredImportColumn,
   mapImportRow,
 } from '@/lib/import-column-mapping';
+import { resolveStudentImportRow } from '@/lib/student-import-normalization';
 
 // Supabase Admin client for creating auth users
 const supabaseAdmin = createClient(
@@ -53,6 +54,16 @@ function normalizeStudentReligion(value) {
   };
 
   return map[normalized] || null;
+}
+
+function parseClassMappings(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 // Field name mapping from template to database
@@ -144,6 +155,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     const file = formData.get('file');
     const moduleKey = formData.get('module');
     const retryIds = formData.get('retryIds'); // For retry functionality
+    const classMappings = parseClassMappings(formData.get('classMappings'));
 
     if (!file || !moduleKey) {
       return NextResponse.json({ error: 'File and module are required' }, { status: 400 });
@@ -235,6 +247,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       try {
         const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {}, {
           academicYearId: String(formData.get('academicYearId') || '').trim() || null,
+          classMappings,
         });
         results.success++;
 
@@ -468,35 +481,30 @@ export async function processRow(module, row, schoolId, fieldMap, options = {}) 
 async function importStudent(data, schoolId, options = {}) {
   const { name, email, admissionNo, className, sectionName, gender, dob, ...rest } = data;
 
-  if (!name || !className || !gender || !dob) {
-    throw new Error('Missing required fields: name, className, gender, dob');
-  }
-
-  // Find class
-  const existingClass = await prisma.class.findFirst({
-    where: { schoolId, className },
-    include: { sections: true }
+  const classes = await prisma.class.findMany({
+    where: { schoolId },
+    include: { sections: true },
+    orderBy: { id: 'asc' }
   });
-
-  if (!existingClass) {
-    throw new Error(`Class '${className}' not found. Please create the class first.`);
-  }
-
-  // Find section
-  const section = existingClass.sections.find((s) =>
-  s.name?.toLowerCase() === sectionName?.toLowerCase()
+  const resolved = resolveStudentImportRow(
+    { name, email, admissionNo, className, sectionName, gender, dob, ...rest },
+    classes,
+    options.classMappings || {}
   );
 
-  if (!section) {
-    throw new Error(`Section '${sectionName}' not found in class '${className}'.`);
+  if (resolved.errors.length > 0) {
+    throw new Error(resolved.errors.join('; '));
   }
+  const normalizedData = resolved.data;
+  const existingClass = resolved.resolvedClass || null;
+  const section = existingClass?.sections?.find((item) => item.id === normalizedData.sectionId) || null;
 
   // Check if student already exists
-  const studentId = normalizeStudentIdentifier(admissionNo) || await generateNextStudentId({ schoolId });
+  const studentId = normalizeStudentIdentifier(normalizedData.admissionNo) || await generateNextStudentId({ schoolId });
   const { authEmail, externalEmail } = await resolveStudentAccountIdentity({
     schoolId,
     studentId,
-    externalEmail: email,
+    externalEmail: normalizedData.email,
   });
 
   const existingStudent = await prisma.student.findFirst({
@@ -532,11 +540,11 @@ async function importStudent(data, schoolId, options = {}) {
     const user = await tx.user.create({
       data: {
         id: userId,
-        name,
+        name: normalizedData.name,
         email: authEmail,
         password: hashedPassword,
         roleId: studentRole.id,
-        gender: gender || 'Other',
+        gender: normalizedData.gender || 'Other',
         schoolId,
         status: 'ACTIVE'
       }
@@ -546,41 +554,41 @@ async function importStudent(data, schoolId, options = {}) {
     await tx.student.create({
       data: {
         userId: user.id,
-        name,
+        name: normalizedData.name,
         email: externalEmail || authEmail,
         admissionNo: studentId,
-        classId: existingClass.id,
-        sectionId: section.id,
+        classId: existingClass?.id || null,
+        sectionId: section?.id || null,
         schoolId,
-        gender: gender || 'Other',
-        religion: normalizeStudentReligion(rest.religion) || null,
-        dob,
-        rollNumber: rest.rollNumber || '',
-        contactNumber: rest.contactNumber || '',
-        Address: rest.address || '',
-        city: rest.city || '',
-        state: rest.state || '',
+        gender: normalizedData.gender || 'Other',
+        religion: normalizeStudentReligion(normalizedData.religion) || null,
+        dob: normalizedData.dob,
+        rollNumber: normalizedData.rollNumber || '',
+        contactNumber: normalizedData.contactNumber || '',
+        Address: normalizedData.address || '',
+        city: normalizedData.city || '',
+        state: normalizedData.state || '',
         country: 'India',
         postalCode: '',
-        FatherName: rest.fatherName || '',
-        MotherName: rest.motherName || '',
-        FatherNumber: rest.fatherPhone || '',
-        MotherNumber: rest.motherPhone || '',
-        bloodGroup: rest.bloodGroup || '',
+        FatherName: normalizedData.fatherName || '',
+        MotherName: normalizedData.motherName || '',
+        FatherNumber: normalizedData.fatherPhone || '',
+        MotherNumber: normalizedData.motherPhone || '',
+        bloodGroup: normalizedData.bloodGroup || '',
         admissionDate: new Date().toISOString().split('T')[0],
         ...(activeYear && { academicYearId: activeYear.id })
       }
     });
 
     // Create StudentSession + set currentSessionId
-    if (activeYear?.id) {
+    if (activeYear?.id && existingClass?.id && section?.id) {
       const session = await tx.studentSession.create({
         data: {
           studentId: user.id,
           academicYearId: activeYear.id,
           classId: existingClass.id,
           sectionId: section.id,
-          rollNumber: rest.rollNumber || '',
+          rollNumber: normalizedData.rollNumber || '',
           status: 'ACTIVE'
         }
       });
@@ -596,8 +604,8 @@ async function importStudent(data, schoolId, options = {}) {
       create: { name: 'PARENT' }
     });
 
-    const parentName = rest.fatherName || rest.motherName || rest.guardianName || `Guardian of ${name}`;
-    const parentPhone = rest.fatherPhone || rest.motherPhone || '';
+    const parentName = normalizedData.fatherName || normalizedData.motherName || normalizedData.guardianName || `Guardian of ${normalizedData.name}`;
+    const parentPhone = normalizedData.fatherPhone || normalizedData.motherPhone || '';
     const parentPhoneNormalized = normalizePhoneNumber(parentPhone);
     const parentPlaceholder = buildMissingContactPlaceholder({ schoolId, admissionNumber: studentId });
     const school = await getSchoolIdentityContext(schoolId, tx);
@@ -635,7 +643,7 @@ async function importStudent(data, schoolId, options = {}) {
           contactNumber: parentContactNumber,
           alternateNumber: parentPhoneNormalized ? null : parentPhone || null,
           schoolId,
-          address: rest.address || null
+          address: normalizedData.address || null
         }
       });
     }
@@ -644,7 +652,7 @@ async function importStudent(data, schoolId, options = {}) {
       data: {
         studentId: user.id,
         parentId: parent.id,
-        relation: rest.fatherName ? 'FATHER' : rest.motherName ? 'MOTHER' : 'GUARDIAN',
+        relation: normalizedData.fatherName ? 'FATHER' : normalizedData.motherName ? 'MOTHER' : 'GUARDIAN',
         isPrimary: true
       }
     });
@@ -661,7 +669,7 @@ async function importStudent(data, schoolId, options = {}) {
     loginLabel: "Admission Number",
     loginValue: studentId,
     recordId: result.id,
-    name,
+    name: normalizedData.name,
     defaultPassword: null,
   };
 }
