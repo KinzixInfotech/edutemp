@@ -53,6 +53,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
+import { supabase } from "@/lib/supabase";
 
 const MODULE_ICONS = {
     students: GraduationCap,
@@ -107,6 +108,7 @@ export default function ImportDataPage() {
     const [uploadedFile, setUploadedFile] = useState(null);
     const [previewPage, setPreviewPage] = useState(1);
     const [classMappings, setClassMappings] = useState({});
+    const [sectionMappings, setSectionMappings] = useState({});
     const previewPageSize = 10;
 
     // Export states
@@ -143,7 +145,6 @@ export default function ImportDataPage() {
             return res.json();
         },
         enabled: !!schoolId && (activeTab === "import" || activeTab === "history"),
-        refetchInterval: 5000,
         refetchOnWindowFocus: false,
     });
 
@@ -176,12 +177,36 @@ export default function ImportDataPage() {
             return res.json();
         },
         enabled: !!schoolId && !!activeImportJobId,
-        refetchInterval: (data) => {
-            if (data?.status === 'completed' || data?.status === 'failed') return false;
-            return 3000;
-        },
         refetchOnWindowFocus: false,
     });
+
+    useEffect(() => {
+        if (!schoolId) return;
+
+        const channel = supabase
+            .channel(`import-history:${schoolId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'ImportHistory',
+                    filter: `schoolId=eq.${schoolId}`,
+                },
+                () => {
+                    queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
+                    queryClient.invalidateQueries({ queryKey: ['importHistory', schoolId] });
+                    if (activeImportJobId) {
+                        queryClient.invalidateQueries({ queryKey: ['importJob', schoolId, activeImportJobId] });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [schoolId, activeImportJobId, queryClient]);
 
     const { data: activeExportJob } = useQuery({
         queryKey: ['exportJob', schoolId, activeExportJobId],
@@ -197,6 +222,25 @@ export default function ImportDataPage() {
         refetchOnWindowFocus: false,
     });
 
+    const abortImportJobMutation = useMutation({
+        mutationFn: async (jobId) => {
+            const res = await fetch(`/api/schools/${schoolId}/import/jobs/${jobId}`, {
+                method: "DELETE",
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to abort import job");
+            return data;
+        },
+        onSuccess: () => {
+            toast.success("Import job aborted");
+            queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
+            queryClient.invalidateQueries({ queryKey: ['importHistory', schoolId] });
+        },
+        onError: (error) => {
+            toast.error(error.message || "Failed to abort import job");
+        },
+    });
+
     const currentUploadProgress = activeImportJob?.id
         ? (activeImportJob.totalRows ? Math.round((activeImportJob.processedRows / activeImportJob.totalRows) * 100) : 0)
         : uploadProgress;
@@ -207,7 +251,9 @@ export default function ImportDataPage() {
                 ? "Import complete"
                 : activeImportJob.status === "failed"
                     ? "Import failed"
-                    : `Processing ${activeImportJob.processedRows || 0}/${activeImportJob.totalRows || 0} rows`
+                    : activeImportJob.status === "cancelled"
+                        ? "Import cancelled"
+                        : `Processing ${activeImportJob.processedRows || 0}/${activeImportJob.totalRows || 0} rows`
         )
         : importStatus;
 
@@ -506,6 +552,7 @@ export default function ImportDataPage() {
             formData.append("skipDuplicates", skipDuplicates.toString());
             if (selectedModule === "students") {
                 formData.append("classMappings", JSON.stringify(classMappings));
+                formData.append("sectionMappings", JSON.stringify(sectionMappings));
             }
             if (effectiveAcademicYearId) {
                 formData.append("academicYearId", effectiveAcademicYearId);
@@ -541,6 +588,7 @@ export default function ImportDataPage() {
         setPreviewData(null);
         setUploadedFile(null);
         setClassMappings({});
+        setSectionMappings({});
     };
 
     // Handle export
@@ -598,6 +646,7 @@ export default function ImportDataPage() {
 
     const modules = modulesData?.modules || [];
     const exportModules = exportModulesData?.modules || [];
+    const visibleImportJobs = (importJobsData?.jobs || []).filter((job) => job.status !== "cancelled");
     const canImportPreviewRow = (row) => {
         if (!row || row.isDuplicate) return false;
         const errors = row.errors || [];
@@ -646,14 +695,14 @@ export default function ImportDataPage() {
                 </div>
             </div>
 
-            {activeTab === "import" && importJobsData?.jobs?.length > 0 && (
+            {activeTab === "import" && visibleImportJobs.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle>Import Jobs</CardTitle>
                         <CardDescription>Live progress, retries, and failed-row reports</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {importJobsData.jobs.slice(0, 4).map((job) => {
+                        {visibleImportJobs.slice(0, 4).map((job) => {
                             const percent = job.totalRows ? Math.round((job.processedRows / job.totalRows) * 100) : 0;
                             return (
                                 <div key={job.id} className="rounded-lg border p-4 space-y-3">
@@ -695,6 +744,16 @@ export default function ImportDataPage() {
                                         {job.status === "failed" && (
                                             <Button variant="outline" size="sm" onClick={() => handleRetryImportJob(job.id)}>
                                                 Retry Job
+                                            </Button>
+                                        )}
+                                        {["queued", "running"].includes(job.status) && (
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={() => abortImportJobMutation.mutate(job.id)}
+                                                disabled={abortImportJobMutation.isPending}
+                                            >
+                                                Abort
                                             </Button>
                                         )}
                                     </div>
@@ -1409,6 +1468,40 @@ export default function ImportDataPage() {
                                                                         <option value="">Choose class</option>
                                                                         {previewData.classResolution.options?.map((option) => (
                                                                             <option key={option.id} value={option.id}>{option.className}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {selectedModule === "students" && previewData.sectionResolution?.unresolved?.length > 0 && (
+                                                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3 dark:border-blue-900 dark:bg-blue-950/30">
+                                                        <div>
+                                                            <p className="font-medium text-blue-900 dark:text-blue-200">Assign missing or unmatched sections</p>
+                                                            <p className="text-sm text-blue-800/80 dark:text-blue-300/80">
+                                                                Choose a section for each class group. Students will be imported directly into that section.
+                                                            </p>
+                                                        </div>
+                                                        <div className="grid gap-3 md:grid-cols-2">
+                                                            {previewData.sectionResolution.unresolved.map((item) => (
+                                                                <label key={item.key} className="space-y-1 text-sm">
+                                                                    <span className="block font-medium">
+                                                                        {item.className} · {item.sectionLabel}
+                                                                        <span className="text-xs text-muted-foreground"> rows {item.rows.join(", ")}</span>
+                                                                    </span>
+                                                                    <select
+                                                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                                                        value={sectionMappings[item.key] || ""}
+                                                                        onChange={(event) => setSectionMappings((prev) => ({
+                                                                            ...prev,
+                                                                            [item.key]: event.target.value,
+                                                                        }))}
+                                                                    >
+                                                                        <option value="">Keep without section</option>
+                                                                        {item.options?.map((option) => (
+                                                                            <option key={option.id} value={option.id}>{option.name}</option>
                                                                         ))}
                                                                     </select>
                                                                 </label>

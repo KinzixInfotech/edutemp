@@ -69,6 +69,7 @@ async function enqueueWorker(jobId) {
     const sendEmails = formData.get('sendEmails') === 'true';
     const academicYearId = String(formData.get('academicYearId') || '').trim() || null;
     const classMappings = parseClassMappings(formData.get('classMappings'));
+    const sectionMappings = parseClassMappings(formData.get('sectionMappings'));
 
     if (!file || !moduleKey || !importedBy) {
       return NextResponse.json({ error: 'File, module, and user are required' }, { status: 400 });
@@ -154,6 +155,7 @@ async function enqueueWorker(jobId) {
       importedBy,
       sendEmails,
       classMappings,
+      sectionMappings,
       academicYearId,
       academicYearName: academicYear?.name || null,
       historyId: history.id,
@@ -195,7 +197,8 @@ async function enqueueWorker(jobId) {
 export const GET = withSchoolAccess(async function GET(req, { params }) {
   try {
     const { schoolId } = await params;
-    const jobs = await listBulkJobs({ schoolId, type: 'import' });
+    const jobs = (await listBulkJobs({ schoolId, type: 'import' }))
+      .filter((job) => job.status !== 'cancelled');
     return NextResponse.json({ jobs });
   } catch (error) {
     console.error('[IMPORT JOB LIST ERROR]', error);

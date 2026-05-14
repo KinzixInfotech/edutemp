@@ -2,6 +2,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from 'next/server';
 import { getBulkJob, updateBulkJob } from '@/lib/bulk-job-store';
 import qstash from '@/lib/qstash';
+import prisma from '@/lib/prisma';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 
@@ -82,5 +83,56 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
   } catch (error) {
     console.error('[IMPORT JOB RETRY ERROR]', error);
     return NextResponse.json({ error: error.message || 'Failed to retry job' }, { status: 500 });
+  }
+});
+
+export const DELETE = withSchoolAccess(async function DELETE(req, { params }) {
+  try {
+    const { schoolId, jobId } = await params;
+    const job = await getBulkJob(jobId);
+
+    if (!job || job.schoolId !== schoolId || job.type !== 'import') {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    if (job.status === 'completed') {
+      return NextResponse.json({ error: 'Completed import jobs cannot be aborted.' }, { status: 400 });
+    }
+
+    const updated = await updateBulkJob(jobId, {
+      status: 'cancelled',
+      cancelledAt: new Date().toISOString(),
+      chunks: (job.chunks || []).map((chunk) => (
+        chunk.status === 'completed' ? chunk : { ...chunk, status: 'cancelled' }
+      )),
+    });
+
+    if (job.historyId) {
+      await prisma.importHistory.update({
+        where: { id: job.historyId },
+        data: {
+          success: job.success || 0,
+          failed: job.failed || 0,
+          errors: {
+            ...(job.errors || {}),
+            jobId: job.id,
+            status: 'cancelled',
+            processedRows: job.processedRows || 0,
+            totalRows: job.totalRows || 0,
+            chunkSize: job.chunkSize,
+            totalChunks: job.chunks?.length || 0,
+            fileUrl: job.fileUrl,
+            failedRows: job.failedRows || [],
+            credentials: job.credentials || [],
+            cancelledAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, job: updated });
+  } catch (error) {
+    console.error('[IMPORT JOB CANCEL ERROR]', error);
+    return NextResponse.json({ error: error.message || 'Failed to abort job' }, { status: 500 });
   }
 });

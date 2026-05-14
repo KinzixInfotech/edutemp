@@ -10,6 +10,7 @@ import { readImportWorksheetRows } from '@/lib/import-workbook';
 import {
   resolveStudentImportRow,
   summarizeUnresolvedClasses,
+  summarizeUnresolvedSections,
 } from '@/lib/student-import-normalization';
 
 // Field mappings for each module - MUST match labels from template/route.js exactly
@@ -207,6 +208,8 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         mappedData = resolved.data;
         errors.push(...resolved.errors);
         warnings.push(...resolved.warnings);
+        mappedData.__rawSectionName = resolved.rawSectionName;
+        mappedData.__resolvedClass = resolved.resolvedClass;
       } else {
         for (const { field, label } of requiredFields) {
           if (!mappedData[field] || mappedData[field] === '') {
@@ -228,7 +231,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         warnings,
         isDuplicate,
         duplicateReason,
-        rawClassName: moduleKey === 'students' ? (mapImportRow(row, expectedFields).className || '') : undefined
+        rawClassName: moduleKey === 'students' ? (mapImportRow(row, expectedFields).className || '') : undefined,
+        rawSectionName: moduleKey === 'students' ? (mappedData.__rawSectionName || '') : undefined,
+        resolvedClass: moduleKey === 'students' ? mappedData.__resolvedClass : undefined
       };
     });
 
@@ -251,6 +256,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       classResolution: moduleKey === 'students' ? {
         unresolved: summarizeUnresolvedClasses(previewRows),
         options: classes.map((cls) => ({ id: cls.id, className: cls.className }))
+      } : null,
+      sectionResolution: moduleKey === 'students' ? {
+        unresolved: summarizeUnresolvedSections(previewRows)
       } : null
     });
 

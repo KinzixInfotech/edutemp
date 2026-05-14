@@ -122,7 +122,11 @@ export function normalizeStudentGender(value) {
   return cleanImportString(value);
 }
 
-export function resolveStudentImportRow(data = {}, classes = [], classMappings = {}) {
+function getSectionMappingKey(classId, rawSectionName) {
+  return `${classId}::${cleanImportString(rawSectionName) || '__blank__'}`;
+}
+
+export function resolveStudentImportRow(data = {}, classes = [], classMappings = {}, sectionMappings = {}) {
   const normalized = normalizeImportObject(data);
   const errors = [];
   const warnings = [];
@@ -176,21 +180,26 @@ export function resolveStudentImportRow(data = {}, classes = [], classMappings =
     warnings.push('No class provided. Student will be imported without a class assignment.');
   }
 
-  if (resolvedClass && rawSectionName) {
-    const section = (resolvedClass.sections || []).find(
+  if (resolvedClass) {
+    const mappedSectionId = sectionMappings[getSectionMappingKey(resolvedClass.id, rawSectionName)];
+    const section = mappedSectionId
+      ? (resolvedClass.sections || []).find((item) => String(item.id) === String(mappedSectionId))
+      : rawSectionName
+        ? (resolvedClass.sections || []).find(
       (item) => cleanImportString(item.name).toLowerCase() === rawSectionName.toLowerCase()
-    );
+        )
+        : null;
 
     if (section) {
       normalized.sectionName = section.name;
       normalized.sectionId = section.id;
-    } else {
+    } else if (rawSectionName) {
       normalized.sectionId = null;
       warnings.push(`Section "${rawSectionName}" was not found in ${resolvedClass.className}. Student will be imported without a section.`);
+    } else {
+      normalized.sectionId = null;
+      warnings.push('No section provided. Student will be imported without a section.');
     }
-  } else if (resolvedClass) {
-    normalized.sectionId = null;
-    warnings.push('No section provided. Student will be imported without a section.');
   } else {
     normalized.sectionName = '';
     normalized.sectionId = null;
@@ -201,8 +210,39 @@ export function resolveStudentImportRow(data = {}, classes = [], classMappings =
     errors,
     warnings,
     rawClassName,
+    rawSectionName,
     resolvedClass,
   };
+}
+
+export function summarizeUnresolvedSections(rows = []) {
+  const unresolved = new Map();
+
+  for (const row of rows) {
+    const classId = row.data?.classId;
+    const className = row.data?.className;
+    if (!classId) continue;
+    if (row.data?.sectionId) continue;
+    const sectionWarnings = row.warnings?.filter((warning) =>
+      warning.includes('No section provided') || warning.includes('was not found')
+    );
+    if (!sectionWarnings?.length) continue;
+
+    const rawSectionName = cleanImportString(row.rawSectionName);
+    const key = getSectionMappingKey(classId, rawSectionName);
+    const entry = unresolved.get(key) || {
+      key,
+      classId,
+      className,
+      sectionLabel: rawSectionName || 'Missing section',
+      rows: [],
+      options: row.resolvedClass?.sections || [],
+    };
+    entry.rows.push(row.rowNumber);
+    unresolved.set(key, entry);
+  }
+
+  return Array.from(unresolved.values());
 }
 
 export function summarizeUnresolvedClasses(rows = []) {

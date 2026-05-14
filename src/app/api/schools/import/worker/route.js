@@ -138,6 +138,10 @@ async function handleWorker(req) {
     return NextResponse.json({ success: true, message: 'Job already completed' });
   }
 
+  if (job.status === 'cancelled') {
+    return NextResponse.json({ success: true, message: 'Job cancelled' });
+  }
+
   const nextChunk = job.chunks.find((chunk) => chunk.status === 'queued' || chunk.status === 'failed' && chunk.retryCount < 3);
   if (!nextChunk) {
     return NextResponse.json({ success: true, message: 'No pending chunks' });
@@ -164,6 +168,26 @@ async function handleWorker(req) {
     const credentials = [...(job.credentials || [])];
 
     for (let index = 0; index < chunkRows.length; index++) {
+      const latestJob = await getBulkJob(job.id);
+      if (latestJob?.status === 'cancelled') {
+        nextChunk.status = 'cancelled';
+        await updateBulkJob(job.id, {
+          status: 'cancelled',
+          chunks: job.chunks,
+          processedRows: Math.min(job.totalRows, nextChunk.startRow + index),
+          success,
+          failed,
+          accountsCreated,
+          accountsFailed,
+          importedWithWarnings,
+          missingJoiningDate,
+          credentials,
+          failedRows,
+        });
+        await updateHistory({ ...job, status: 'cancelled', processedRows: Math.min(job.totalRows, nextChunk.startRow + index), success, failed, accountsCreated, accountsFailed, importedWithWarnings, missingJoiningDate, credentials, failedRows });
+        return NextResponse.json({ success: true, message: 'Job cancelled' });
+      }
+
       const row = chunkRows[index];
       const rowNumber = row['S.No'] || nextChunk.startRow + index + 2;
 
@@ -171,6 +195,7 @@ async function handleWorker(req) {
         const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap, {
           academicYearId: job.academicYearId || null,
           classMappings: job.classMappings || {},
+          sectionMappings: job.sectionMappings || {},
         });
         success += 1;
         if (result?.warnings?.length) importedWithWarnings += 1;

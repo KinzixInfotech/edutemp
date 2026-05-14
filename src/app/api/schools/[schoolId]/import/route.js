@@ -162,6 +162,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     const moduleKey = formData.get('module');
     const retryIds = formData.get('retryIds'); // For retry functionality
     const classMappings = parseClassMappings(formData.get('classMappings'));
+    const sectionMappings = parseClassMappings(formData.get('sectionMappings'));
 
     if (!file || !moduleKey) {
       return NextResponse.json({ error: 'File and module are required' }, { status: 400 });
@@ -243,6 +244,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {}, {
           academicYearId: String(formData.get('academicYearId') || '').trim() || null,
           classMappings,
+          sectionMappings,
         });
         results.success++;
         if (importResult?.warnings?.length) results.importedWithWarnings++;
@@ -496,7 +498,8 @@ async function importStudent(data, schoolId, options = {}) {
   const resolved = resolveStudentImportRow(
     { name, email, admissionNo, className, sectionName, gender, dob, ...rest },
     classes,
-    options.classMappings || {}
+    options.classMappings || {},
+    options.sectionMappings || {}
   );
 
   if (resolved.errors.length > 0) {
