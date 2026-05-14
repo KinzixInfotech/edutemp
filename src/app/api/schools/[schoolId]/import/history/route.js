@@ -36,8 +36,11 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
     const normalizedHistory = history.map((item) => ({
       ...item,
       credentials: item.errors?.credentials || [],
+      failedRows: item.errors?.failedRows || [],
       errorReportUrl: item.errors?.errorReportUrl || null,
       fileUrl: item.errors?.fileUrl || null,
+      importedWithWarnings: item.errors?.importedWithWarnings || 0,
+      missingJoiningDate: item.errors?.missingJoiningDate || 0,
     }));
 
     return NextResponse.json({

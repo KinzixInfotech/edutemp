@@ -71,7 +71,7 @@ export const GET = withSchoolAccess(async function GET(req) {
       ...(classId && { classId }),
       ...(sectionId && { sectionId }),
       ...(academicYearId && { academicYearId }), // ADDED
-      ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } })
+      ...(admissionNumber && { admissionNo: { contains: admissionNumber, mode: "insensitive" } })
     };
 
     const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit, fetchAll });
@@ -99,6 +99,10 @@ export const GET = withSchoolAccess(async function GET(req) {
               name: true,
               teachingStaffUserId: true
             }
+          },
+          studentFees: {
+            where: academicYearId ? { academicYearId } : undefined,
+            select: { id: true, academicYearId: true }
           }
         },
         orderBy: { user: { name: "asc" } }

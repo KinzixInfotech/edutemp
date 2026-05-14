@@ -19,6 +19,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { assertStudentHasJoiningDate } from "@/lib/student-profile-status";
 
 // ─── Month helpers ──────────────────────────────────────────
 const MONTH_NAMES = [
@@ -72,7 +73,13 @@ export async function generateStudentLedger({
     feeStructureId, joinDate, userId, tx
 }) {
     const db = tx || prisma;
+    if (!joinDate) {
+        throw new Error("Joining date is required before generating fee ledger.");
+    }
     const effectiveJoinDate = new Date(joinDate);
+    if (Number.isNaN(effectiveJoinDate.getTime())) {
+        throw new Error("Valid joining date is required before generating fee ledger.");
+    }
 
     // 1. Fetch fee session
     const session = await db.feeSession.findUnique({
@@ -237,8 +244,9 @@ export async function regenerateStudentLedger({
     // AFTER — fall back to session.academicYearId when student.academicYearId is null
     const student = await db.student.findUnique({
         where: { userId: studentId },
-        select: { admissionDate: true, schoolId: true, academicYearId: true },
+        select: { admissionDate: true, schoolId: true, academicYearId: true, missingJoiningDate: true, profileStatus: true, name: true, admissionNo: true },
     });
+    assertStudentHasJoiningDate(student, "regenerating fee ledger");
 
     const result = await generateStudentLedger({
         studentId,
@@ -246,7 +254,7 @@ export async function regenerateStudentLedger({
         academicYearId: student.academicYearId || session.academicYearId,  // ← FIXED
         feeSessionId,
         feeStructureId,
-        joinDate: student.admissionDate || session.startMonth,
+        joinDate: student.admissionDate,
         userId,
         tx: db,
     });
@@ -284,7 +292,7 @@ export async function generateClassLedger({
 
     const students = await prisma.student.findMany({
         where,
-        select: { userId: true, admissionDate: true, academicYearId: true },
+        select: { userId: true, admissionDate: true, academicYearId: true, missingJoiningDate: true, profileStatus: true, name: true, admissionNo: true },
     });
 
     const results = { total: students.length, created: 0, skipped: 0, errors: [] };
@@ -297,13 +305,14 @@ export async function generateClassLedger({
         await prisma.$transaction(async (tx) => {
             for (const student of batch) {
                 try {
+                    assertStudentHasJoiningDate(student, "generating class fee ledger");
                     const result = await generateStudentLedger({
                         studentId: student.userId,
                         schoolId,
                         academicYearId: student.academicYearId || academicYearId,
                         feeSessionId,
                         feeStructureId,
-                        joinDate: student.admissionDate || new Date(),
+                        joinDate: student.admissionDate,
                         userId,
                         tx,
                     });
@@ -406,10 +415,11 @@ export async function addOptionalComponent({
 
     const student = await prisma.student.findUnique({
         where: { userId: studentId },
-        select: { admissionDate: true },
+        select: { admissionDate: true, missingJoiningDate: true, profileStatus: true, name: true, admissionNo: true },
     });
+    assertStudentHasJoiningDate(student, "adding optional fee component");
 
-    const months = getMonthsForComponent(component, session, new Date(student?.admissionDate || session.startMonth));
+    const months = getMonthsForComponent(component, session, new Date(student.admissionDate));
     const now = getFirstOfMonth(new Date());
 
     // Only create entries from current month onwards

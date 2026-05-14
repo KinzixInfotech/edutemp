@@ -2126,7 +2126,9 @@ model Student {
   dob                String
   gender             String
   religion           StudentReligion?
-  admissionDate      String
+  admissionDate      String?
+  missingJoiningDate Boolean          @default(false)
+  profileStatus      String           @default("ACTIVE")
   sectionId          Int?
   bloodGroup         String
   rollNumber         String
@@ -2205,6 +2207,29 @@ model Student {
   @@index([sectionId])
   @@index([parentId])
   @@index([currentSessionId])
+  @@index([schoolId, missingJoiningDate])
+}
+
+model FeeAssignmentHistory {
+  id                        String   @id @default(uuid()) @db.Uuid
+  schoolId                  String   @db.Uuid
+  academicYearId            String?  @db.Uuid
+  globalFeeStructureId      String?
+  structureName             String?
+  classId                   Int?
+  sectionId                 Int?
+  assignedBy                String?  @db.Uuid
+  totalRequested            Int      @default(0)
+  assignedCount             Int      @default(0)
+  skippedAlreadyAssigned    Int      @default(0)
+  skippedMissingJoiningDate Int      @default(0)
+  failedCount               Int      @default(0)
+  report                    Json?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([schoolId, academicYearId])
+  @@index([createdAt])
 }
 
 enum StudentReligion {

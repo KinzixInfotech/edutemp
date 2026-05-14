@@ -27,7 +27,9 @@ import {
     UserX,
     GraduationCap,
     BookOpen,
-    Camera
+    Camera,
+    AlertTriangle,
+    CalendarDays
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -66,6 +68,10 @@ export default function StudentListPage() {
     const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
     const [bulkClass, setBulkClass] = useState('');
     const [bulkSection, setBulkSection] = useState('');
+    const [joiningDateDialogOpen, setJoiningDateDialogOpen] = useState(false);
+    const [selectedMissingStudents, setSelectedMissingStudents] = useState([]);
+    const [joiningDateEdits, setJoiningDateEdits] = useState({});
+    const [bulkJoiningDate, setBulkJoiningDate] = useState('');
 
     // Fetch classes & sections
     const { data: allClasses = [] } = useQuery({
@@ -111,7 +117,22 @@ export default function StudentListPage() {
 
     const students = studentData.students || [];
     const total = studentData.total || 0;
+    const missingJoiningDateCount = studentData.missingJoiningDateCount || 0;
     const pageCount = Math.ceil(total / itemsPerPage);
+
+    const { data: missingJoiningDateData = {}, isLoading: missingJoiningDateLoading } = useQuery({
+        queryKey: ['students-missing-joining-date', schoolId, academicYearId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/students/missing-joining-date`, {
+                params: { academicYearId }
+            });
+            return res.data || {};
+        },
+        enabled: !!schoolId && joiningDateDialogOpen,
+        staleTime: 10 * 1000,
+    });
+
+    const missingJoiningDateStudents = missingJoiningDateData.students || [];
 
     // Fetch all parents (only when dialog is open)
     const { data: allParents = [] } = useQuery({
@@ -197,6 +218,25 @@ export default function StudentListPage() {
         }
     });
 
+    const updateJoiningDatesMutation = useMutation({
+        mutationFn: async (updates) => {
+            const res = await axios.patch(`/api/schools/${schoolId}/students/missing-joining-date`, { updates });
+            return res.data;
+        },
+        onSuccess: (data) => {
+            toast.success(`${data.updated || 0} joining date(s) updated`);
+            setJoiningDateDialogOpen(false);
+            setSelectedMissingStudents([]);
+            setJoiningDateEdits({});
+            queryClient.invalidateQueries({ queryKey: ['students-missing-joining-date', schoolId] });
+            queryClient.invalidateQueries({ queryKey: schoolDirectoryQueryKeys.studentsRoot(schoolId) });
+            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.error || 'Failed to update joining dates');
+        }
+    });
+
     const toggleSelect = (id) => {
         setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
@@ -225,6 +265,27 @@ export default function StudentListPage() {
                 parentId: selectedParentId
             });
         }
+    };
+
+    const toggleMissingStudent = (id) => {
+        setSelectedMissingStudents(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+    };
+
+    const applyBulkJoiningDate = () => {
+        if (!bulkJoiningDate) return toast.error('Choose a joining date first');
+        if (!selectedMissingStudents.length) return toast.error('Select students first');
+        setJoiningDateEdits(prev => ({
+            ...prev,
+            ...Object.fromEntries(selectedMissingStudents.map(id => [id, bulkJoiningDate]))
+        }));
+    };
+
+    const saveJoiningDates = () => {
+        const updates = selectedMissingStudents
+            .map(studentId => ({ studentId, admissionDate: joiningDateEdits[studentId] }))
+            .filter(update => update.admissionDate);
+        if (!updates.length) return toast.error('Select students and add joining dates');
+        updateJoiningDatesMutation.mutate(updates);
     };
 
     // Stats - use API totals when available, fallback to current page data
@@ -377,6 +438,30 @@ export default function StudentListPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {missingJoiningDateCount > 0 && (
+                <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+                    <CardContent className="py-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                                <div>
+                                    <p className="font-semibold text-amber-900 dark:text-amber-200">
+                                        {missingJoiningDateCount} Students Missing Joining Date
+                                    </p>
+                                    <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                                        Profiles remain active, but fee assignment, dues, invoices, and transport fee calculations are blocked.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button size="sm" onClick={() => setJoiningDateDialogOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white">
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                Assign Now
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Filters Card */}
             <Card>
@@ -848,6 +933,111 @@ export default function StudentListPage() {
                     </DialogContent>
                 </Dialog>
             )}
+
+            <Dialog open={joiningDateDialogOpen} onOpenChange={setJoiningDateDialogOpen}>
+                <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-600" />
+                            Assign Missing Joining Dates
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between rounded-lg border bg-muted/30 p-3">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium">{selectedMissingStudents.length} selected</p>
+                                <p className="text-xs text-muted-foreground">Apply one date to selected students, or edit each row individually.</p>
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <Input
+                                    type="date"
+                                    value={bulkJoiningDate}
+                                    onChange={(event) => setBulkJoiningDate(event.target.value)}
+                                    className="sm:w-44"
+                                />
+                                <Button variant="outline" size="sm" onClick={applyBulkJoiningDate}>
+                                    Apply to Selected
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={saveJoiningDates}
+                                    disabled={updateJoiningDatesMutation.isPending}
+                                    className="dark:text-white"
+                                >
+                                    {updateJoiningDatesMutation.isPending ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : null}
+                                    Save Dates
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-12">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedMissingStudents.length === missingJoiningDateStudents.length && missingJoiningDateStudents.length > 0}
+                                                onChange={(event) => setSelectedMissingStudents(event.target.checked ? missingJoiningDateStudents.map(student => student.userId) : [])}
+                                            />
+                                        </TableHead>
+                                        <TableHead>Student</TableHead>
+                                        <TableHead>Admission No</TableHead>
+                                        <TableHead>Class</TableHead>
+                                        <TableHead>Section</TableHead>
+                                        <TableHead className="w-48">Joining Date</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {missingJoiningDateLoading ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center py-8">
+                                                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                                                Loading students...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : missingJoiningDateStudents.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                No students are missing joining date.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        missingJoiningDateStudents.map(student => (
+                                            <TableRow key={student.userId}>
+                                                <TableCell>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedMissingStudents.includes(student.userId)}
+                                                        onChange={() => toggleMissingStudent(student.userId)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="font-medium">{student.name}</TableCell>
+                                                <TableCell>{student.admissionNo || '-'}</TableCell>
+                                                <TableCell>{student.class?.className || '-'}</TableCell>
+                                                <TableCell>{student.section?.name || '-'}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="date"
+                                                        value={joiningDateEdits[student.userId] || ''}
+                                                        onChange={(event) => {
+                                                            setJoiningDateEdits(prev => ({ ...prev, [student.userId]: event.target.value }));
+                                                            setSelectedMissingStudents(prev => prev.includes(student.userId) ? prev : [...prev, student.userId]);
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

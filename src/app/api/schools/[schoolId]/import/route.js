@@ -14,10 +14,9 @@ import {
 } from '@/lib/profile-auth';
 import { buildParentAuthEmail, buildParentPlaceholderAuthEmail, normalizePhoneNumber, normalizeStudentIdentifier } from '@/lib/auth-identifiers';
 import {
-  analyzeImportHeaders,
-  isIgnoredImportColumn,
   mapImportRow,
 } from '@/lib/import-column-mapping';
+import { readImportWorksheetRows } from '@/lib/import-workbook';
 import { resolveStudentImportRow } from '@/lib/student-import-normalization';
 
 // Supabase Admin client for creating auth users
@@ -27,7 +26,7 @@ const supabaseAdmin = createClient(
 );
 
 // Modules that require Supabase account creation
-export const AUTH_MODULES = ['teachers', 'nonTeachingStaff'];
+export const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff'];
 
 function normalizeStudentReligion(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -74,7 +73,14 @@ export const FIELD_MAPPINGS = {
     'Email (Optional)': 'email',
     'Admission Number': 'admissionNo',
     'Student ID': 'admissionNo',
+    'Admission Date': 'admissionDate',
+    'Admission Date (YYYY-MM-DD)': 'admissionDate',
+    'Joining Date': 'admissionDate',
+    'Joining Date (YYYY-MM-DD)': 'admissionDate',
+    'Date of Admission': 'admissionDate',
+    'Class Name': 'className',
     'Class Name *': 'className',
+    'Section': 'sectionName',
     'Section *': 'sectionName',
     'Gender *': 'gender',
     'Date of Birth (YYYY-MM-DD) *': 'dob',
@@ -167,23 +173,19 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     // Parse Excel file
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames.find((s) => s === 'Data') || workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-    if (!rawData || rawData.length === 0) {
-      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
-    }
-
     // Get expected columns for this module
     const expectedFields = FIELD_MAPPINGS[moduleKey];
     if (!expectedFields) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    // Validate template columns match expected format
-    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
+    const { rawData, rows: data, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
 
+    if (!rawData || rawData.length === 0) {
+      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
+    }
+
+    // Validate template columns match expected format
     if (!headerAnalysis.isValid) {
       return NextResponse.json({
         error: 'Template mapping not matched',
@@ -207,15 +209,6 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       }, { status: 400 });
     }
 
-    // Filter out empty rows (rows with only S.No or empty values)
-    const data = rawData.filter((row) => {
-      const values = Object.entries(row)
-        .filter(([key]) => !isIgnoredImportColumn(key))
-        .map(([, value]) => String(value ?? '').trim())
-        .filter(Boolean);
-      return values.length > 0;
-    });
-
     if (data.length === 0) {
       return NextResponse.json({ error: 'No valid data rows found' }, { status: 400 });
     }
@@ -230,7 +223,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       accountsFailed: 0,
       accountErrors: [],
       requiresAuth: AUTH_MODULES.includes(moduleKey),
-      totalRecords: data.length
+      totalRecords: data.length,
+      importedWithWarnings: 0,
+      missingJoiningDate: 0
     };
 
     // Track created users for email sending
@@ -250,6 +245,8 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
           classMappings,
         });
         results.success++;
+        if (importResult?.warnings?.length) results.importedWithWarnings++;
+        if (importResult?.missingJoiningDate) results.missingJoiningDate++;
 
         // Track Supabase account creation for auth modules
         if (AUTH_MODULES.includes(moduleKey) && importResult) {
@@ -264,6 +261,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
               loginLabel: importResult.loginLabel,
               name: importResult.name || row['Full Name *'],
               password: importResult.defaultPassword,
+              className: importResult.className || null,
+              sectionName: importResult.sectionName || null,
+              missingJoiningDate: Boolean(importResult.missingJoiningDate),
               userType: moduleKey === 'students' ? 'student' :
               moduleKey === 'teachers' ? 'teacher' :
               moduleKey === 'nonTeachingStaff' ? 'staff' : 'parent'
@@ -355,6 +355,11 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       message: 'Import completed',
       total: data.length,
       ...results,
+      failedRows: results.errors.map((entry) => ({
+        row: entry.row,
+        reason: entry.message,
+        data: entry.data,
+      })),
       // Include credentials for export (only if accounts were created)
       credentials: createdUsers.length > 0 ? createdUsers.map((u) => ({
         name: u.name,
@@ -364,7 +369,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         loginLabel: u.loginLabel,
         loginValue: u.loginValue,
         password: u.password,
-        userType: u.userType
+        userType: u.userType,
+        className: u.className || null,
+        sectionName: u.sectionName || null,
       })) : []
     });
 
@@ -522,8 +529,8 @@ async function importStudent(data, schoolId, options = {}) {
     create: { name: 'STUDENT' }
   });
 
-  const inactivePassword = require('crypto').randomBytes(24).toString('hex');
-  const hashedPassword = await bcrypt.hash(inactivePassword, 10);
+  const defaultPassword = `Student@${studentId}`;
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
   // Generate UUID for user
   const userId = require('crypto').randomUUID();
@@ -575,7 +582,9 @@ async function importStudent(data, schoolId, options = {}) {
         FatherNumber: normalizedData.fatherPhone || '',
         MotherNumber: normalizedData.motherPhone || '',
         bloodGroup: normalizedData.bloodGroup || '',
-        admissionDate: new Date().toISOString().split('T')[0],
+        admissionDate: normalizedData.admissionDate || null,
+        missingJoiningDate: Boolean(normalizedData.missingJoiningDate),
+        profileStatus: normalizedData.profileStatus || (normalizedData.admissionDate ? 'ACTIVE' : 'MISSING_JOIN_DATE'),
         ...(activeYear && { academicYearId: activeYear.id })
       }
     });
@@ -660,17 +669,35 @@ async function importStudent(data, schoolId, options = {}) {
     return user;
   });
 
+  let authSuccess = false;
+  let authError = null;
+  const authResult = await createSupabaseAccount(authEmail, defaultPassword, result.id, {
+    name: normalizedData.name,
+    role: 'student',
+  });
+  if (authResult.success) {
+    authSuccess = true;
+  } else {
+    authError = authResult.error;
+  }
+
   return {
-    authSuccess: false,
-    authError: null,
-    appAccessPending: true,
+    authSuccess,
+    authError,
+    appAccessPending: !authSuccess,
     email: authEmail,
     deliveryEmail: externalEmail,
     loginLabel: "Admission Number",
     loginValue: studentId,
     recordId: result.id,
     name: normalizedData.name,
-    defaultPassword: null,
+    defaultPassword,
+    className: existingClass?.className || '',
+    sectionName: section?.name || '',
+    missingJoiningDate: Boolean(normalizedData.missingJoiningDate),
+    warnings: normalizedData.missingJoiningDate
+      ? ['Missing joining/admission date. Fee assignment is blocked until assigned.']
+      : [],
   };
 }
 

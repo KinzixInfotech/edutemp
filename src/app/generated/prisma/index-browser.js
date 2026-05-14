@@ -1153,6 +1153,8 @@ exports.Prisma.StudentScalarFieldEnum = {
   gender: 'gender',
   religion: 'religion',
   admissionDate: 'admissionDate',
+  missingJoiningDate: 'missingJoiningDate',
+  profileStatus: 'profileStatus',
   sectionId: 'sectionId',
   bloodGroup: 'bloodGroup',
   rollNumber: 'rollNumber',
@@ -1177,6 +1179,25 @@ exports.Prisma.StudentScalarFieldEnum = {
   currentSessionId: 'currentSessionId',
   isAlumni: 'isAlumni',
   alumniConvertedAt: 'alumniConvertedAt'
+};
+
+exports.Prisma.FeeAssignmentHistoryScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  academicYearId: 'academicYearId',
+  globalFeeStructureId: 'globalFeeStructureId',
+  structureName: 'structureName',
+  classId: 'classId',
+  sectionId: 'sectionId',
+  assignedBy: 'assignedBy',
+  totalRequested: 'totalRequested',
+  assignedCount: 'assignedCount',
+  skippedAlreadyAssigned: 'skippedAlreadyAssigned',
+  skippedMissingJoiningDate: 'skippedMissingJoiningDate',
+  failedCount: 'failedCount',
+  report: 'report',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.StudentSessionScalarFieldEnum = {
@@ -4489,6 +4510,7 @@ exports.Prisma.ModelName = {
   Librarian: 'Librarian',
   Accountant: 'Accountant',
   Student: 'Student',
+  FeeAssignmentHistory: 'FeeAssignmentHistory',
   StudentSession: 'StudentSession',
   Parent: 'Parent',
   StudentParentLink: 'StudentParentLink',

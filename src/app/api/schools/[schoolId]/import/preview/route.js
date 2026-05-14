@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from '@/lib/prisma';
 import {
-  analyzeImportHeaders,
   getImportRequiredFieldLabels,
   mapImportRow,
 } from '@/lib/import-column-mapping';
+import { readImportWorksheetRows } from '@/lib/import-workbook';
 import {
   resolveStudentImportRow,
   summarizeUnresolvedClasses,
@@ -20,7 +20,14 @@ const FIELD_MAPPINGS = {
     'Email (Optional)': 'email',
     'Admission Number': 'admissionNo',
     'Student ID': 'admissionNo',
+    'Admission Date': 'admissionDate',
+    'Admission Date (YYYY-MM-DD)': 'admissionDate',
+    'Joining Date': 'admissionDate',
+    'Joining Date (YYYY-MM-DD)': 'admissionDate',
+    'Date of Admission': 'admissionDate',
+    'Class Name': 'className',
     'Class Name *': 'className',
+    'Section': 'sectionName',
     'Section *': 'sectionName',
     'Gender *': 'gender',
     'Date of Birth (YYYY-MM-DD) *': 'dob',
@@ -94,7 +101,7 @@ const FIELD_MAPPINGS = {
 };
 
 // Modules that require authentication accounts
-const AUTH_MODULES = ['teachers', 'nonTeachingStaff'];
+const AUTH_MODULES = ['students', 'teachers', 'nonTeachingStaff'];
 
 function normalizeStudentReligion(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -141,23 +148,19 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     // Parse Excel file
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames.find((s) => s === 'Data') || workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-    if (!rawData || rawData.length === 0) {
-      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
-    }
-
     // Get expected columns for this module
     const expectedFields = FIELD_MAPPINGS[moduleKey];
     if (!expectedFields) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    // Validate template columns using flexible matching
-    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
+    const { sheetName, rawData, rows: data, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
 
+    if (!rawData || rawData.length === 0) {
+      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
+    }
+
+    // Validate template columns using flexible matching
     if (!headerAnalysis.isValid) {
       return NextResponse.json({
         error: 'Template mapping not matched',
@@ -168,12 +171,6 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         }
       }, { status: 400 });
     }
-
-    // Filter out empty rows
-    const data = rawData.filter((row) => {
-      const values = Object.values(row).filter((v) => v !== '' && v !== null && v !== undefined);
-      return values.length > 1;
-    });
 
     if (data.length === 0) {
       return NextResponse.json({ error: 'No valid data rows found' }, { status: 400 });
@@ -242,6 +239,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     return NextResponse.json({
       fileName: file.name,
+      sheetName,
       module: moduleKey,
       totalRows: previewRows.length,
       validRows: validCount,

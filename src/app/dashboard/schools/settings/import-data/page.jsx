@@ -236,6 +236,9 @@ export default function ImportDataPage() {
                 'Temporary Auth Email': cred.internalEmail || cred.email || '',
                 'Visible Email': cred.visibleEmail || '',
                 'Password': cred.password,
+                'Class': cred.className || '',
+                'Section': cred.sectionName || '',
+                'Joining Date Status': cred.missingJoiningDate ? 'Missing - fees blocked' : 'Ready',
             }));
 
             const wb = XLSX.utils.book_new();
@@ -250,6 +253,9 @@ export default function ImportDataPage() {
                 { wch: 34 },
                 { wch: 32 },
                 { wch: 20 },
+                { wch: 16 },
+                { wch: 10 },
+                { wch: 24 },
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
@@ -263,6 +269,56 @@ export default function ImportDataPage() {
         } catch (error) {
             console.error('Failed to export credentials:', error);
             toast.error('Failed to export credentials file');
+        }
+    }
+
+    function handleExportFailedRows(failedRows, moduleType) {
+        if (!failedRows || failedRows.length === 0) return;
+
+        try {
+            const exportData = failedRows.map((entry, index) => {
+                const rowData = entry.data || {};
+                return {
+                    'S.No': index + 1,
+                    'Source Row': entry.row || '',
+                    'Reason': entry.reason || entry.message || '',
+                    'Name': rowData.name || rowData['Full Name *'] || '',
+                    'Admission No': rowData.admissionNo || rowData['Student ID'] || rowData['Admission Number'] || '',
+                    'Class': rowData.className || rowData['Class Name *'] || '',
+                    'Section': rowData.sectionName || rowData['Section *'] || '',
+                    'Gender': rowData.gender || rowData['Gender *'] || '',
+                    'Date of Birth': rowData.dob || rowData['Date of Birth (YYYY-MM-DD) *'] || '',
+                    'Contact Number': rowData.contactNumber || rowData['Contact Number'] || '',
+                    'Father Name': rowData.fatherName || rowData['Father Name'] || '',
+                    'Mother Name': rowData.motherName || rowData['Mother Name'] || rowData['Mother name'] || '',
+                };
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            ws['!cols'] = [
+                { wch: 6 },
+                { wch: 10 },
+                { wch: 44 },
+                { wch: 28 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 10 },
+                { wch: 12 },
+                { wch: 14 },
+                { wch: 16 },
+                { wch: 24 },
+                { wch: 24 },
+            ];
+            XLSX.utils.book_append_sheet(wb, ws, 'Failed Rows');
+
+            const date = new Date().toISOString().split('T')[0];
+            const fileName = `${moduleType}_failed_rows_${date}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            toast.success(`Failed rows exported to ${fileName}`);
+        } catch (error) {
+            console.error('Failed to export failed rows:', error);
+            toast.error('Failed to export failed rows file');
         }
     }
 
@@ -617,16 +673,23 @@ export default function ImportDataPage() {
                                         <span>Success: {job.success || 0}</span>
                                         <span>Failed: {job.failed || 0}</span>
                                         <span>Accounts: {job.accountsCreated || 0}</span>
+                                        {(job.importedWithWarnings || 0) > 0 && <span>Warnings: {job.importedWithWarnings}</span>}
+                                        {(job.missingJoiningDate || 0) > 0 && <span>Missing joining date: {job.missingJoiningDate}</span>}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {job.status === "completed" && job.credentials?.length > 0 && (
                                             <Button variant="outline" size="sm" onClick={() => handleExportCredentials(job.credentials, job.moduleKey)}>
-                                                Download Credentials
+                                                Download Added Students
+                                            </Button>
+                                        )}
+                                        {job.failedRows?.length > 0 && (
+                                            <Button variant="outline" size="sm" onClick={() => handleExportFailedRows(job.failedRows, job.moduleKey)}>
+                                                Download Failed Excel
                                             </Button>
                                         )}
                                         {job.errorReportUrl && (
                                             <Button variant="outline" size="sm" onClick={() => window.open(job.errorReportUrl, "_blank", "noopener,noreferrer")}>
-                                                Download Error CSV
+                                                Error CSV
                                             </Button>
                                         )}
                                         {job.status === "failed" && (
@@ -921,7 +984,12 @@ export default function ImportDataPage() {
                                                 <div className="flex flex-wrap gap-2">
                                                     {item.credentials?.length > 0 && (
                                                         <Button variant="outline" size="sm" onClick={() => handleExportCredentials(item.credentials, item.module)}>
-                                                            Credentials
+                                                            Added Students
+                                                        </Button>
+                                                    )}
+                                                    {item.failedRows?.length > 0 && (
+                                                        <Button variant="outline" size="sm" onClick={() => handleExportFailedRows(item.failedRows, item.module)}>
+                                                            Failed Excel
                                                         </Button>
                                                     )}
                                                     {item.errorReportUrl && (
@@ -1523,7 +1591,7 @@ export default function ImportDataPage() {
                                         {importResults && !importResults.error && (
                                             <div className="space-y-4">
                                                 {/* Records Stats */}
-                                                <div className="grid grid-cols-3 gap-3">
+                                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                                     <div className="text-center p-3 bg-muted rounded-lg">
                                                         <p className="text-xl font-bold">{importResults.total}</p>
                                                         <p className="text-xs text-muted-foreground">Total</p>
@@ -1539,6 +1607,18 @@ export default function ImportDataPage() {
                                                             {importResults.failed}
                                                         </p>
                                                         <p className="text-xs text-red-600">Failed</p>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                                                        <p className="text-xl font-bold text-amber-600">
+                                                            {importResults.importedWithWarnings || 0}
+                                                        </p>
+                                                        <p className="text-xs text-amber-600">Warnings</p>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                                                        <p className="text-xl font-bold text-orange-600">
+                                                            {importResults.missingJoiningDate || 0}
+                                                        </p>
+                                                        <p className="text-xs text-orange-600">Missing Joining Date</p>
                                                     </div>
                                                 </div>
 
@@ -1573,7 +1653,19 @@ export default function ImportDataPage() {
                                                                 onClick={() => handleExportCredentials(importResults.credentials, selectedModule)}
                                                             >
                                                                 <Download className="h-4 w-4 mr-2" />
-                                                                Download Credentials Excel
+                                                                Download Added Students Excel
+                                                            </Button>
+                                                        )}
+
+                                                        {importResults.failedRows?.length > 0 && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                                                                onClick={() => handleExportFailedRows(importResults.failedRows, selectedModule)}
+                                                            >
+                                                                <Download className="h-4 w-4 mr-2" />
+                                                                Download Failed Rows Excel
                                                             </Button>
                                                         )}
 

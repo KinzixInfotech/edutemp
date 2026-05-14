@@ -8,6 +8,7 @@ import qstash from '@/lib/qstash';
 import prisma from '@/lib/prisma';
 import { getJob, updateJob } from '../route';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
+import { assertStudentHasJoiningDate } from '@/lib/student-profile-status';
 
 const CHUNK_SIZE = 25;
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -57,6 +58,7 @@ async function handleWorker(req) {
 
   if (!chunk.length) {
     await updateJob(jobId, { status: 'done' });
+    await updateAssignmentHistory(job);
     await notifyAdmin(job, structure.name);
     return NextResponse.json({ message: 'All done' });
   }
@@ -111,6 +113,7 @@ async function handleWorker(req) {
       });
     }
   } else {
+    await updateAssignmentHistory({ ...job, done: newDone, failed: newFailed });
     await notifyAdmin(job, structure.name, newDone, newFailed);
   }
 
@@ -120,6 +123,23 @@ async function handleWorker(req) {
     failed: newFailed,
     remaining: studentIds.length - newProcessed,
     status: allDone ? 'done' : 'running'
+  });
+}
+
+async function updateAssignmentHistory(job) {
+  if (!job.historyId) return;
+
+  await prisma.feeAssignmentHistory.update({
+    where: { id: job.historyId },
+    data: {
+      assignedCount: job.done || 0,
+      failedCount: job.failed || 0,
+      skippedMissingJoiningDate: job.skippedMissingJoiningDate || 0,
+      report: {
+        missingJoiningDateStudents: job.missingJoiningDateReport || [],
+        completedAt: new Date().toISOString(),
+      },
+    },
   });
 }
 
@@ -164,6 +184,21 @@ async function assignFeeToStudent({ studentId, structure, academicYearId, school
   const requiredTotal = requiredParticulars.reduce((sum, p) => sum + p.amount, 0);
 
   await prisma.$transaction(async (tx) => {
+    const student = await tx.student.findFirst({
+      where: { userId: studentId, schoolId },
+      select: {
+        userId: true,
+        name: true,
+        admissionNo: true,
+        admissionDate: true,
+        missingJoiningDate: true,
+        profileStatus: true,
+      },
+    });
+
+    if (!student) throw new Error('Student not found');
+    assertStudentHasJoiningDate(student, 'assigning fee structure');
+
     const studentFee = await tx.studentFee.create({
       data: {
         studentId,

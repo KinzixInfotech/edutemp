@@ -4,6 +4,7 @@ import { withSchoolAccess } from "@/lib/api-auth"; // app/api/schools/transport/
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
+import { studentMissingJoiningDate } from '@/lib/student-profile-status';
 
 export const POST = withSchoolAccess(async function POST(req) {
   try {
@@ -23,6 +24,30 @@ export const POST = withSchoolAccess(async function POST(req) {
     });
     if (!fee) {
       return NextResponse.json({ error: 'Transport fee not found' }, { status: 404 });
+    }
+
+    const missingStudents = await prisma.student.findMany({
+      where: { userId: { in: studentIds }, schoolId: fee.schoolId },
+      select: {
+        userId: true,
+        name: true,
+        admissionNo: true,
+        admissionDate: true,
+        missingJoiningDate: true,
+        profileStatus: true,
+      },
+    }).then((students) => students.filter(studentMissingJoiningDate));
+
+    if (missingStudents.length) {
+      return NextResponse.json({
+        error: `${missingStudents.length} student(s) are missing joining date. Transport fee cannot be assigned until joining date is assigned.`,
+        code: 'MISSING_JOINING_DATE',
+        students: missingStudents.map((student) => ({
+          studentId: student.userId,
+          name: student.name,
+          admissionNo: student.admissionNo,
+        })),
+      }, { status: 400 });
     }
 
     // Assign to students

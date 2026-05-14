@@ -6,10 +6,7 @@ import qstash from '@/lib/qstash';
 import { uploadToR2, generateFileKey } from '@/lib/r2';
 import { createJobId, listBulkJobs, setBulkJob } from '@/lib/bulk-job-store';
 import { FIELD_MAPPINGS } from '../route';
-import {
-  analyzeImportHeaders,
-  isIgnoredImportColumn,
-} from '@/lib/import-column-mapping';
+import { readImportWorksheetRows } from '@/lib/import-workbook';
 
 const CHUNK_SIZE = 500;
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
@@ -96,15 +93,7 @@ async function enqueueWorker(jobId) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames.find((sheet) => sheet === 'Data') || workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-    if (!rawData.length) {
-      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
-    }
-
-    const headerAnalysis = analyzeImportHeaders(Object.keys(rawData[0]), expectedFields);
+    const { sheetName, rawData, rows: dataRows, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
 
     if (!headerAnalysis.isValid) {
       return NextResponse.json({
@@ -117,13 +106,10 @@ async function enqueueWorker(jobId) {
       }, { status: 400 });
     }
 
-    const dataRows = rawData.filter((row) => {
-      const meaningfulValues = Object.entries(row).
-      filter(([key]) => !isIgnoredImportColumn(key)).
-      map(([, value]) => String(value ?? '').trim()).
-      filter(Boolean);
-      return meaningfulValues.length > 0;
-    });
+    if (!rawData.length) {
+      return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
+    }
+
     if (!dataRows.length) {
       return NextResponse.json({ error: 'No valid data rows found' }, { status: 400 });
     }
@@ -162,6 +148,7 @@ async function enqueueWorker(jobId) {
       type: 'import',
       schoolId,
       moduleKey,
+      sheetName,
       fileName: file.name,
       fileUrl,
       importedBy,
@@ -178,6 +165,8 @@ async function enqueueWorker(jobId) {
       failed: 0,
       accountsCreated: 0,
       accountsFailed: 0,
+      importedWithWarnings: 0,
+      missingJoiningDate: 0,
       credentials: [],
       chunks,
       failedRows: [],

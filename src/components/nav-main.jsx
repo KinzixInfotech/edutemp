@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useLoader } from "@/app/dashboard/context/Loader"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -64,6 +64,22 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     })
 
     const unreadNoticesCount = noticesData?.unreadCount || 0
+
+    const { data: missingJoiningDateData } = useQuery({
+        queryKey: ['sidebar-missing-joining-date', fullUser?.schoolId],
+        queryFn: async () => {
+            if (!fullUser?.schoolId) return { count: 0 }
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/students/missing-joining-date`)
+            if (!res.ok) return { count: 0 }
+            return res.json()
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 5 * 60 * 1000,
+    })
+
+    const missingJoiningDateCount = missingJoiningDateData?.count || 0
+    const showMissingJoiningDateIndicator = (label) =>
+        missingJoiningDateCount > 0 && ['Manage Students', 'Assign Structure'].includes(label)
 
     // Fetch attendance window status for indicator
     const { data: attendanceStatus } = useQuery({
@@ -307,6 +323,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             {item.showNew && (
                                                                 <span className="absolute top-0 right-0 h-2 w-2 bg-purple-500 rounded-full" />
                                                             )}
+                                                            {showMissingJoiningDateIndicator(item.label) && (
+                                                                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" />
+                                                            )}
                                                         </Link>
                                                     </SidebarMenuButton>
                                                 </SidebarMenuItem>
@@ -342,6 +361,12 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                     )}
                                                     {item.showNew && (
                                                         <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-md font-bold">NEW</span>
+                                                    )}
+                                                    {showMissingJoiningDateIndicator(item.label) && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                                                            <AlertTriangle className="h-3 w-3" />
+                                                            {missingJoiningDateCount}
+                                                        </span>
                                                     )}
                                                 </div>
                                                 {/* Badge for Noticeboard */}

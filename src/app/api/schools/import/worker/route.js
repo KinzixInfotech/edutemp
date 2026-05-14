@@ -9,7 +9,8 @@ import { generateFileKey, uploadToR2 } from '@/lib/r2';
 import { FIELD_MAPPINGS, processRow } from '../../[schoolId]/import/route';
 import { getAccountCredentialsEmailTemplate } from '@/lib/email';
 import { sendResendEmail } from '@/lib/resend';
-import { isIgnoredImportColumn, mapImportRow } from '@/lib/import-column-mapping';
+import { mapImportRow } from '@/lib/import-column-mapping';
+import { readImportWorksheetRows } from '@/lib/import-workbook';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -96,6 +97,8 @@ async function updateHistory(job) {
         totalChunks: job.chunks.length,
         fileUrl: job.fileUrl,
         errorReportUrl: job.errorReportUrl || null,
+        importedWithWarnings: job.importedWithWarnings || 0,
+        missingJoiningDate: job.missingJoiningDate || 0,
         failedRows: job.failedRows.slice(0, 200),
         credentials: job.credentials || [],
         etaSeconds: toEtaSeconds(job.processedRows, job.totalRows, job.startedAt)
@@ -112,17 +115,8 @@ async function parseWorkbookRows(job) {
 
   const buffer = Buffer.from(await response.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames.find((sheet) => sheet === 'Data') || workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-  return rawData.filter((row) => {
-    const meaningfulValues = Object.entries(row).
-    filter(([key]) => !isIgnoredImportColumn(key)).
-    map(([, value]) => String(value ?? '').trim()).
-    filter(Boolean);
-    return meaningfulValues.length > 0;
-  });
+  const fieldMap = FIELD_MAPPINGS[job.moduleKey] || {};
+  return readImportWorksheetRows(workbook, fieldMap).rows;
 }
 
 function mapRow(row, fieldMap) {
@@ -165,6 +159,8 @@ async function handleWorker(req) {
     let failed = job.failed;
     let accountsCreated = job.accountsCreated;
     let accountsFailed = job.accountsFailed;
+    let importedWithWarnings = job.importedWithWarnings || 0;
+    let missingJoiningDate = job.missingJoiningDate || 0;
     const credentials = [...(job.credentials || [])];
 
     for (let index = 0; index < chunkRows.length; index++) {
@@ -177,6 +173,8 @@ async function handleWorker(req) {
           classMappings: job.classMappings || {},
         });
         success += 1;
+        if (result?.warnings?.length) importedWithWarnings += 1;
+        if (result?.missingJoiningDate) missingJoiningDate += 1;
 
         if (result?.authSuccess) {
           accountsCreated += 1;
@@ -188,6 +186,9 @@ async function handleWorker(req) {
             internalEmail: result.email || null,
             visibleEmail: result.deliveryEmail || null,
             password: result.defaultPassword || null,
+            className: result.className || null,
+            sectionName: result.sectionName || null,
+            missingJoiningDate: Boolean(result.missingJoiningDate),
           });
 
           if (job.sendEmails && result.deliveryEmail) {
@@ -236,6 +237,8 @@ async function handleWorker(req) {
       failed,
       accountsCreated,
       accountsFailed,
+      importedWithWarnings,
+      missingJoiningDate,
       credentials,
       failedRows,
       chunks: job.chunks

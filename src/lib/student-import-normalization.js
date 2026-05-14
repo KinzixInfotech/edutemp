@@ -18,6 +18,9 @@ export function normalizeClassLookupKey(value) {
 
   return text
     .replace(/\b(standard|std|class|grade)\b/g, '')
+    .replace(/\biii\b/g, '3')
+    .replace(/\bii\b/g, '2')
+    .replace(/\bi\b/g, '1')
     .replace(/\bukg\b/g, 'upperkg')
     .replace(/\bu\.?\s*k\.?\s*g\.?\b/g, 'upperkg')
     .replace(/\blkg\b/g, 'lowerkg')
@@ -34,7 +37,6 @@ export function buildClassLookup(classes = []) {
   for (const cls of classes) {
     const keys = new Set([
       normalizeClassLookupKey(cls.className),
-      normalizeClassLookupKey(String(cls.id)),
     ]);
 
     const numberMatch = cleanImportString(cls.className).match(/\d+/);
@@ -60,13 +62,15 @@ export function parseImportDate(value) {
   }
 
   if (typeof value === 'number') {
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    epoch.setUTCDate(epoch.getUTCDate() + value);
-    return epoch.toISOString().slice(0, 10);
+    return parseExcelSerialDate(value);
   }
 
   const text = cleanImportString(value);
   if (!text) return '';
+
+  if (/^\d{5}$/.test(text)) {
+    return parseExcelSerialDate(Number(text));
+  }
 
   const isoMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (isoMatch) {
@@ -82,6 +86,13 @@ export function parseImportDate(value) {
   }
 
   return null;
+}
+
+function parseExcelSerialDate(value) {
+  if (!Number.isFinite(value) || value < 20000 || value > 60000) return null;
+  const epoch = new Date(Date.UTC(1899, 11, 30));
+  epoch.setUTCDate(epoch.getUTCDate() + value);
+  return epoch.toISOString().slice(0, 10);
 }
 
 function formatDateParts(year, month, day) {
@@ -131,6 +142,20 @@ export function resolveStudentImportRow(data = {}, classes = [], classMappings =
   if (!normalized.name) errors.push('Missing required field: Full Name *');
   if (!normalized.gender) errors.push('Missing required field: Gender *');
   if (!normalized.dob) errors.push('Missing required field: Date of Birth *');
+
+  const parsedAdmissionDate = parseImportDate(normalized.admissionDate);
+  if (parsedAdmissionDate) {
+    normalized.admissionDate = parsedAdmissionDate;
+    normalized.missingJoiningDate = false;
+    normalized.profileStatus = 'ACTIVE';
+  } else if (parsedAdmissionDate === null) {
+    errors.push(`Invalid Joining Date: "${normalized.admissionDate}". Use YYYY-MM-DD or DD/MM/YYYY.`);
+  } else {
+    normalized.admissionDate = null;
+    normalized.missingJoiningDate = true;
+    normalized.profileStatus = 'MISSING_JOIN_DATE';
+    warnings.push('No joining/admission date provided. Student will import, but fee assignment and fee generation will be blocked until it is assigned.');
+  }
 
   let resolvedClass = null;
   if (rawClassName) {

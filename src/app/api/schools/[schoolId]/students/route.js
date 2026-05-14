@@ -60,21 +60,23 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       if (activeYear) academicYearId = activeYear.id;
     }
 
+    const andFilters = [];
+    if (academicYearId) andFilters.push({ OR: [{ academicYearId }, { class: { academicYearId } }] });
+    if (search) {
+      andFilters.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { admissionNo: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+
     const whereClause = {
       schoolId,
       ...(parsedClassId ? { classId: parsedClassId } : {}),
       ...(parsedSectionId ? { sectionId: parsedSectionId } : {}),
-      // Filter by academic year through the class relation
-      ...(academicYearId ? { class: { academicYearId } } : {}),
-      ...(search ?
-      {
-        OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-        { admissionNo: { contains: search, mode: "insensitive" } }]
-
-      } :
-      {})
+      ...(andFilters.length ? { AND: andFilters } : {}),
     };
 
     const cacheKey = generateKey("students", {
@@ -93,7 +95,18 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       async () => {
         const skip = (pageNum - 1) * limitNum;
 
-        const [students, total, activeCount] = await Promise.all([
+        const missingJoiningDateFilter = {
+          schoolId,
+          OR: [
+            { missingJoiningDate: true },
+            { profileStatus: "MISSING_JOIN_DATE" },
+            { admissionDate: null },
+            { admissionDate: "" },
+          ],
+          ...(academicYearId ? { AND: [{ OR: [{ academicYearId }, { class: { academicYearId } }] }] } : {}),
+        };
+
+        const [students, total, activeCount, missingJoiningDateCount] = await Promise.all([
         prisma.student.findMany({
           where: whereClause,
           include: {
@@ -117,7 +130,8 @@ export const GET = withSchoolAccess(async function GET(req, props) {
         prisma.student.count({ where: whereClause }),
         prisma.student.count({
           where: { schoolId, user: { status: "ACTIVE" } }
-        })]
+        }),
+        prisma.student.count({ where: missingJoiningDateFilter })]
         );
 
         return {
@@ -127,6 +141,7 @@ export const GET = withSchoolAccess(async function GET(req, props) {
           })),
           total,
           activeCount,
+          missingJoiningDateCount,
         };
       },
       300 // 5 minutes cache

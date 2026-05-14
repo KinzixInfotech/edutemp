@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import redis from '@/lib/redis';
 import qstash from '@/lib/qstash';
+import { studentMissingJoiningDate } from '@/lib/student-profile-status';
 
 // ── Job helpers (exported so worker + status routes can import) ─
 const JOB_TTL = 60 * 60 * 2; // 2 hours
@@ -37,7 +38,9 @@ export const POST = withSchoolAccess(async function POST(req) {
       classId,
       sectionId,
       academicYearId,
-      schoolId
+      schoolId,
+      assignedBy,
+      acknowledgeMissingJoiningDate = false
     } = body;
 
     if (!globalFeeStructureId || !schoolId || !academicYearId) {
@@ -62,19 +65,96 @@ export const POST = withSchoolAccess(async function POST(req) {
       return NextResponse.json({ error: 'No students to assign' }, { status: 400 });
     }
 
+    const targetStudents = await prisma.student.findMany({
+      where: { userId: { in: targetIds }, schoolId },
+      select: {
+        userId: true,
+        name: true,
+        admissionNo: true,
+        admissionDate: true,
+        missingJoiningDate: true,
+        profileStatus: true,
+        class: { select: { className: true } },
+        section: { select: { name: true } }
+      }
+    });
+    const targetStudentMap = new Map(targetStudents.map((student) => [student.userId, student]));
+    const missingJoiningDateStudents = targetStudents.filter(studentMissingJoiningDate);
+
+    if (missingJoiningDateStudents.length && !acknowledgeMissingJoiningDate) {
+      return NextResponse.json({
+        error: `${missingJoiningDateStudents.length} student(s) are missing joining date. Assign joining dates first or acknowledge that they will be skipped.`,
+        code: 'MISSING_JOINING_DATE_ACK_REQUIRED',
+        missingJoiningDateStudents: missingJoiningDateStudents.map((student) => ({
+          studentId: student.userId,
+          name: student.name,
+          admissionNo: student.admissionNo,
+          className: student.class?.className || null,
+          sectionName: student.section?.name || null
+        }))
+      }, { status: 400 });
+    }
+
+    const eligibleTargetIds = targetIds.filter((id) => {
+      const student = targetStudentMap.get(id);
+      return student && !studentMissingJoiningDate(student);
+    });
+
+    if (!eligibleTargetIds.length) {
+      return NextResponse.json({
+        error: 'No eligible students to assign. All selected students are missing joining date.',
+        skippedMissingJoiningDate: missingJoiningDateStudents.length
+      }, { status: 400 });
+    }
+
     // ── 2. Filter already-assigned ─────────────────────────
     const existing = await prisma.studentFee.findMany({
-      where: { studentId: { in: targetIds }, academicYearId },
+      where: { studentId: { in: eligibleTargetIds }, academicYearId },
       select: { studentId: true }
     });
     const alreadyAssigned = new Set(existing.map((f) => f.studentId));
-    const toAssign = targetIds.filter((id) => !alreadyAssigned.has(id));
+    const toAssign = eligibleTargetIds.filter((id) => !alreadyAssigned.has(id));
+
+    const structure = await prisma.globalFeeStructure.findUnique({
+      where: { id: globalFeeStructureId },
+      select: { id: true, name: true }
+    });
+
+    const reportRows = missingJoiningDateStudents.map((student) => ({
+      reason: 'Missing joining/admission date. Fee structure was not assigned.',
+      studentId: student.userId,
+      name: student.name,
+      admissionNo: student.admissionNo,
+      className: student.class?.className || '',
+      sectionName: student.section?.name || ''
+    }));
+
+    const history = await prisma.feeAssignmentHistory.create({
+      data: {
+        schoolId,
+        academicYearId,
+        globalFeeStructureId,
+        structureName: structure?.name || null,
+        classId: classId ? parseInt(classId) : null,
+        sectionId: sectionId && sectionId !== 'all' ? parseInt(sectionId) : null,
+        assignedBy: assignedBy || null,
+        totalRequested: targetIds.length,
+        skippedAlreadyAssigned: alreadyAssigned.size,
+        skippedMissingJoiningDate: missingJoiningDateStudents.length,
+        report: {
+          missingJoiningDateStudents: reportRows,
+          createdAt: new Date().toISOString()
+        }
+      }
+    });
 
     if (!toAssign.length) {
       return NextResponse.json({
         jobId: null,
         message: 'All selected students already have fees assigned',
-        skipped: targetIds.length,
+        skipped: eligibleTargetIds.length,
+        skippedMissingJoiningDate: missingJoiningDateStudents.length,
+        historyId: history.id,
         assigned: 0
       });
     }
@@ -93,6 +173,9 @@ export const POST = withSchoolAccess(async function POST(req) {
       academicYearId,
       schoolId,
       studentIds: toAssign,
+      historyId: history.id,
+      skippedMissingJoiningDate: missingJoiningDateStudents.length,
+      missingJoiningDateReport: reportRows,
       processedCount: 0, // tracks how many have been processed across QStash hops
       startedAt: Date.now()
     });
@@ -125,6 +208,8 @@ export const POST = withSchoolAccess(async function POST(req) {
       jobId,
       total: toAssign.length,
       skipped: alreadyAssigned.size,
+      skippedMissingJoiningDate: missingJoiningDateStudents.length,
+      historyId: history.id,
       status: 'running'
     });
 

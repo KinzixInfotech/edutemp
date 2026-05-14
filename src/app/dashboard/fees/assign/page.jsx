@@ -10,7 +10,7 @@ import {
     Users, CheckCircle, Loader2, Search,
     ChevronLeft, ChevronRight, FileText,
     ArrowRight, Tag, Sparkles, GraduationCap,
-    CircleDot, Filter,
+    CircleDot, Filter, AlertTriangle, History, Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 const PER_PAGE = 25;
@@ -73,6 +74,8 @@ export default function AssignFeesToStudents() {
     const [page, setPage] = useState(1);
     const [assigning, setAssigning] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all'); // all | pending | assigned
+    const [ackMissingJoiningDate, setAckMissingJoiningDate] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
 
     // ── Queries ───────────────────────────────────────────────────
     const { data: academicYears } = useQuery({
@@ -105,10 +108,11 @@ export default function AssignFeesToStudents() {
     });
 
     const { data: students, isLoading: studentsLoading } = useQuery({
-        queryKey: ['students-assign', schoolId, selectedClass, selectedSection],
+        queryKey: ['students-assign', schoolId, selectedClass, selectedSection, academicYearId],
         queryFn: async () => {
             const params = new URLSearchParams({
                 schoolId,
+                ...(academicYearId && { academicYearId }),
                 ...(selectedClass && { classId: selectedClass }),
                 ...(selectedSection && selectedSection !== 'all' && { sectionId: selectedSection }),
             });
@@ -117,6 +121,18 @@ export default function AssignFeesToStudents() {
             return r.json();
         },
         enabled: !!schoolId && !!selectedClass, staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false,
+    });
+
+    const { data: assignmentHistory } = useQuery({
+        queryKey: ['fee-assignment-history', schoolId, academicYearId],
+        queryFn: async () => {
+            const params = new URLSearchParams({ schoolId, ...(academicYearId && { academicYearId }) });
+            const r = await fetch(`/api/schools/fee/assign/history?${params}`);
+            if (!r.ok) throw new Error();
+            return r.json();
+        },
+        enabled: !!schoolId && !!academicYearId && historyOpen,
+        staleTime: 1000 * 30,
     });
 
     // ── Derived ───────────────────────────────────────────────────
@@ -136,6 +152,8 @@ export default function AssignFeesToStudents() {
     }, [allStudents, search, filterStatus, academicYearId]);
 
     const unassigned = useMemo(() => allStudents.filter(s => !s.studentFees?.some(f => f.academicYearId === academicYearId)), [allStudents, academicYearId]);
+    const missingJoiningDateStudents = useMemo(() => allStudents.filter(s => s.missingJoiningDate || s.profileStatus === 'MISSING_JOIN_DATE' || !s.admissionDate), [allStudents]);
+    const eligibleUnassigned = useMemo(() => unassigned.filter(s => !missingJoiningDateStudents.some(m => m.userId === s.userId)), [unassigned, missingJoiningDateStudents]);
     const assignedCount = allStudents.length - unassigned.length;
     const pct = allStudents.length > 0 ? Math.round(assignedCount / allStudents.length * 100) : 0;
 
@@ -143,7 +161,7 @@ export default function AssignFeesToStudents() {
     const pagedStudents = filteredStudents.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
     const allPageUnassigned = pagedStudents
-        .filter(s => !s.studentFees?.some(f => f.academicYearId === academicYearId))
+        .filter(s => !s.studentFees?.some(f => f.academicYearId === academicYearId) && !(s.missingJoiningDate || s.profileStatus === 'MISSING_JOIN_DATE' || !s.admissionDate))
         .map(s => s.userId);
     const allPageSelected = allPageUnassigned.length > 0 && allPageUnassigned.every(id => selectedStudents.includes(id));
 
@@ -158,15 +176,39 @@ export default function AssignFeesToStudents() {
     };
 
     const selectAllUnassigned = () => {
-        const all = unassigned.map(s => s.userId);
+        const all = eligibleUnassigned.map(s => s.userId);
         if (selectedStudents.length === all.length) setSelectedStudents([]);
         else setSelectedStudents(all);
+    };
+
+    const exportMissingReport = (rows = []) => {
+        const header = ['Reason', 'Name', 'Admission No', 'Class', 'Section'];
+        const lines = [
+            header.join(','),
+            ...rows.map((row) => [
+                row.reason,
+                row.name,
+                row.admissionNo,
+                row.className,
+                row.sectionName,
+            ].map(value => `"${String(value || '').replaceAll('"', '""')}"`).join(','))
+        ];
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fee-assignment-skipped-students.csv';
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleAssign = async () => {
         if (!selectedStructure) return toast.error('Select a fee structure');
         if (!applyToAll && !selectedStudents.length) return toast.error('Select at least one student');
         if (!selectedClass) return toast.error('Select a class');
+        if (missingJoiningDateStudents.length && !ackMissingJoiningDate) {
+            return toast.error('Acknowledge that students missing joining date will be skipped.');
+        }
 
         setAssigning(true);
         try {
@@ -181,10 +223,15 @@ export default function AssignFeesToStudents() {
                     sectionId: selectedSection && selectedSection !== 'all' ? selectedSection : undefined,
                     academicYearId,
                     schoolId,
+                    assignedBy: fullUser?.id,
+                    acknowledgeMissingJoiningDate: ackMissingJoiningDate,
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            if (!res.ok) {
+                if (data.code === 'MISSING_JOINING_DATE_ACK_REQUIRED') setAckMissingJoiningDate(false);
+                throw new Error(data.error);
+            }
 
             if (!data.jobId) {
                 toast.info(data.message || 'All students already assigned');
@@ -200,9 +247,12 @@ export default function AssignFeesToStudents() {
             });
 
             if (data.skipped > 0) toast.info(`${data.skipped} students skipped (already assigned)`);
+            if (data.skippedMissingJoiningDate > 0) toast.warning(`${data.skippedMissingJoiningDate} students skipped (missing joining date)`);
             setSelectedStudents([]);
             setApplyToAll(false);
+            setAckMissingJoiningDate(false);
             queryClient.invalidateQueries({ queryKey: ['students-assign'] });
+            queryClient.invalidateQueries({ queryKey: ['fee-assignment-history'] });
         } catch (err) {
             toast.error(err.message || 'Failed to start assignment');
         } finally {
@@ -227,6 +277,10 @@ export default function AssignFeesToStudents() {
                         Runs in background — navigate away freely after starting
                     </p>
                 </div>
+                <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+                    <History className="mr-2 h-4 w-4" />
+                    History
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-6">
@@ -315,6 +369,26 @@ export default function AssignFeesToStudents() {
                                 </div>
                             </label>
 
+                            {missingJoiningDateStudents.length > 0 && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-100">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-semibold">{missingJoiningDateStudents.length} student(s) missing joining date</p>
+                                            <p className="text-xs">These students will not receive this fee structure until their joining date is assigned.</p>
+                                            <label className="flex items-start gap-2 text-xs font-medium">
+                                                <Checkbox
+                                                    checked={ackMissingJoiningDate}
+                                                    onCheckedChange={value => setAckMissingJoiningDate(Boolean(value))}
+                                                    className="mt-0.5"
+                                                />
+                                                <span>I understand students missing joining date will be skipped and listed in the assignment report.</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <Button
                                 className="w-full h-10 bg-green-600 hover:bg-green-700 text-white font-semibold "
                                 onClick={handleAssign}
@@ -379,11 +453,12 @@ export default function AssignFeesToStudents() {
                     {selectedClass && !studentsLoading && allStudents.length > 0 && (
                         <Card className="border  bg-white dark:bg-muted">
                             <CardContent className="pt-4 pb-4 space-y-3">
-                                <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="grid grid-cols-4 gap-2 text-center">
                                     {[
                                         { label: 'Total', value: allStudents.length, color: 'text-foreground' },
                                         { label: 'Assigned', value: assignedCount, color: 'text-green-600' },
                                         { label: 'Pending', value: unassigned.length, color: 'text-amber-600' },
+                                        { label: 'Blocked', value: missingJoiningDateStudents.length, color: 'text-red-600' },
                                     ].map(s => (
                                         <div key={s.label} className="p-2.5 rounded-xl bg-muted/40">
                                             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -462,17 +537,17 @@ export default function AssignFeesToStudents() {
                                     <Button
                                         size="sm"
                                         onClick={selectAllUnassigned}
-                                        disabled={!unassigned.length}
+                                        disabled={!eligibleUnassigned.length}
                                         className={cn(
                                             'h-8 text-xs',
-                                            selectedStudents.length === unassigned.length && unassigned.length > 0
+                                            selectedStudents.length === eligibleUnassigned.length && eligibleUnassigned.length > 0
                                                 ? 'bg-muted text-foreground hover:bg-muted/80 border'
                                                 : 'bg-green-600 hover:bg-green-700 text-white'
                                         )}
                                     >
-                                        {selectedStudents.length === unassigned.length && unassigned.length > 0
+                                        {selectedStudents.length === eligibleUnassigned.length && eligibleUnassigned.length > 0
                                             ? 'Deselect all'
-                                            : `All unassigned (${unassigned.length})`}
+                                            : `All eligible (${eligibleUnassigned.length})`}
                                     </Button>
                                 </>
                             )}
@@ -529,8 +604,9 @@ export default function AssignFeesToStudents() {
                             <div className="divide-y divide-border/50">
                                 {pagedStudents.map((student, idx) => {
                                     const isAssigned = student.studentFees?.some(f => f.academicYearId === academicYearId);
+                                    const missingJoin = student.missingJoiningDate || student.profileStatus === 'MISSING_JOIN_DATE' || !student.admissionDate;
                                     const isSelected = selectedStudents.includes(student.userId);
-                                    const isDisabled = isAssigned || applyToAll;
+                                    const isDisabled = isAssigned || applyToAll || missingJoin;
 
                                     return (
                                         <div
@@ -545,11 +621,12 @@ export default function AssignFeesToStudents() {
                                                         : 'hover:bg-muted/40',
                                                 !isDisabled && 'cursor-pointer',
                                                 isDisabled && 'cursor-default',
+                                                missingJoin && 'bg-red-50/60 dark:bg-red-950/20',
                                             )}
                                         >
                                             {/* Checkbox */}
                                             <div className="w-5 flex items-center justify-center">
-                                                {!applyToAll && !isAssigned ? (
+                                                {!applyToAll && !isAssigned && !missingJoin ? (
                                                     <Checkbox
                                                         checked={isSelected}
                                                         onCheckedChange={() => toggleStudent(student.userId)}
@@ -561,6 +638,8 @@ export default function AssignFeesToStudents() {
                                                     />
                                                 ) : isAssigned ? (
                                                     <CheckCircle className="w-4 h-4 text-green-500" />
+                                                ) : missingJoin ? (
+                                                    <AlertTriangle className="w-4 h-4 text-red-500" />
                                                 ) : (
                                                     <div className="w-4 h-4" />
                                                 )}
@@ -602,7 +681,12 @@ export default function AssignFeesToStudents() {
 
                                             {/* Status */}
                                             <div className="w-24 flex justify-end">
-                                                {isAssigned ? (
+                                                {missingJoin ? (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        Missing Date
+                                                    </span>
+                                                ) : isAssigned ? (
                                                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-950/40 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
                                                         <CheckCircle className="w-3 h-3" />
                                                         Assigned
@@ -645,6 +729,58 @@ export default function AssignFeesToStudents() {
                     )}
                 </Card>
             </div>
+
+            <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <History className="h-5 w-5" />
+                            Fee Assignment History
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        {(assignmentHistory?.history || []).length === 0 ? (
+                            <div className="py-10 text-center text-sm text-muted-foreground">No fee assignment history found.</div>
+                        ) : (
+                            assignmentHistory.history.map((item) => {
+                                const skippedRows = item.report?.missingJoiningDateStudents || [];
+                                return (
+                                    <div key={item.id} className="rounded-lg border p-4 space-y-3">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <p className="font-semibold">{item.structureName || 'Fee Structure'}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {new Date(item.createdAt).toLocaleString()} · Class {item.classId || 'All'}{item.sectionId ? ` / Section ${item.sectionId}` : ''}
+                                                </p>
+                                            </div>
+                                            {skippedRows.length > 0 && (
+                                                <Button variant="outline" size="sm" onClick={() => exportMissingReport(skippedRows)}>
+                                                    <Download className="mr-2 h-4 w-4" />
+                                                    Skipped Report
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                                            {[
+                                                ['Requested', item.totalRequested],
+                                                ['Assigned', item.assignedCount],
+                                                ['Already', item.skippedAlreadyAssigned],
+                                                ['Missing Date', item.skippedMissingJoiningDate],
+                                                ['Failed', item.failedCount],
+                                            ].map(([label, value]) => (
+                                                <div key={label} className="rounded-md bg-muted/50 p-2">
+                                                    <p className="text-lg font-bold">{value || 0}</p>
+                                                    <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 } 
