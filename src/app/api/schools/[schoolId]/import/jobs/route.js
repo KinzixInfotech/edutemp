@@ -68,6 +68,7 @@ async function enqueueWorker(jobId) {
     const importedBy = formData.get('userId');
     const sendEmails = formData.get('sendEmails') === 'true';
     const academicYearId = String(formData.get('academicYearId') || '').trim() || null;
+    const requestedSheetName = String(formData.get('sheetName') || '').trim();
     const classMappings = parseClassMappings(formData.get('classMappings'));
     const sectionMappings = parseClassMappings(formData.get('sectionMappings'));
 
@@ -94,7 +95,9 @@ async function enqueueWorker(jobId) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const { sheetName, rawData, rows: dataRows, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
+    const { sheetName, rawData, rows: dataRows, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields, {
+      sheetName: requestedSheetName,
+    });
 
     if (!headerAnalysis.isValid) {
       return NextResponse.json({

@@ -138,6 +138,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     const formData = await req.formData();
     const file = formData.get('file');
     const moduleKey = formData.get('module');
+    const requestedSheetName = String(formData.get('sheetName') || '').trim();
 
     if (!file || !moduleKey) {
       return NextResponse.json({ error: 'File and module are required' }, { status: 400 });
@@ -155,7 +156,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    const { sheetName, rawData, rows: data, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
+    const { sheetName, rawData, rows: data, headerAnalysis, sheets } = readImportWorksheetRows(workbook, expectedFields, {
+      sheetName: requestedSheetName,
+    });
 
     if (!rawData || rawData.length === 0) {
       return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });
@@ -168,6 +171,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         details: {
           message: 'The uploaded file does not match the expected template format.',
           ...headerAnalysis,
+          sheets,
           suggestion: 'Fix the missing or unrecognized headers shown above, or download the latest template for this module.'
         }
       }, { status: 400 });
@@ -245,6 +249,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     return NextResponse.json({
       fileName: file.name,
       sheetName,
+      sheets,
       module: moduleKey,
       totalRows: previewRows.length,
       validRows: validCount,

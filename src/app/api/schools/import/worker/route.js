@@ -116,7 +116,7 @@ async function parseWorkbookRows(job) {
   const buffer = Buffer.from(await response.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const fieldMap = FIELD_MAPPINGS[job.moduleKey] || {};
-  return readImportWorksheetRows(workbook, fieldMap).rows;
+  return readImportWorksheetRows(workbook, fieldMap, { sheetName: job.sheetName }).rows;
 }
 
 function mapRow(row, fieldMap) {
@@ -229,12 +229,21 @@ async function handleWorker(req) {
               loginValue: result.loginValue,
             });
 
-            await sendResendEmail({
-              to: result.deliveryEmail,
-              subject: emailTemplate.subject,
-              html: emailTemplate.html,
-              text: emailTemplate.text
-            });
+            try {
+              await sendResendEmail({
+                to: result.deliveryEmail,
+                subject: emailTemplate.subject,
+                html: emailTemplate.html,
+                text: emailTemplate.text
+              });
+            } catch (emailError) {
+              importedWithWarnings += 1;
+              failedRows.push({
+                row: rowNumber,
+                reason: `Credentials email was not sent: ${emailError.message || 'email provider error'}`,
+                data: mapRow(row, fieldMap)
+              });
+            }
           }
         } else if (result?.authError) {
           accountsFailed += 1;
@@ -285,13 +294,17 @@ async function handleWorker(req) {
       }
 
       if (adminUser?.email) {
-        const email = buildCompletionEmail(updatedJob, updatedJob);
-        await sendResendEmail({
-          to: adminUser.email,
-          subject: email.subject,
-          html: email.html,
-          text: email.text
-        });
+        try {
+          const email = buildCompletionEmail(updatedJob, updatedJob);
+          await sendResendEmail({
+            to: adminUser.email,
+            subject: email.subject,
+            html: email.html,
+            text: email.text
+          });
+        } catch (emailError) {
+          console.error('[IMPORT COMPLETION EMAIL ERROR]', emailError);
+        }
       }
     }
 

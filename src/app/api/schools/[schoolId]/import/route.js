@@ -161,6 +161,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     const file = formData.get('file');
     const moduleKey = formData.get('module');
     const retryIds = formData.get('retryIds'); // For retry functionality
+    const requestedSheetName = String(formData.get('sheetName') || '').trim();
     const classMappings = parseClassMappings(formData.get('classMappings'));
     const sectionMappings = parseClassMappings(formData.get('sectionMappings'));
 
@@ -180,7 +181,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       return NextResponse.json({ error: `Module '${moduleKey}' not supported` }, { status: 400 });
     }
 
-    const { rawData, rows: data, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields);
+    const { rawData, rows: data, headerAnalysis } = readImportWorksheetRows(workbook, expectedFields, {
+      sheetName: requestedSheetName,
+    });
 
     if (!rawData || rawData.length === 0) {
       return NextResponse.json({ error: 'No data found in the file' }, { status: 400 });

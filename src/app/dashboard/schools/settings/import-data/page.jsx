@@ -109,6 +109,7 @@ export default function ImportDataPage() {
     const [previewPage, setPreviewPage] = useState(1);
     const [classMappings, setClassMappings] = useState({});
     const [sectionMappings, setSectionMappings] = useState({});
+    const [selectedSheetName, setSelectedSheetName] = useState("");
     const previewPageSize = 10;
 
     // Export states
@@ -487,28 +488,21 @@ export default function ImportDataPage() {
         }
     };
 
-    // Handle file upload - First Preview
-    const handleFileUpload = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Validate file type
-        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-            toast.error("Please upload an Excel file (.xlsx or .xls)");
-            return;
-        }
-
-        setUploadedFile(file);
+    const previewUploadedFile = async (file, sheetName = "") => {
         setIsPreviewing(true);
         setPreviewData(null);
         setPreviewPage(1);
         setClassMappings({});
+        setSectionMappings({});
         setImportResults(null);
 
         try {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("module", selectedModule);
+            if (sheetName) {
+                formData.append("sheetName", sheetName);
+            }
 
             const res = await fetch(`/api/schools/${schoolId}/import/preview`, {
                 method: "POST",
@@ -522,6 +516,7 @@ export default function ImportDataPage() {
             }
 
             setPreviewData(data);
+            setSelectedSheetName(data.sheetName || sheetName || "");
             toast.success(`Found ${data.totalRows} records to import`);
 
         } catch (error) {
@@ -529,7 +524,30 @@ export default function ImportDataPage() {
             setPreviewData({ error: error.message, details: error.details });
         } finally {
             setIsPreviewing(false);
-            event.target.value = "";
+        }
+    };
+
+    // Handle file upload - First Preview
+    const handleFileUpload = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+            toast.error("Please upload an Excel file (.xlsx or .xls)");
+            return;
+        }
+
+        setUploadedFile(file);
+        setSelectedSheetName("");
+        await previewUploadedFile(file);
+        event.target.value = "";
+    };
+
+    const handleSheetChange = async (sheetName) => {
+        setSelectedSheetName(sheetName);
+        if (uploadedFile) {
+            await previewUploadedFile(uploadedFile, sheetName);
         }
     };
 
@@ -550,6 +568,9 @@ export default function ImportDataPage() {
             }
             formData.append("sendEmails", sendEmails.toString());
             formData.append("skipDuplicates", skipDuplicates.toString());
+            if (selectedSheetName) {
+                formData.append("sheetName", selectedSheetName);
+            }
             if (selectedModule === "students") {
                 formData.append("classMappings", JSON.stringify(classMappings));
                 formData.append("sectionMappings", JSON.stringify(sectionMappings));
@@ -589,6 +610,7 @@ export default function ImportDataPage() {
         setUploadedFile(null);
         setClassMappings({});
         setSectionMappings({});
+        setSelectedSheetName("");
     };
 
     // Handle export
@@ -1338,6 +1360,7 @@ export default function ImportDataPage() {
                                                         <p className="font-medium">{previewData.fileName}</p>
                                                         <p className="text-sm text-muted-foreground">
                                                             {previewData.totalRows} records found
+                                                            {previewData.sheetName ? ` from sheet "${previewData.sheetName}"` : ""}
                                                         </p>
                                                     </div>
                                                     <div className="flex gap-2">
@@ -1356,6 +1379,29 @@ export default function ImportDataPage() {
                                                         )}
                                                     </div>
                                                 </div>
+
+                                                {previewData.sheets?.length > 1 && (
+                                                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2 dark:border-blue-900 dark:bg-blue-950/30">
+                                                        <div>
+                                                            <p className="font-medium text-blue-900 dark:text-blue-200">Choose workbook sheet</p>
+                                                            <p className="text-sm text-blue-800/80 dark:text-blue-300/80">
+                                                                Select the exact Excel sheet to import. Other sheets will be ignored.
+                                                            </p>
+                                                        </div>
+                                                        <select
+                                                            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                                            value={selectedSheetName}
+                                                            onChange={(event) => handleSheetChange(event.target.value)}
+                                                            disabled={isPreviewing || isUploading}
+                                                        >
+                                                            {previewData.sheets.map((sheet) => (
+                                                                <option key={sheet.sheetName} value={sheet.sheetName}>
+                                                                    {sheet.sheetName} · {sheet.rowCount} rows{sheet.isValid ? "" : " · template mismatch"}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
 
                                                 {/* Preview Table */}
                                                 <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
@@ -1591,6 +1637,24 @@ export default function ImportDataPage() {
                                                 <AlertTitle>Preview Failed</AlertTitle>
                                                 <AlertDescription className="space-y-3 overflow-hidden">
                                                     <p className="break-words">{previewData.error}</p>
+
+                                                    {previewData.details?.sheets?.length > 1 && (
+                                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2 dark:border-blue-900 dark:bg-blue-950/30">
+                                                            <p className="font-medium text-blue-900 dark:text-blue-200">Try another workbook sheet</p>
+                                                            <select
+                                                                className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+                                                                value={selectedSheetName}
+                                                                onChange={(event) => handleSheetChange(event.target.value)}
+                                                                disabled={isPreviewing || isUploading}
+                                                            >
+                                                                {previewData.details.sheets.map((sheet) => (
+                                                                    <option key={sheet.sheetName} value={sheet.sheetName}>
+                                                                        {sheet.sheetName} · {sheet.rowCount} rows{sheet.isValid ? "" : " · template mismatch"}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
 
                                                     {/* Show detailed column information if available */}
                                                     {previewData.details && (
