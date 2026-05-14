@@ -57,6 +57,9 @@ function buildCompletionEmail(job, summary) {
   };
 }
 
+// Time-guard: re-enqueue only if we're about to hit the Vercel timeout
+const MAX_WORKER_DURATION_MS = 50_000; // 50 seconds safety margin
+
 async function enqueueNext(jobId) {
   const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
   const workerUrl = `${baseUrl}/api/schools/import/worker`;
@@ -124,6 +127,7 @@ function mapRow(row, fieldMap) {
 }
 
 async function handleWorker(req) {
+  const workerStartTime = Date.now();
   const { jobId } = await req.json();
   if (!jobId) {
     return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
@@ -142,208 +146,219 @@ async function handleWorker(req) {
     return NextResponse.json({ success: true, message: 'Job cancelled' });
   }
 
-  const nextChunk = job.chunks.find((chunk) => chunk.status === 'queued' || chunk.status === 'failed' && chunk.retryCount < 3);
-  if (!nextChunk) {
-    return NextResponse.json({ success: true, message: 'No pending chunks' });
-  }
-
   const fieldMap = FIELD_MAPPINGS[job.moduleKey];
   const school = await prisma.school.findUnique({ where: { id: job.schoolId }, select: { name: true } });
   const adminUser = await prisma.user.findUnique({ where: { id: job.importedBy }, select: { email: true, name: true } });
 
+  const failedRows = [...job.failedRows];
+  let success = job.success;
+  let failed = job.failed;
+  let accountsCreated = job.accountsCreated;
+  let accountsFailed = job.accountsFailed;
+  let importedWithWarnings = job.importedWithWarnings || 0;
+  let missingJoiningDate = job.missingJoiningDate || 0;
+  const credentials = [...(job.credentials || [])];
+  let lastProcessedRows = job.processedRows || 0;
+  let timedOut = false;
+
+  // Parse workbook once for all chunks
+  let rows;
   try {
-    job.status = 'running';
-    nextChunk.status = 'running';
-    await updateBulkJob(job.id, { status: job.status, chunks: job.chunks });
+    rows = await parseWorkbookRows(job);
+  } catch (err) {
+    console.error('[IMPORT WORKER] Failed to parse workbook', err);
+    await updateBulkJob(job.id, { status: 'failed' });
+    return NextResponse.json({ error: 'Failed to parse workbook' }, { status: 500 });
+  }
 
-    const rows = await parseWorkbookRows(job);
-    const chunkRows = rows.slice(nextChunk.startRow, nextChunk.endRow + 1);
-    const failedRows = [...job.failedRows];
-    let success = job.success;
-    let failed = job.failed;
-    let accountsCreated = job.accountsCreated;
-    let accountsFailed = job.accountsFailed;
-    let importedWithWarnings = job.importedWithWarnings || 0;
-    let missingJoiningDate = job.missingJoiningDate || 0;
-    const credentials = [...(job.credentials || [])];
+  job.status = 'running';
 
-    for (let index = 0; index < chunkRows.length; index++) {
-      const latestJob = await getBulkJob(job.id);
-      if (latestJob?.status === 'cancelled') {
-        nextChunk.status = 'cancelled';
-        await updateBulkJob(job.id, {
-          status: 'cancelled',
-          chunks: job.chunks,
-          processedRows: Math.min(job.totalRows, nextChunk.startRow + index),
-          success,
-          failed,
-          accountsCreated,
-          accountsFailed,
-          importedWithWarnings,
-          missingJoiningDate,
-          credentials,
-          failedRows,
-        });
-        await updateHistory({ ...job, status: 'cancelled', processedRows: Math.min(job.totalRows, nextChunk.startRow + index), success, failed, accountsCreated, accountsFailed, importedWithWarnings, missingJoiningDate, credentials, failedRows });
-        return NextResponse.json({ success: true, message: 'Job cancelled' });
-      }
-
-      const row = chunkRows[index];
-      const rowNumber = row['S.No'] || nextChunk.startRow + index + 2;
-
-      try {
-        const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap, {
-          academicYearId: job.academicYearId || null,
-          classMappings: job.classMappings || {},
-          sectionMappings: job.sectionMappings || {},
-        });
-        success += 1;
-        if (result?.warnings?.length) importedWithWarnings += 1;
-        if (result?.missingJoiningDate) missingJoiningDate += 1;
-
-        if (result?.authSuccess) {
-          accountsCreated += 1;
-          credentials.push({
-            name: result.name,
-            userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
-            loginLabel: result.loginLabel || 'Login',
-            loginValue: result.loginValue || null,
-            internalEmail: result.email || null,
-            visibleEmail: result.deliveryEmail || null,
-            password: result.defaultPassword || null,
-            className: result.className || null,
-            sectionName: result.sectionName || null,
-            missingJoiningDate: Boolean(result.missingJoiningDate),
-          });
-
-          if (job.sendEmails && result.deliveryEmail) {
-            const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com'}/login`;
-            const emailTemplate = getAccountCredentialsEmailTemplate({
-              userName: result.name,
-              email: result.deliveryEmail,
-              password: result.defaultPassword,
-              userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
-              schoolName: school?.name || 'Your School',
-              loginUrl,
-              loginLabel: result.loginLabel,
-              loginValue: result.loginValue,
-            });
-
-            try {
-              await sendResendEmail({
-                to: result.deliveryEmail,
-                subject: emailTemplate.subject,
-                html: emailTemplate.html,
-                text: emailTemplate.text
-              });
-            } catch (emailError) {
-              importedWithWarnings += 1;
-              failedRows.push({
-                row: rowNumber,
-                reason: `Credentials email was not sent: ${emailError.message || 'email provider error'}`,
-                data: mapRow(row, fieldMap)
-              });
-            }
-          }
-        } else if (result?.authError) {
-          accountsFailed += 1;
-          failedRows.push({ row: rowNumber, reason: result.authError, data: mapRow(row, fieldMap) });
-        }
-      } catch (error) {
-        failed += 1;
-        failedRows.push({
-          row: rowNumber,
-          reason: error.message,
-          data: mapRow(row, fieldMap)
-        });
-      }
+  // ── Process ALL pending chunks in a single invocation ─────────
+  while (true) {
+    // Time-guard: if approaching Vercel timeout, break and re-enqueue
+    if (Date.now() - workerStartTime > MAX_WORKER_DURATION_MS) {
+      timedOut = true;
+      console.log(`[IMPORT WORKER] Time-guard triggered after ${Math.round((Date.now() - workerStartTime) / 1000)}s, re-enqueuing`);
+      break;
     }
 
-    nextChunk.status = 'completed';
-    const processedRows = Math.min(job.totalRows, nextChunk.endRow + 1);
-    const allChunksDone = job.chunks.every((chunk) => chunk.status === 'completed' || chunk.index === nextChunk.index);
+    const nextChunk = job.chunks.find((chunk) => chunk.status === 'queued' || chunk.status === 'failed' && chunk.retryCount < 3);
+    if (!nextChunk) break;
 
-    const updatedJob = {
-      ...job,
-      status: allChunksDone ? 'completed' : 'running',
-      processedRows,
-      success,
-      failed,
-      accountsCreated,
-      accountsFailed,
-      importedWithWarnings,
-      missingJoiningDate,
-      credentials,
-      failedRows,
-      chunks: job.chunks
-    };
+    try {
+      nextChunk.status = 'running';
 
-    if (allChunksDone) {
-      if (failedRows.length) {
-        const csvLines = [
+      const chunkRows = rows.slice(nextChunk.startRow, nextChunk.endRow + 1);
+
+      for (let index = 0; index < chunkRows.length; index++) {
+        // Check cancellation every 50 rows to reduce Redis calls
+        if (index % 50 === 0 && index > 0) {
+          const latestJob = await getBulkJob(job.id);
+          if (latestJob?.status === 'cancelled') {
+            nextChunk.status = 'cancelled';
+            const cancelledJob = {
+              ...job,
+              status: 'cancelled',
+              processedRows: Math.min(job.totalRows, nextChunk.startRow + index),
+              success, failed, accountsCreated, accountsFailed,
+              importedWithWarnings, missingJoiningDate, credentials, failedRows,
+              chunks: job.chunks,
+            };
+            await updateBulkJob(job.id, cancelledJob);
+            await updateHistory(cancelledJob);
+            return NextResponse.json({ success: true, message: 'Job cancelled' });
+          }
+        }
+
+        const row = chunkRows[index];
+        const rowNumber = row['S.No'] || nextChunk.startRow + index + 2;
+
+        try {
+          const result = await processRow(job.moduleKey, row, job.schoolId, fieldMap, {
+            academicYearId: job.academicYearId || null,
+            classMappings: job.classMappings || {},
+            sectionMappings: job.sectionMappings || {},
+          });
+          success += 1;
+          if (result?.warnings?.length) importedWithWarnings += 1;
+          if (result?.missingJoiningDate) missingJoiningDate += 1;
+
+          if (result?.authSuccess) {
+            accountsCreated += 1;
+            credentials.push({
+              name: result.name,
+              userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
+              loginLabel: result.loginLabel || 'Login',
+              loginValue: result.loginValue || null,
+              internalEmail: result.email || null,
+              visibleEmail: result.deliveryEmail || null,
+              password: result.defaultPassword || null,
+              className: result.className || null,
+              sectionName: result.sectionName || null,
+              missingJoiningDate: Boolean(result.missingJoiningDate),
+            });
+
+            if (job.sendEmails && result.deliveryEmail) {
+              const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com'}/login`;
+              const emailTemplate = getAccountCredentialsEmailTemplate({
+                userName: result.name,
+                email: result.deliveryEmail,
+                password: result.defaultPassword,
+                userType: job.moduleKey === 'students' ? 'student' : job.moduleKey === 'teachers' ? 'teacher' : job.moduleKey === 'parents' ? 'parent' : 'staff',
+                schoolName: school?.name || 'Your School',
+                loginUrl,
+                loginLabel: result.loginLabel,
+                loginValue: result.loginValue,
+              });
+
+              try {
+                await sendResendEmail({
+                  to: result.deliveryEmail,
+                  subject: emailTemplate.subject,
+                  html: emailTemplate.html,
+                  text: emailTemplate.text
+                });
+              } catch (emailError) {
+                importedWithWarnings += 1;
+                failedRows.push({
+                  row: rowNumber,
+                  reason: `Credentials email was not sent: ${emailError.message || 'email provider error'}`,
+                  data: mapRow(row, fieldMap)
+                });
+              }
+            }
+          } else if (result?.authError) {
+            accountsFailed += 1;
+            failedRows.push({ row: rowNumber, reason: result.authError, data: mapRow(row, fieldMap) });
+          }
+        } catch (error) {
+          failed += 1;
+          failedRows.push({
+            row: rowNumber,
+            reason: error.message,
+            data: mapRow(row, fieldMap)
+          });
+        }
+      }
+
+      nextChunk.status = 'completed';
+      lastProcessedRows = Math.min(job.totalRows, nextChunk.endRow + 1);
+    } catch (error) {
+      nextChunk.retryCount = (nextChunk.retryCount || 0) + 1;
+      nextChunk.status = 'failed';
+      nextChunk.lastError = error.message;
+      console.error(`[IMPORT WORKER] Chunk ${nextChunk.index} error:`, error.message);
+
+      if (nextChunk.retryCount >= 3) {
+        // Skip this chunk permanently, move to next
+        continue;
+      }
+    }
+  }
+
+  // ── Finalize job state ────────────────────────────────────────
+  const allChunksDone = job.chunks.every((chunk) => chunk.status === 'completed' || (chunk.status === 'failed' && chunk.retryCount >= 3));
+
+  const updatedJob = {
+    ...job,
+    status: allChunksDone ? 'completed' : 'running',
+    processedRows: lastProcessedRows,
+    success,
+    failed,
+    accountsCreated,
+    accountsFailed,
+    importedWithWarnings,
+    missingJoiningDate,
+    credentials,
+    failedRows,
+    chunks: job.chunks
+  };
+
+  if (allChunksDone) {
+    if (failedRows.length) {
+      const csvLines = [
         'Row,Reason,Data',
         ...failedRows.map((entry) => {
           const serialized = JSON.stringify(entry.data || {}).replaceAll('"', '""');
           const reason = String(entry.reason || '').replaceAll('"', '""');
           return `${entry.row},"${reason}","${serialized}"`;
-        })];
+        })
+      ];
+      const key = generateFileKey(`import-errors-${job.moduleKey}.csv`, { folder: 'documents', subFolder: 'import-errors', schoolId: job.schoolId });
+      updatedJob.errorReportUrl = await uploadToR2(key, Buffer.from(csvLines.join('\n')), 'text/csv');
+    }
 
-
-        const key = generateFileKey(`import-errors-${job.moduleKey}.csv`, { folder: 'documents', subFolder: 'import-errors', schoolId: job.schoolId });
-        updatedJob.errorReportUrl = await uploadToR2(key, Buffer.from(csvLines.join('\n')), 'text/csv');
-      }
-
-      if (adminUser?.email) {
-        try {
-          const email = buildCompletionEmail(updatedJob, updatedJob);
-          await sendResendEmail({
-            to: adminUser.email,
-            subject: email.subject,
-            html: email.html,
-            text: email.text
-          });
-        } catch (emailError) {
-          console.error('[IMPORT COMPLETION EMAIL ERROR]', emailError);
-        }
+    if (adminUser?.email) {
+      try {
+        const email = buildCompletionEmail(updatedJob, updatedJob);
+        await sendResendEmail({
+          to: adminUser.email,
+          subject: email.subject,
+          html: email.html,
+          text: email.text
+        });
+      } catch (emailError) {
+        console.error('[IMPORT COMPLETION EMAIL ERROR]', emailError);
       }
     }
-
-    await updateBulkJob(job.id, updatedJob);
-    await updateHistory(updatedJob);
-
-    if (!allChunksDone) {
-      await enqueueNext(job.id);
-    }
-
-    return NextResponse.json({
-      success: true,
-      jobId: job.id,
-      status: updatedJob.status,
-      processedRows: updatedJob.processedRows,
-      totalRows: updatedJob.totalRows,
-      etaSeconds: toEtaSeconds(updatedJob.processedRows, updatedJob.totalRows, updatedJob.startedAt)
-    });
-  } catch (error) {
-    nextChunk.retryCount += 1;
-    nextChunk.status = 'failed';
-    nextChunk.lastError = error.message;
-
-    const updatedJob = {
-      ...job,
-      status: nextChunk.retryCount >= 3 ? 'failed' : 'running',
-      chunks: job.chunks
-    };
-
-    await updateBulkJob(job.id, updatedJob);
-    await updateHistory(updatedJob);
-
-    if (nextChunk.retryCount < 3) {
-      await enqueueNext(job.id);
-    }
-
-    console.error('[IMPORT WORKER ERROR]', error);
-    return NextResponse.json({ error: error.message || 'Worker failed' }, { status: 500 });
   }
+
+  await updateBulkJob(job.id, updatedJob);
+  await updateHistory(updatedJob);
+
+  // Only re-enqueue if timed out with remaining chunks
+  if (!allChunksDone && timedOut) {
+    await enqueueNext(job.id);
+  }
+
+  return NextResponse.json({
+    success: true,
+    jobId: job.id,
+    status: updatedJob.status,
+    processedRows: updatedJob.processedRows,
+    totalRows: updatedJob.totalRows,
+    etaSeconds: toEtaSeconds(updatedJob.processedRows, updatedJob.totalRows, updatedJob.startedAt)
+  });
 }export const POST = withSchoolAccess(async function POST(req) {
   if (IS_DEV) {
     if (req.headers.get('x-internal-key') !== INTERNAL_KEY) {
