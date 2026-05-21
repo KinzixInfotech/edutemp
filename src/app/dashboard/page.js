@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import OnboardingModal from '@/components/dashboard/OnboardingModal'; // Legacy - kept for reference
 import AiInsightsCard from '@/components/dashboard/AiInsightsCard';
 import RecentPaymentsWidget from '@/components/dashboard/widgets/RecentPaymentsWidget';
+import UnresolvedEnrollmentBanner from '@/components/UnresolvedEnrollmentBanner';
 
 // School Timing Warning Component
 const SchoolTimingWarning = ({ schoolId }) => {
@@ -491,6 +492,7 @@ export default function Dashboard() {
 
             {/* Welcome Banner */}
             <div className='px-4'>
+              <UnresolvedEnrollmentBanner />
               <WelcomeBanner
                 fullUser={fullUser}
                 schoolName={fullUser?.school?.name || 'Your School'}

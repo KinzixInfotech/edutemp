@@ -10,8 +10,16 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     const { schoolId, classId } = params;
     const { searchParams } = new URL(req.url);
     const sectionId = searchParams.get('sectionId');
+    let academicYearId = searchParams.get('academicYearId');
+    if (!academicYearId) {
+      const activeYear = await prisma.academicYear.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true }
+      });
+      academicYearId = activeYear?.id;
+    }
 
-    const cacheKey = generateKey('timetable:view:class', { schoolId, classId, sectionId });
+    const cacheKey = generateKey('timetable:view:class', { schoolId, classId, sectionId, academicYearId });
 
     const timetableData = await remember(cacheKey, async () => {
       // Fetch class + section + school info in parallel with timetable data
@@ -24,6 +32,7 @@ export const GET = withSchoolAccess(async function GET(req, props) {
         where: {
           schoolId,
           classId: parseInt(classId),
+          ...(academicYearId && { academicYearId }),
           ...(sectionId && { sectionId: parseInt(sectionId) }),
           isActive: true
         },

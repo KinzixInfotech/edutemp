@@ -169,6 +169,7 @@ const FEATURE_DEFINITIONS = [
         dependencies: ["academic_years"],
         dashboardPatterns: [
             "/dashboard/schools/create-classes",
+            "/dashboard/schools/academic/promotion",
         ],
         apiPatterns: [
             "/api/schools/:schoolId/classes",
@@ -185,6 +186,9 @@ const FEATURE_DEFINITIONS = [
         dependencies: ["classes_sections", "academic_years"],
         dashboardPatterns: [
             "/dashboard/schools/manage-student",
+            "/dashboard/schools/students/registry",
+            "/dashboard/schools/students/enrollment-resolution",
+            "/dashboard/schools/students",
         ],
         apiPatterns: [
             "/api/schools/students",

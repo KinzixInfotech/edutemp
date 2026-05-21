@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
 import { studentMissingJoiningDate } from '@/lib/student-profile-status';
+import { assertOperationalStudentsForYear, resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
 
 export const POST = withSchoolAccess(async function POST(req) {
   try {
@@ -24,6 +25,26 @@ export const POST = withSchoolAccess(async function POST(req) {
     });
     if (!fee) {
       return NextResponse.json({ error: 'Transport fee not found' }, { status: 404 });
+    }
+    const activeYear = await resolveActiveAcademicYear(fee.schoolId, data.academicYearId || null);
+    if (!activeYear) {
+      return NextResponse.json({ error: 'No active academic year found for transport assignment.' }, { status: 400 });
+    }
+
+    try {
+      await assertOperationalStudentsForYear({
+        schoolId: fee.schoolId,
+        academicYearId: activeYear.id,
+        studentIds,
+        moduleName: 'assigning transport fee',
+        requireJoiningDate: true,
+      });
+    } catch (error) {
+      return NextResponse.json({
+        error: error.message,
+        code: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED',
+        blockedStudentIds: error.blockedStudentIds || [],
+      }, { status: 400 });
     }
 
     const missingStudents = await prisma.student.findMany({

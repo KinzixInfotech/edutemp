@@ -24,49 +24,50 @@ export const GET = withSchoolAccess(async function GET(req) {
       );
     }
 
-    const where = {
-      schoolId,
-      academicYearId,
-      ...(status && { status })
-    };
-
-    const studentWhere = {
-      schoolId,
-      academicYearId,
-      ...(classId && { classId: parseInt(classId) }),
-      ...(sectionId && { sectionId: parseInt(sectionId) })
-    };
-
-    const students = await prisma.student.findMany({
-      where: studentWhere,
+    const enrollments = await prisma.studentSession.findMany({
+      where: {
+        academicYearId,
+        status: "ACTIVE",
+        enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+        ...(classId && { classId: parseInt(classId) }),
+        ...(sectionId && { sectionId: parseInt(sectionId) }),
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ["ALUMNI", "TC", "LEFT", "DROPPED", "ARCHIVED"] },
+        },
+      },
       include: {
-        studentFees: {
-          where: { academicYearId },
+        class: { select: { className: true } },
+        section: { select: { name: true } },
+        student: {
           include: {
-            globalFeeStructure: {
-              select: { name: true, mode: true }
-            },
-            particulars: true,
-            installments: {
-              orderBy: { installmentNumber: "asc" }
-            },
-            payments: {
-              where: {
-                status: "SUCCESS",
-                ...(startDate && endDate && {
-                  paymentDate: {
-                    gte: new Date(startDate),
-                    lte: new Date(endDate)
-                  }
-                })
+            studentFees: {
+              where: { academicYearId, ...(status && { status }) },
+              include: {
+                globalFeeStructure: {
+                  select: { name: true, mode: true }
+                },
+                particulars: true,
+                installments: {
+                  orderBy: { installmentNumber: "asc" }
+                },
+                payments: {
+                  where: {
+                    status: "SUCCESS",
+                    ...(startDate && endDate && {
+                      paymentDate: {
+                        gte: new Date(startDate),
+                        lte: new Date(endDate)
+                      }
+                    })
+                  },
+                  orderBy: { paymentDate: "desc" }
+                },
+                discounts: true
               },
-              orderBy: { paymentDate: "desc" }
             },
-            discounts: true
           }
         },
-        class: { select: { className: true } },
-        section: { select: { name: true } }
       },
       orderBy: [
       { classId: "asc" },
@@ -74,17 +75,18 @@ export const GET = withSchoolAccess(async function GET(req) {
 
     });
 
-    const report = students.map((student) => {
+    const report = enrollments.map((enrollment) => {
+      const student = enrollment.student;
       const fee = student.studentFees[0];
       if (!fee) return null;
 
       return {
         studentId: student.userId,
         admissionNo: student.admissionNo,
-        rollNumber: student.rollNumber,
+        rollNumber: enrollment.rollNumber || student.rollNumber,
         name: student.name,
-        class: student.class.className,
-        section: student.section?.name,
+        class: enrollment.class?.className,
+        section: enrollment.section?.name,
         feeStructure: fee.globalFeeStructure?.name,
         originalAmount: fee.originalAmount,
         discountAmount: fee.discountAmount,

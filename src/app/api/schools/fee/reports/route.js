@@ -5,6 +5,29 @@ import { withSchoolAccess } from "@/lib/api-auth"; // ==========================
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+function activeEnrollmentStudentWhere(academicYearId, extra = {}) {
+  if (!academicYearId) return extra;
+  return {
+    ...extra,
+    sessions: {
+      some: {
+        academicYearId,
+        status: "ACTIVE",
+        enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+      },
+    },
+  };
+}
+
+function activeFeeWhere(schoolId, academicYearId, extra = {}) {
+  return {
+    schoolId,
+    ...(academicYearId && { academicYearId }),
+    ...(academicYearId ? { student: activeEnrollmentStudentWhere(academicYearId) } : {}),
+    ...extra,
+  };
+}
+
 export const GET = withSchoolAccess(async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -52,10 +75,7 @@ export const GET = withSchoolAccess(async function GET(req) {
 
 // Dashboard Summary
 async function getDashboardReport(schoolId, academicYearId) {
-  const where = {
-    schoolId,
-    ...(academicYearId && { academicYearId })
-  };
+  const where = activeFeeWhere(schoolId, academicYearId);
 
   // Get totals
   const fees = await prisma.studentFee.aggregate({
@@ -80,7 +100,14 @@ async function getDashboardReport(schoolId, academicYearId) {
 
   // Get recent payments
   const recentPayments = await prisma.feePayment.findMany({
-    where: { schoolId, status: "SUCCESS" },
+    where: {
+      schoolId,
+      status: "SUCCESS",
+      ...(academicYearId && {
+        academicYearId,
+        student: activeEnrollmentStudentWhere(academicYearId),
+      }),
+    },
     orderBy: { paymentDate: "desc" },
     take: 10,
     include: {
@@ -92,7 +119,7 @@ async function getDashboardReport(schoolId, academicYearId) {
   const today = new Date();
   const overdueStats = await prisma.studentFeeInstallment.aggregate({
     where: {
-      studentFee: { schoolId, ...(academicYearId && { academicYearId }) },
+      studentFee: activeFeeWhere(schoolId, academicYearId),
       status: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
       dueDate: { lt: today }
     },
@@ -125,7 +152,7 @@ async function getCollectionReport(schoolId, academicYearId, startDate, endDate)
   const where = {
     schoolId,
     status: "SUCCESS",
-    ...(academicYearId && { studentFee: { academicYearId } }),
+    ...(academicYearId && { studentFee: activeFeeWhere(schoolId, academicYearId) }),
     paymentDate: {
       ...(startDate && { gte: new Date(startDate) }),
       ...(endDate && { lte: new Date(endDate) })
@@ -181,7 +208,16 @@ async function getDefaultersReport(schoolId, academicYearId, classId) {
     where: {
       schoolId,
       ...(academicYearId && { academicYearId }),
-      ...(classId && { student: { classId: parseInt(classId) } }),
+      student: academicYearId ? {
+        sessions: {
+          some: {
+            academicYearId,
+            ...(classId && { classId: parseInt(classId) }),
+            status: "ACTIVE",
+            enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+          },
+        },
+      } : {},
       status: { in: ["UNPAID", "PARTIAL"] },
       installments: {
         some: {
@@ -256,7 +292,16 @@ async function getClassWiseReport(schoolId, academicYearId) {
         where: {
           schoolId,
           ...(academicYearId && { academicYearId }),
-          student: { classId: cls.id }
+          student: academicYearId ? {
+            sessions: {
+              some: {
+                academicYearId,
+                classId: cls.id,
+                status: "ACTIVE",
+                enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+              },
+            },
+          } : { classId: cls.id }
         },
         _sum: {
           finalAmount: true,
@@ -297,7 +342,7 @@ async function getPaymentMethodsReport(schoolId, academicYearId, startDate, endD
   const where = {
     schoolId,
     status: "SUCCESS",
-    ...(academicYearId && { studentFee: { academicYearId } }),
+    ...(academicYearId && { studentFee: activeFeeWhere(schoolId, academicYearId) }),
     ...(startDate && { paymentDate: { gte: new Date(startDate) } }),
     ...(endDate && { paymentDate: { lte: new Date(endDate) } })
   };
@@ -354,7 +399,7 @@ async function getMonthlyTrendReport(schoolId, academicYearId) {
           gte: startOfMonth,
           lte: endOfMonth
         },
-        ...(academicYearId && { studentFee: { academicYearId } })
+        ...(academicYearId && { studentFee: activeFeeWhere(schoolId, academicYearId) })
       },
       _sum: { amount: true },
       _count: true

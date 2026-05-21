@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey } from "@/lib/cache";
 import { getSchoolTimezone, zonedDateToDbDate } from '@/lib/attendance/timezone';
+import { resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
 
 function parseReportDate(input, timezone) {
   if (!input) {
@@ -152,6 +153,10 @@ async function generateMonthlyReport(schoolId, startDate, endDate) {
 // 2. Class-wise Report
 async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
   let classStats;
+  const activeYear = await resolveActiveAcademicYear(schoolId);
+  if (!activeYear) {
+    return { type: 'CLASS_WISE', period: { start: startDate, end: endDate }, classes: [] };
+  }
 
   if (classId) {
     // With class filter
@@ -170,7 +175,12 @@ async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
           NULLIF(COUNT(a.id), 0) * 100), 2
         ) as "attendancePercentage"
       FROM "Class" c
-      LEFT JOIN "Student" s ON s."classId" = c.id AND s."schoolId" = ${schoolId}::uuid
+      LEFT JOIN "StudentSession" ss ON ss."classId" = c.id
+        AND ss."academicYearId" = ${activeYear.id}::uuid
+        AND ss.status = 'ACTIVE'::"SessionStatus"
+        AND ss."enrollmentStatus" IN ('ENROLLED'::"EnrollmentStatus", 'PENDING_VERIFICATION'::"EnrollmentStatus")
+      LEFT JOIN "Student" s ON s."userId" = ss."studentId" AND s."schoolId" = ${schoolId}::uuid
+        AND s."lifecycleStatus" NOT IN ('ALUMNI'::"StudentLifecycleStatus", 'TC'::"StudentLifecycleStatus", 'LEFT'::"StudentLifecycleStatus", 'DROPPED'::"StudentLifecycleStatus", 'ARCHIVED'::"StudentLifecycleStatus")
       LEFT JOIN "Attendance" a ON a."userId" = s."userId" 
         AND a.date >= ${startDate}::date 
         AND a.date <= ${endDate}::date
@@ -196,7 +206,12 @@ async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
           NULLIF(COUNT(a.id), 0) * 100), 2
         ) as "attendancePercentage"
       FROM "Class" c
-      LEFT JOIN "Student" s ON s."classId" = c.id AND s."schoolId" = ${schoolId}::uuid
+      LEFT JOIN "StudentSession" ss ON ss."classId" = c.id
+        AND ss."academicYearId" = ${activeYear.id}::uuid
+        AND ss.status = 'ACTIVE'::"SessionStatus"
+        AND ss."enrollmentStatus" IN ('ENROLLED'::"EnrollmentStatus", 'PENDING_VERIFICATION'::"EnrollmentStatus")
+      LEFT JOIN "Student" s ON s."userId" = ss."studentId" AND s."schoolId" = ${schoolId}::uuid
+        AND s."lifecycleStatus" NOT IN ('ALUMNI'::"StudentLifecycleStatus", 'TC'::"StudentLifecycleStatus", 'LEFT'::"StudentLifecycleStatus", 'DROPPED'::"StudentLifecycleStatus", 'ARCHIVED'::"StudentLifecycleStatus")
       LEFT JOIN "Attendance" a ON a."userId" = s."userId" 
         AND a.date >= ${startDate}::date 
         AND a.date <= ${endDate}::date
@@ -225,34 +240,50 @@ async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
 
 // 3. Student-wise Report - OPTIMIZED
 async function generateStudentWiseReport(schoolId, startDate, endDate, classId, sectionId) {
+  const activeYear = await resolveActiveAcademicYear(schoolId);
+  if (!activeYear) {
+    return { type: 'STUDENT_WISE', period: { start: startDate, end: endDate }, students: [] };
+  }
+
   const where = {
-    schoolId,
+    academicYearId: activeYear.id,
+    status: 'ACTIVE',
+    enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
     ...(classId && { classId: parseInt(classId) }),
     ...(sectionId && { sectionId: parseInt(sectionId) }),
-    user: { deletedAt: null, status: 'ACTIVE' }
+    student: {
+      schoolId,
+      lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+      user: { deletedAt: null, status: 'ACTIVE' },
+    }
   };
 
-  const students = await prisma.student.findMany({
+  const enrollments = await prisma.studentSession.findMany({
     where,
     select: {
-      userId: true,
-      name: true,
-      admissionNo: true,
       rollNumber: true,
       class: { select: { className: true } },
       section: { select: { name: true } },
-      user: {
+      student: {
         select: {
-          attendance: {
-            where: {
-              date: { gte: startDate, lte: endDate }
-            },
+          userId: true,
+          name: true,
+          admissionNo: true,
+          rollNumber: true,
+          user: {
             select: {
-              date: true,
-              status: true,
-              checkInTime: true,
-              checkOutTime: true,
-              workingHours: true
+              attendance: {
+                where: {
+                  date: { gte: startDate, lte: endDate }
+                },
+                select: {
+                  date: true,
+                  status: true,
+                  checkInTime: true,
+                  checkOutTime: true,
+                  workingHours: true
+                }
+              }
             }
           }
         }
@@ -265,6 +296,12 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
   });
 
   // Batch fetch streaks
+  const students = enrollments.map((enrollment) => ({
+    ...enrollment.student,
+    rollNumber: enrollment.rollNumber || enrollment.student.rollNumber,
+    class: enrollment.class,
+    section: enrollment.section,
+  }));
   const studentIds = students.map((s) => s.userId);
   const streaks = await batchCalculateStreak(studentIds, schoolId);
 

@@ -14,50 +14,61 @@ export const GET = withSchoolAccess(async function GET(req, props) {
   }
 
   try {
-    // Query students by classId - students may not have academicYearId set directly
-    // They inherit the year via their class assignment
-    const students = await prisma.student.findMany({
+    const enrollments = await prisma.studentSession.findMany({
       where: {
-        schoolId,
+        academicYearId,
         classId,
-        isAlumni: false, // Only active students
-        DateOfLeaving: null // Exclude students who have left
+        status: "ACTIVE",
+        enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ["ALUMNI", "TC", "LEFT", "DROPPED", "ARCHIVED"] },
+          isAlumni: false,
+          DateOfLeaving: null,
+          user: { deletedAt: null },
+        },
       },
       include: {
-        examResults: {
-          where: {
-            exam: {
-              academicYearId: academicYearId,
-              isFinalExam: true
-            }
-          },
-          include: {
-            exam: {
-              select: {
-                title: true,
-                type: true
-              }
-            },
-            subject: {
-              select: {
-                subjectName: true
-              }
-            }
-          }
-        },
         section: {
           select: {
+            id: true,
             name: true
           }
+        },
+        student: {
+          include: {
+            examResults: {
+              where: {
+                exam: {
+                  academicYearId,
+                  isFinalExam: true
+                }
+              },
+              include: {
+                exam: {
+                  select: {
+                    title: true,
+                    type: true
+                  }
+                },
+                subject: {
+                  select: {
+                    subjectName: true
+                  }
+                }
+              }
+            }
+          },
         }
       },
       orderBy: {
-        name: 'asc'
+        student: { name: 'asc' }
       }
     });
 
     // Process students to add recommended action
-    const studentsWithStats = students.map((student) => {
+    const studentsWithStats = enrollments.map((enrollment) => {
+      const student = enrollment.student;
       let totalMarks = 0;
       let passedExams = 0;
       let totalExams = 0;
@@ -82,10 +93,14 @@ export const GET = withSchoolAccess(async function GET(req, props) {
 
       return {
         id: student.userId,
+        enrollmentId: enrollment.id,
         name: student.name,
         admissionNo: student.admissionNo,
-        rollNumber: student.rollNumber,
-        sectionName: student.section?.name,
+        rollNumber: enrollment.rollNumber || student.rollNumber,
+        sectionId: enrollment.sectionId,
+        sectionName: enrollment.section?.name,
+        classId: enrollment.classId,
+        academicYearId: enrollment.academicYearId,
         examStats: {
           totalMarks,
           examCount: Object.keys(examMap).length,

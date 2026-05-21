@@ -26,6 +26,17 @@ export const GET = withSchoolAccess(async function GET(req) {
         schoolId,
         academicYearId,
         status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ["ALUMNI", "TC", "LEFT", "DROPPED", "ARCHIVED"] },
+          sessions: {
+            some: {
+              academicYearId,
+              status: "ACTIVE",
+              enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+            },
+          },
+        },
         installments: {
           some: {
             isOverdue: true,

@@ -13,8 +13,7 @@ export const POST = withSchoolAccess(async function POST(request, props) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Parallel fetch: Exam, Template, Students
-    const [exam, template, students] = await Promise.all([
+    const [exam, template] = await Promise.all([
     prisma.exam.findUnique({
       where: { id: examId },
       include: {
@@ -31,24 +30,42 @@ export const POST = withSchoolAccess(async function POST(request, props) {
     }),
     prisma.documentTemplate.findFirst({
       where: { id: templateId, schoolId, templateType: 'admitcard' }
-    }),
-    prisma.student.findMany({
-      where: {
-        schoolId,
-        classId: parseInt(classId),
-        ...(sectionId && sectionId !== 'ALL' && sectionId !== '' && { sectionId: parseInt(sectionId) })
-      },
-      include: {
-        class: true,
-        section: true,
-        user: { select: { profilePicture: true } }
-      },
-      orderBy: { rollNumber: 'asc' }
     })]
     );
 
     if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+
+    const enrollments = await prisma.studentSession.findMany({
+      where: {
+        academicYearId: exam.academicYearId,
+        classId: parseInt(classId),
+        ...(sectionId && sectionId !== 'ALL' && sectionId !== '' && { sectionId: parseInt(sectionId) }),
+        status: 'ACTIVE',
+        enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+        }
+      },
+      include: {
+        class: true,
+        section: true,
+        student: {
+          include: {
+            user: { select: { profilePicture: true } }
+          }
+        }
+      },
+      orderBy: { rollNumber: 'asc' }
+    });
+
+    const students = enrollments.map((enrollment) => ({
+      ...enrollment.student,
+      rollNumber: enrollment.rollNumber || enrollment.student.rollNumber,
+      class: enrollment.class,
+      section: enrollment.section,
+    }));
 
     // Filter by fee payment if feePaidMonth is specified
     let filteredStudents = students;

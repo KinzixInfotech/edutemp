@@ -415,6 +415,29 @@ export const GET = withSchoolAccess(async function GET(req, props) {
 
     // Fetch payment settings for this school
     const schoolId = student?.schoolId || studentFee?.student?.schoolId;
+    const activeEnrollment = schoolId ? await prisma.studentSession.findFirst({
+      where: {
+        studentId,
+        academicYearId,
+        status: "ACTIVE",
+        enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ["ALUMNI", "TC", "LEFT", "DROPPED", "ARCHIVED"] },
+        },
+      },
+      include: {
+        class: { select: { className: true } },
+        section: { select: { name: true } },
+      },
+    }) : null;
+
+    if (!activeEnrollment) {
+      return NextResponse.json({
+        error: "Student is not enrolled in this academic session. Fee details and ledger actions are blocked.",
+        code: "OPERATIONAL_ENROLLMENT_REQUIRED",
+      }, { status: 400 });
+    }
 
     let feeSettings = null;
     let schoolPaymentSettings = null;

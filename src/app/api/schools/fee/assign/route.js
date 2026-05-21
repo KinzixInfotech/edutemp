@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma';
 import redis from '@/lib/redis';
 import qstash from '@/lib/qstash';
 import { studentMissingJoiningDate } from '@/lib/student-profile-status';
+import { getOperationalEnrollmentMap } from '@/lib/enrollment/session-enrollment';
 
 // ── Job helpers (exported so worker + status routes can import) ─
 const JOB_TTL = 60 * 60 * 2; // 2 hours
@@ -50,20 +51,33 @@ export const POST = withSchoolAccess(async function POST(req) {
     let targetIds = studentIds || [];
 
     if (applyToClass && classId) {
-      const students = await prisma.student.findMany({
+      const enrollments = await prisma.studentSession.findMany({
         where: {
-          schoolId,
+          academicYearId,
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
           classId: parseInt(classId),
-          ...(sectionId && sectionId !== 'all' && { sectionId: parseInt(sectionId) })
+          ...(sectionId && sectionId !== 'all' && { sectionId: parseInt(sectionId) }),
+          student: {
+            schoolId,
+            lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+            user: { deletedAt: null }
+          }
         },
-        select: { userId: true }
+        select: { studentId: true }
       });
-      targetIds = students.map((s) => s.userId);
+      targetIds = enrollments.map((enrollment) => enrollment.studentId);
     }
 
     if (!targetIds.length) {
       return NextResponse.json({ error: 'No students to assign' }, { status: 400 });
     }
+
+    const operationalEnrollmentMap = await getOperationalEnrollmentMap({
+      schoolId,
+      academicYearId,
+      studentIds: targetIds,
+    });
 
     const targetStudents = await prisma.student.findMany({
       where: { userId: { in: targetIds }, schoolId },
@@ -78,6 +92,14 @@ export const POST = withSchoolAccess(async function POST(req) {
         section: { select: { name: true } }
       }
     });
+    const inactiveOrHistoricalIds = targetIds.filter((id) => !operationalEnrollmentMap.has(id));
+    if (inactiveOrHistoricalIds.length) {
+      return NextResponse.json({
+        error: `${inactiveOrHistoricalIds.length} student(s) are not enrolled in this academic session. Fee assignment is blocked for historical/global-only students.`,
+        code: 'OPERATIONAL_ENROLLMENT_REQUIRED',
+        blockedStudentIds: inactiveOrHistoricalIds
+      }, { status: 400 });
+    }
     const targetStudentMap = new Map(targetStudents.map((student) => [student.userId, student]));
     const missingJoiningDateStudents = targetStudents.filter(studentMissingJoiningDate);
 

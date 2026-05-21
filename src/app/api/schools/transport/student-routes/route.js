@@ -10,6 +10,7 @@ import { withSchoolAccess } from "@/lib/api-auth";
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { assertOperationalStudentsForYear, resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
 
 export const GET = withSchoolAccess(async function GET(req) {
   const { searchParams } = new URL(req.url);
@@ -25,9 +26,24 @@ export const GET = withSchoolAccess(async function GET(req) {
   }
 
   try {
+    const activeYear = await resolveActiveAcademicYear(schoolId, searchParams.get('academicYearId'));
     const where = { schoolId };
     if (studentId) where.studentId = studentId;
     if (routeId) where.routeId = routeId;
+    if (activeYear) {
+      where.academicYearId = activeYear.id;
+      where.student = {
+        schoolId,
+        lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+        sessions: {
+          some: {
+            academicYearId: activeYear.id,
+            status: 'ACTIVE',
+            enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+          },
+        },
+      };
+    }
 
     const [assignments, total] = await Promise.all([
     prisma.studentRouteAssignment.findMany({
@@ -82,6 +98,25 @@ export const POST = withSchoolAccess(async function POST(req) {
         select: { id: true }
       });
       if (activeYear) data.academicYearId = activeYear.id;
+    }
+
+    if (!data.studentId || !data.schoolId || !data.routeId || !data.academicYearId) {
+      return NextResponse.json({ error: 'studentId, schoolId, routeId, and academicYearId are required' }, { status: 400 });
+    }
+
+    try {
+      await assertOperationalStudentsForYear({
+        schoolId: data.schoolId,
+        academicYearId: data.academicYearId,
+        studentIds: [data.studentId],
+        moduleName: 'assigning transport route',
+      });
+    } catch (error) {
+      return NextResponse.json({
+        error: error.message,
+        code: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED',
+        blockedStudentIds: error.blockedStudentIds || [],
+      }, { status: 400 });
     }
 
     const assignment = await prisma.studentRouteAssignment.create({

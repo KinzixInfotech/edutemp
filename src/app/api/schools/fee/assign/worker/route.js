@@ -9,6 +9,7 @@ import prisma from '@/lib/prisma';
 import { getJob, updateJob } from '../route';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 import { assertStudentHasJoiningDate } from '@/lib/student-profile-status';
+import { assertOperationalStudentsForYear } from '@/lib/enrollment/session-enrollment';
 
 const CHUNK_SIZE = 25;
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -197,6 +198,14 @@ async function assignFeeToStudent({ studentId, structure, academicYearId, school
     });
 
     if (!student) throw new Error('Student not found');
+    await assertOperationalStudentsForYear({
+      schoolId,
+      academicYearId,
+      studentIds: [studentId],
+      moduleName: 'assigning fee structure',
+      requireJoiningDate: true,
+      db: tx,
+    });
     assertStudentHasJoiningDate(student, 'assigning fee structure');
 
     const studentFee = await tx.studentFee.create({

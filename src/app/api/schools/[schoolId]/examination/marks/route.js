@@ -24,22 +24,42 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     const cacheKey = generateKey('examination:marks', { schoolId, examId, classId, subjectId });
 
     const studentMarks = await remember(cacheKey, async () => {
-      // Fetch all students in the class
-      const students = await prisma.student.findMany({
+      const exam = await prisma.exam.findFirst({
+        where: { id: examId, schoolId },
+        select: { academicYearId: true },
+      });
+      if (!exam) return [];
+
+      const enrollments = await prisma.studentSession.findMany({
         where: {
-          schoolId,
-          classId: parseInt(classId)
+          academicYearId: exam.academicYearId,
+          classId: parseInt(classId),
+          status: "ACTIVE",
+          enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+          student: {
+            schoolId,
+            lifecycleStatus: { notIn: ["ALUMNI", "TC", "LEFT", "DROPPED", "ARCHIVED"] },
+          },
         },
         select: {
-          userId: true,
-          name: true,
           rollNumber: true,
-          admissionNo: true
+          student: {
+            select: {
+              userId: true,
+              name: true,
+              rollNumber: true,
+              admissionNo: true
+            }
+          }
         },
         orderBy: {
           rollNumber: 'asc'
         }
       });
+      const students = enrollments.map((enrollment) => ({
+        ...enrollment.student,
+        rollNumber: enrollment.rollNumber || enrollment.student.rollNumber
+      }));
 
       // Fetch existing marks
       const marks = await prisma.examResult.findMany({
@@ -89,6 +109,28 @@ export const POST = withSchoolAccess(async function POST(req, props) {
         { error: 'Invalid data provided' },
         { status: 400 }
       );
+    }
+
+    const exam = await prisma.exam.findFirst({
+      where: { id: examId, schoolId },
+      select: { academicYearId: true }
+    });
+    if (!exam) {
+      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+    }
+    const enrollmentCount = await prisma.studentSession.count({
+      where: {
+        academicYearId: exam.academicYearId,
+        status: "ACTIVE",
+        enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+        studentId: { in: marks.map((mark) => mark.studentId) },
+        student: { schoolId }
+      }
+    });
+    if (enrollmentCount !== new Set(marks.map((mark) => mark.studentId)).size) {
+      return NextResponse.json({
+        error: 'Marks can only be submitted for students enrolled in the exam academic session.'
+      }, { status: 400 });
     }
 
     // Use transaction for bulk update

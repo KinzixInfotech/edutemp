@@ -7,6 +7,14 @@ import { withSchoolAccess } from "@/lib/api-auth";
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
+
+function rangeWhere(startDate, endDate) {
+  return startDate || endDate ? {
+    ...(startDate ? { gte: startDate } : {}),
+    ...(endDate ? { lte: endDate } : {}),
+  } : undefined;
+}
 
 export const GET = withSchoolAccess(async function GET(req) {
   const { searchParams } = new URL(req.url);
@@ -20,12 +28,27 @@ export const GET = withSchoolAccess(async function GET(req) {
   }
 
   try {
+    const activeYear = await resolveActiveAcademicYear(schoolId, searchParams.get('academicYearId'));
+    const operationalStudentWhere = activeYear ? {
+      schoolId,
+      lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+      sessions: {
+        some: {
+          academicYearId: activeYear.id,
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+        },
+      },
+    } : { schoolId };
+
     let report;
     if (type === 'usage') {
       const assignments = await prisma.studentRouteAssignment.findMany({
         where: {
           schoolId,
-          assignedAt: { gte: startDate, lte: endDate }
+          ...(activeYear ? { academicYearId: activeYear.id } : {}),
+          ...(rangeWhere(startDate, endDate) ? { assignedAt: rangeWhere(startDate, endDate) } : {}),
+          student: operationalStudentWhere,
         },
         select: {
           route: { select: { name: true, vehicle: { select: { licensePlate: true } } } },
@@ -63,8 +86,11 @@ export const GET = withSchoolAccess(async function GET(req) {
         type: 'attendance',
         data: await prisma.attendance.findMany({
           where: {
-            user: { schoolId },
-            date: { gte: startDate, lte: endDate }
+            ...(rangeWhere(startDate, endDate) ? { date: rangeWhere(startDate, endDate) } : {}),
+            user: {
+              schoolId,
+              student: operationalStudentWhere,
+            },
           },
           select: {
             user: { select: { name: true } },

@@ -27,21 +27,37 @@ export const GET = withSchoolAccess(async function GET(req, props) {
       // Get all students from the exam's classes
       const classIds = exam.classes.map((c) => c.id);
 
-      const students = await prisma.student.findMany({
+      const enrollments = await prisma.studentSession.findMany({
         where: {
-          schoolId,
-          classId: { in: classIds }
+          academicYearId: exam.academicYearId,
+          classId: { in: classIds },
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+          student: {
+            schoolId,
+            lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+          },
         },
         include: {
-          user: { select: { id: true, name: true, email: true, profilePicture: true } },
           class: { select: { id: true, className: true } },
           section: { select: { id: true, name: true } },
-          studentFees: {
-            where: { academicYearId: exam.academicYearId },
-            select: { balanceAmount: true, paidAmount: true, finalAmount: true }
+          student: {
+            include: {
+              user: { select: { id: true, name: true, email: true, profilePicture: true } },
+              studentFees: {
+                where: { academicYearId: exam.academicYearId },
+                select: { balanceAmount: true, paidAmount: true, finalAmount: true }
+              }
+            }
           }
         }
       });
+      const students = enrollments.map((enrollment) => ({
+        ...enrollment.student,
+        rollNumber: enrollment.rollNumber || enrollment.student.rollNumber,
+        class: enrollment.class,
+        section: enrollment.section,
+      }));
 
       // Get existing hall tickets for this exam (using existing fields only)
       const existingTickets = await prisma.admitCard.findMany({

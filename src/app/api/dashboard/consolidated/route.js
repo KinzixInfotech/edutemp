@@ -94,7 +94,14 @@ export const GET = withSchoolAccess(async function GET(req) {
           user: { role: { name: 'NON_TEACHING_STAFF' } }
         }
       }),
-      prisma.student.count({ where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) } }),
+      academicYearId ? prisma.studentSession.count({
+        where: {
+          academicYearId,
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+          student: { schoolId, lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] } }
+        }
+      }) : prisma.student.count({ where: { schoolId, lifecycleStatus: 'ACTIVE' } }),
       prisma.user.count({ where: { schoolId, role: { name: 'TEACHING_STAFF' } } }),
       prisma.user.count({ where: { schoolId, role: { name: 'NON_TEACHING_STAFF' } } }),
 
@@ -115,6 +122,15 @@ export const GET = withSchoolAccess(async function GET(req) {
         where: {
           schoolId,
           academicYearId,
+          student: {
+            sessions: {
+              some: {
+                academicYearId,
+                status: 'ACTIVE',
+                enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] }
+              }
+            }
+          },
           balanceAmount: { gt: 0 }
         },
         _sum: { balanceAmount: true }
@@ -125,6 +141,15 @@ export const GET = withSchoolAccess(async function GET(req) {
         where: {
           schoolId,
           academicYearId,
+          student: {
+            sessions: {
+              some: {
+                academicYearId,
+                status: 'ACTIVE',
+                enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] }
+              }
+            }
+          },
           balanceAmount: { gt: 0 }
         }
       }) : Promise.resolve(0),
@@ -146,7 +171,19 @@ export const GET = withSchoolAccess(async function GET(req) {
 
       // ===== FEE STATS =====
       academicYearId ? (async () => {
-        const where = { schoolId, academicYearId };
+        const where = {
+          schoolId,
+          academicYearId,
+          student: {
+            sessions: {
+              some: {
+                academicYearId,
+                status: 'ACTIVE',
+                enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] }
+              }
+            }
+          }
+        };
         const [totalExpected, totalCollected, totalDiscount, totalBalance, recentPayments, monthlyCollection] = await Promise.all([
         prisma.studentFee.aggregate({ where, _sum: { originalAmount: true } }),
         prisma.studentFee.aggregate({ where, _sum: { paidAmount: true } }),

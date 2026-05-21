@@ -209,6 +209,104 @@ exports.Prisma.ImportHistoryScalarFieldEnum = {
   accountsFailed: 'accountsFailed'
 };
 
+exports.Prisma.ImportBatchScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  importHistoryId: 'importHistoryId',
+  academicYearId: 'academicYearId',
+  module: 'module',
+  importType: 'importType',
+  fileName: 'fileName',
+  sheetName: 'sheetName',
+  status: 'status',
+  totalRows: 'totalRows',
+  successfulRows: 'successfulRows',
+  failedRows: 'failedRows',
+  warningCount: 'warningCount',
+  missingJoiningDateCount: 'missingJoiningDateCount',
+  unresolvedEnrollmentCount: 'unresolvedEnrollmentCount',
+  rollbackStatus: 'rollbackStatus',
+  rollbackReport: 'rollbackReport',
+  rolledBackAt: 'rolledBackAt',
+  rolledBackBy: 'rolledBackBy',
+  createdBy: 'createdBy',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ImportBatchItemScalarFieldEnum = {
+  id: 'id',
+  batchId: 'batchId',
+  rowNumber: 'rowNumber',
+  module: 'module',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  action: 'action',
+  status: 'status',
+  sourceData: 'sourceData',
+  warnings: 'warnings',
+  errors: 'errors',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EnrollmentResolutionIssueScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  studentId: 'studentId',
+  importBatchId: 'importBatchId',
+  lastEnrollmentId: 'lastEnrollmentId',
+  activeAcademicYearId: 'activeAcademicYearId',
+  issueType: 'issueType',
+  category: 'category',
+  suggestedAction: 'suggestedAction',
+  confidence: 'confidence',
+  status: 'status',
+  resolutionAction: 'resolutionAction',
+  resolvedAt: 'resolvedAt',
+  resolvedBy: 'resolvedBy',
+  ignoredUntil: 'ignoredUntil',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PromotionBatchScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  fromAcademicYearId: 'fromAcademicYearId',
+  toAcademicYearId: 'toAcademicYearId',
+  promotedBy: 'promotedBy',
+  promotionType: 'promotionType',
+  options: 'options',
+  totalStudents: 'totalStudents',
+  promotedCount: 'promotedCount',
+  skippedCount: 'skippedCount',
+  failedCount: 'failedCount',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StudentLifecycleAuditLogScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  studentId: 'studentId',
+  enrollmentId: 'enrollmentId',
+  academicYearId: 'academicYearId',
+  importBatchId: 'importBatchId',
+  promotionBatchId: 'promotionBatchId',
+  actorId: 'actorId',
+  action: 'action',
+  entityType: 'entityType',
+  entityId: 'entityId',
+  oldValue: 'oldValue',
+  newValue: 'newValue',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.ContactSubmissionScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -707,6 +805,7 @@ exports.Prisma.StudentRouteAssignmentScalarFieldEnum = {
   routeId: 'routeId',
   schoolId: 'schoolId',
   academicYearId: 'academicYearId',
+  importBatchId: 'importBatchId',
   assignedAt: 'assignedAt'
 };
 
@@ -805,6 +904,7 @@ exports.Prisma.StudentStopAssignmentScalarFieldEnum = {
   studentId: 'studentId',
   stopId: 'stopId',
   routeId: 'routeId',
+  importBatchId: 'importBatchId',
   pickupStop: 'pickupStop',
   dropStop: 'dropStop',
   isActive: 'isActive',
@@ -860,6 +960,7 @@ exports.Prisma.StudentTransportFeeScalarFieldEnum = {
   id: 'id',
   studentId: 'studentId',
   transportFeeId: 'transportFeeId',
+  importBatchId: 'importBatchId',
   startDate: 'startDate',
   endDate: 'endDate',
   isActive: 'isActive',
@@ -1178,7 +1279,10 @@ exports.Prisma.StudentScalarFieldEnum = {
   academicYearId: 'academicYearId',
   currentSessionId: 'currentSessionId',
   isAlumni: 'isAlumni',
-  alumniConvertedAt: 'alumniConvertedAt'
+  alumniConvertedAt: 'alumniConvertedAt',
+  lifecycleStatus: 'lifecycleStatus',
+  importBatchId: 'importBatchId',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.FeeAssignmentHistoryScalarFieldEnum = {
@@ -1208,6 +1312,12 @@ exports.Prisma.StudentSessionScalarFieldEnum = {
   sectionId: 'sectionId',
   rollNumber: 'rollNumber',
   status: 'status',
+  enrollmentStatus: 'enrollmentStatus',
+  importBatchId: 'importBatchId',
+  promotedFromEnrollmentId: 'promotedFromEnrollmentId',
+  promotionBatchId: 'promotionBatchId',
+  promotionType: 'promotionType',
+  remarks: 'remarks',
   joinedAt: 'joinedAt',
   leftAt: 'leftAt'
 };
@@ -2291,6 +2401,7 @@ exports.Prisma.StudentFeeScalarFieldEnum = {
   schoolId: 'schoolId',
   academicYearId: 'academicYearId',
   globalFeeStructureId: 'globalFeeStructureId',
+  importBatchId: 'importBatchId',
   originalAmount: 'originalAmount',
   discountAmount: 'discountAmount',
   finalAmount: 'finalAmount',
@@ -2503,6 +2614,7 @@ exports.Prisma.StudentFeeLedgerScalarFieldEnum = {
   academicYearId: 'academicYearId',
   feeSessionId: 'feeSessionId',
   feeComponentId: 'feeComponentId',
+  importBatchId: 'importBatchId',
   month: 'month',
   monthLabel: 'monthLabel',
   originalAmount: 'originalAmount',
@@ -2664,6 +2776,8 @@ exports.Prisma.PromotionHistoryScalarFieldEnum = {
   promotedAt: 'promotedAt',
   promotedBy: 'promotedBy',
   batchId: 'batchId',
+  promotionBatchId: 'promotionBatchId',
+  importBatchId: 'importBatchId',
   isRolledBack: 'isRolledBack',
   rolledBackAt: 'rolledBackAt',
   rolledBackBy: 'rolledBackBy',
@@ -3699,6 +3813,36 @@ exports.SubscriptionAction = exports.$Enums.SubscriptionAction = {
   HANDOVER_COMPLETED: 'HANDOVER_COMPLETED'
 };
 
+exports.ImportBatchStatus = exports.$Enums.ImportBatchStatus = {
+  QUEUED: 'QUEUED',
+  RUNNING: 'RUNNING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+  ROLLBACK_PENDING: 'ROLLBACK_PENDING',
+  ROLLED_BACK: 'ROLLED_BACK',
+  PARTIAL_ROLLBACK: 'PARTIAL_ROLLBACK',
+  ROLLBACK_BLOCKED: 'ROLLBACK_BLOCKED'
+};
+
+exports.ImportBatchItemStatus = exports.$Enums.ImportBatchItemStatus = {
+  CREATED: 'CREATED',
+  UPDATED: 'UPDATED',
+  SKIPPED: 'SKIPPED',
+  WARNING: 'WARNING',
+  FAILED: 'FAILED',
+  ROLLED_BACK: 'ROLLED_BACK',
+  ROLLBACK_BLOCKED: 'ROLLBACK_BLOCKED'
+};
+
+exports.EnrollmentResolutionStatus = exports.$Enums.EnrollmentResolutionStatus = {
+  OPEN: 'OPEN',
+  IN_REVIEW: 'IN_REVIEW',
+  RESOLVED: 'RESOLVED',
+  IGNORED: 'IGNORED',
+  DISMISSED: 'DISMISSED'
+};
+
 exports.ContactSubmissionStatus = exports.$Enums.ContactSubmissionStatus = {
   NEW: 'NEW',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -3838,6 +3982,15 @@ exports.StudentReligion = exports.$Enums.StudentReligion = {
   PREFER_NOT_TO_SAY: 'PREFER_NOT_TO_SAY'
 };
 
+exports.StudentLifecycleStatus = exports.$Enums.StudentLifecycleStatus = {
+  ACTIVE: 'ACTIVE',
+  ALUMNI: 'ALUMNI',
+  TC: 'TC',
+  LEFT: 'LEFT',
+  DROPPED: 'DROPPED',
+  ARCHIVED: 'ARCHIVED'
+};
+
 exports.SessionStatus = exports.$Enums.SessionStatus = {
   ACTIVE: 'ACTIVE',
   PROMOTED: 'PROMOTED',
@@ -3845,6 +3998,18 @@ exports.SessionStatus = exports.$Enums.SessionStatus = {
   ALUMNI: 'ALUMNI',
   DROPOUT: 'DROPOUT',
   TRANSFERRED: 'TRANSFERRED'
+};
+
+exports.EnrollmentStatus = exports.$Enums.EnrollmentStatus = {
+  ENROLLED: 'ENROLLED',
+  PROMOTED: 'PROMOTED',
+  COMPLETED: 'COMPLETED',
+  WITHDRAWN: 'WITHDRAWN',
+  TC_ISSUED: 'TC_ISSUED',
+  LEFT: 'LEFT',
+  DROPPED: 'DROPPED',
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  IGNORED: 'IGNORED'
 };
 
 exports.ParentRelationType = exports.$Enums.ParentRelationType = {
@@ -4443,6 +4608,11 @@ exports.Prisma.ModelName = {
   SchoolSubscription: 'SchoolSubscription',
   SubscriptionAuditLog: 'SubscriptionAuditLog',
   ImportHistory: 'ImportHistory',
+  ImportBatch: 'ImportBatch',
+  ImportBatchItem: 'ImportBatchItem',
+  EnrollmentResolutionIssue: 'EnrollmentResolutionIssue',
+  PromotionBatch: 'PromotionBatch',
+  StudentLifecycleAuditLog: 'StudentLifecycleAuditLog',
   ContactSubmission: 'ContactSubmission',
   SchoolPublicProfile: 'SchoolPublicProfile',
   SchoolAchievement: 'SchoolAchievement',

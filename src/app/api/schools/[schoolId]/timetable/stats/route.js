@@ -7,28 +7,38 @@ export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
   try {
     const { schoolId } = params;
+    const { searchParams } = new URL(req.url);
+    let academicYearId = searchParams.get('academicYearId');
+    if (!academicYearId) {
+      const activeYear = await prisma.academicYear.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true }
+      });
+      academicYearId = activeYear?.id;
+    }
+    const entryWhere = { schoolId, isActive: true, ...(academicYearId && { academicYearId }) };
 
     // Total entries
     const totalEntries = await prisma.timetableEntry.count({
-      where: { schoolId, isActive: true }
+      where: entryWhere
     });
 
     // Total unique classes with timetables
     const classesWithEntries = await prisma.timetableEntry.groupBy({
       by: ['classId'],
-      where: { schoolId, isActive: true }
+      where: entryWhere
     });
 
     // Total unique teachers assigned
     const teachersWithEntries = await prisma.timetableEntry.groupBy({
       by: ['teacherId'],
-      where: { schoolId, isActive: true }
+      where: entryWhere
     });
 
     // Teacher workload (count of periods per teacher)
     const teacherWorkload = await prisma.timetableEntry.groupBy({
       by: ['teacherId'],
-      where: { schoolId, isActive: true },
+      where: entryWhere,
       _count: { id: true }
     });
 
@@ -50,7 +60,7 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     // Subject distribution
     const subjectDistribution = await prisma.timetableEntry.groupBy({
       by: ['subjectId'],
-      where: { schoolId, isActive: true },
+      where: entryWhere,
       _count: { id: true }
     });
 
@@ -72,7 +82,7 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     // Class-wise period count
     const classwisePeriods = await prisma.timetableEntry.groupBy({
       by: ['classId'],
-      where: { schoolId, isActive: true },
+      where: entryWhere,
       _count: { id: true }
     });
 

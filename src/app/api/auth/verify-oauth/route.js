@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { enforceSchoolStateAccess } from "@/lib/school-account-state";
+import { getSchoolFeatureStateFromSchool } from "@/lib/school-feature-access";
 
 /**
  * POST /api/auth/verify-oauth
@@ -72,6 +73,9 @@ export async function POST(req) {
 
             // Fetch role-specific data
             response = await enrichUserByRole(response, prismaUser);
+            if (response.school) {
+                response.schoolFeatureAccess = getSchoolFeatureStateFromSchool(response.school);
+            }
 
             if (response.schoolId) {
                 const schoolAccess = await enforceSchoolStateAccess({

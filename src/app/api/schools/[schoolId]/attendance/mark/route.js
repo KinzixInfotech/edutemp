@@ -22,6 +22,7 @@ import { getTeacherShiftAttendanceWindow } from '@/lib/attendance/shifts';
 import { getLocationSecuritySignals } from '@/lib/attendance/security';
 import { createAttendanceAuditLog } from '@/lib/attendance/audit';
 import { getPayrollConfigForSchool } from '@/lib/payroll/config';
+import { assertOperationalStudentsForYear } from '@/lib/enrollment/session-enrollment';
 
 function logAttendanceDebug(stage, payload) {
   console.log(`[attendance/mark] ${stage}`, payload);
@@ -128,6 +129,38 @@ async function enqueueAttendancePostProcessing(payload) {
       return NextResponse.json({
         error: 'Attendance config not found. Please set up attendance settings first.'
       }, { status: 404 });
+    }
+
+    const studentProfile = await prisma.student.findFirst({
+      where: { userId, schoolId },
+      select: { userId: true },
+    });
+    if (studentProfile) {
+      if (!activeAcademicYear?.id) {
+        return NextResponse.json({
+          error: 'No active academic year found. Student attendance requires an active session.'
+        }, { status: 400 });
+      }
+      try {
+        await assertOperationalStudentsForYear({
+          schoolId,
+          academicYearId: activeAcademicYear.id,
+          studentIds: [userId],
+          moduleName: 'marking attendance',
+        });
+      } catch (error) {
+        await createAttendanceAuditLog({
+          userId,
+          schoolId,
+          action: `${type}_BLOCKED_NO_ACTIVE_ENROLLMENT`,
+          payload: { academicYearId: activeAcademicYear.id, submissionMode },
+          error: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED'
+        });
+        return NextResponse.json({
+          error: 'Student is not actively enrolled in the current academic session. Attendance is blocked.',
+          code: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED'
+        }, { status: 400 });
+      }
     }
 
     const timezone = getSchoolTimezone(school);

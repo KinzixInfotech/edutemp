@@ -5,6 +5,19 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+function activeEnrollmentStudentWhere(academicYearId, extra = {}) {
+    return {
+        ...extra,
+        sessions: {
+            some: {
+                academicYearId,
+                status: "ACTIVE",
+                enrollmentStatus: { in: ["ENROLLED", "PENDING_VERIFICATION"] },
+            },
+        },
+    };
+}
+
 export async function POST_SEND_REMINDERS(req) {
     try {
         const body = await req.json();
@@ -38,6 +51,7 @@ export async function POST_SEND_REMINDERS(req) {
                     studentFee: {
                         schoolId,
                         academicYearId,
+                        student: activeEnrollmentStudentWhere(academicYearId),
                     },
                     status: "PENDING",
                     dueDate: {
@@ -76,6 +90,7 @@ export async function POST_SEND_REMINDERS(req) {
                 where: {
                     schoolId,
                     academicYearId,
+                    student: activeEnrollmentStudentWhere(academicYearId),
                     status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
                     installments: {
                         some: {
@@ -116,6 +131,7 @@ export async function POST_SEND_REMINDERS(req) {
                 where: {
                     userId: { in: targetStudents },
                     schoolId,
+                    ...activeEnrollmentStudentWhere(academicYearId),
                 },
                 include: {
                     studentFees: {

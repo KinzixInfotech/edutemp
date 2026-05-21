@@ -6,6 +6,7 @@ import { withSchoolAccess } from "@/lib/api-auth"; // app/api/schools/transport/
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { generateKey, remember, invalidatePattern } from '@/lib/cache';
+import { assertOperationalStudentsForYear, resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
 
 const CACHE_TTL = 120; // 2 minutes
 export const GET = withSchoolAccess(async function GET(req) {
@@ -91,6 +92,25 @@ export const POST = withSchoolAccess(async function POST(req) {
     });
     if (!studentFee) {
       return NextResponse.json({ error: 'Student transport fee not found' }, { status: 404 });
+    }
+    const activeYear = await resolveActiveAcademicYear(studentFee.transportFee.schoolId, data.academicYearId || null);
+    if (!activeYear) {
+      return NextResponse.json({ error: 'No active academic year found for transport fee payment.' }, { status: 400 });
+    }
+    try {
+      await assertOperationalStudentsForYear({
+        schoolId: studentFee.transportFee.schoolId,
+        academicYearId: activeYear.id,
+        studentIds: [studentFee.studentId],
+        moduleName: 'recording transport fee payment',
+        requireJoiningDate: true,
+      });
+    } catch (error) {
+      return NextResponse.json({
+        error: error.message,
+        code: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED',
+        blockedStudentIds: error.blockedStudentIds || [],
+      }, { status: 400 });
     }
 
     const payment = await prisma.transportFeePayment.create({

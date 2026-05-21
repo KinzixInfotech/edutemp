@@ -2,15 +2,67 @@ import { withSchoolAccess } from "@/lib/api-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export const POST = withSchoolAccess(async function POST(req, props) {
-  const params = await props.params;
-  const { schoolId } = params;
-  const body = await req.json();
-  const { promotions, fromYearId, toYearId, promotedBy } = body;
-  // promotions: [{ studentId, toClassId, toSectionId, status, remarks }]
+const PROMOTION_STATUSES = new Set(["PROMOTED", "CONDITIONAL", "DETAINED", "GRADUATE"]);
 
-  // ========== VALIDATION ==========
-  if (!promotions || !Array.isArray(promotions) || promotions.length === 0) {
+function normalizePromotion(promo) {
+  return {
+    studentId: promo.studentId,
+    enrollmentId: promo.enrollmentId || null,
+    toClassId: promo.toClassId ? Number(promo.toClassId) : null,
+    toSectionId: promo.toSectionId ? Number(promo.toSectionId) : null,
+    status: String(promo.status || "PROMOTED").toUpperCase(),
+    remarks: promo.remarks?.trim() || null,
+  };
+}
+
+function getTargetForPromotion({ promo, sourceEnrollment }) {
+  if (promo.status === "GRADUATE") {
+    return {
+      classId: sourceEnrollment.classId,
+      sectionId: sourceEnrollment.sectionId,
+      createEnrollment: false,
+      enrollmentStatus: "COMPLETED",
+      sourceSessionStatus: "ALUMNI",
+      promotionType: "GRADUATE",
+    };
+  }
+
+  if (promo.status === "DETAINED") {
+    return {
+      classId: sourceEnrollment.classId,
+      sectionId: promo.toSectionId || sourceEnrollment.sectionId,
+      createEnrollment: true,
+      enrollmentStatus: "ENROLLED",
+      sourceSessionStatus: "DETAINED",
+      promotionType: "DETAINED",
+    };
+  }
+
+  return {
+    classId: promo.toClassId,
+    sectionId: promo.toSectionId,
+    createEnrollment: true,
+    enrollmentStatus: "ENROLLED",
+    sourceSessionStatus: "PROMOTED",
+    promotionType: promo.status === "CONDITIONAL" ? "CONDITIONAL" : "REGULAR",
+  };
+}
+
+export const POST = withSchoolAccess(async function POST(req, props) {
+  const { schoolId } = await props.params;
+  const body = await req.json().catch(() => ({}));
+  const {
+    promotions: rawPromotions,
+    fromYearId,
+    toYearId,
+    promotedBy,
+    preview = false,
+    options = {},
+  } = body;
+
+  const promotions = Array.isArray(rawPromotions) ? rawPromotions.map(normalizePromotion) : [];
+
+  if (!promotions.length) {
     return NextResponse.json({ error: "No students selected for promotion" }, { status: 400 });
   }
   if (!fromYearId || !toYearId) {
@@ -23,259 +75,298 @@ export const POST = withSchoolAccess(async function POST(req, props) {
     return NextResponse.json({ error: "Source and target academic years must be different" }, { status: 400 });
   }
 
+  const invalidStatus = promotions.find((promo) => !PROMOTION_STATUSES.has(promo.status));
+  if (invalidStatus) {
+    return NextResponse.json({ error: `Invalid promotion status: ${invalidStatus.status}` }, { status: 400 });
+  }
+
   try {
-    // Validate year order (source must be before target)
     const [fromYear, toYear] = await Promise.all([
-    prisma.academicYear.findUnique({ where: { id: fromYearId } }),
-    prisma.academicYear.findUnique({ where: { id: toYearId } })]
-    );
+      prisma.academicYear.findFirst({ where: { id: fromYearId, schoolId } }),
+      prisma.academicYear.findFirst({ where: { id: toYearId, schoolId } }),
+    ]);
 
     if (!fromYear || !toYear) {
       return NextResponse.json({ error: "Invalid academic year(s)" }, { status: 400 });
     }
 
     if (new Date(fromYear.startDate) >= new Date(toYear.startDate)) {
-      return NextResponse.json({
-        error: "Cannot promote backwards. Source year must be before target year."
-      }, { status: 400 });
+      return NextResponse.json({ error: "Cannot promote backwards. Source year must be before target year." }, { status: 400 });
     }
 
-    // Check for duplicate promotions (students already in target year)
-    const studentIds = promotions.map((p) => p.studentId);
-    const existingPromotions = await prisma.promotionHistory.findMany({
+    const studentIds = [...new Set(promotions.map((promo) => promo.studentId).filter(Boolean))];
+    const sourceEnrollments = await prisma.studentSession.findMany({
       where: {
         studentId: { in: studentIds },
-        toYearId: toYearId,
-        isRolledBack: false
+        academicYearId: fromYearId,
+        status: "ACTIVE",
+        student: { schoolId },
+      },
+      include: {
+        student: true,
+        class: { select: { id: true, className: true } },
+        section: { select: { id: true, name: true } },
+      },
+    });
+    const sourceByStudent = new Map(sourceEnrollments.map((enrollment) => [enrollment.studentId, enrollment]));
+
+    const targetClassIds = [...new Set(promotions.map((promo) => {
+      const source = sourceByStudent.get(promo.studentId);
+      return source ? getTargetForPromotion({ promo, sourceEnrollment: source }).classId : promo.toClassId;
+    }).filter(Boolean))];
+    const targetSectionIds = [...new Set(promotions.map((promo) => {
+      const source = sourceByStudent.get(promo.studentId);
+      return source ? getTargetForPromotion({ promo, sourceEnrollment: source }).sectionId : promo.toSectionId;
+    }).filter(Boolean))];
+
+    const [classes, sections, existingTargetEnrollments] = await Promise.all([
+      targetClassIds.length ? prisma.class.findMany({ where: { id: { in: targetClassIds }, schoolId } }) : [],
+      targetSectionIds.length ? prisma.section.findMany({ where: { id: { in: targetSectionIds }, class: { schoolId } } }) : [],
+      prisma.studentSession.findMany({
+        where: {
+          studentId: { in: studentIds },
+          academicYearId: toYearId,
+        },
+        select: { studentId: true, id: true },
+      }),
+    ]);
+    const classIds = new Set(classes.map((item) => item.id));
+    const sectionIds = new Set(sections.map((item) => item.id));
+    const alreadyInTarget = new Set(existingTargetEnrollments.map((item) => item.studentId));
+
+    const rows = promotions.map((promo) => {
+      const sourceEnrollment = sourceByStudent.get(promo.studentId);
+      if (!sourceEnrollment) {
+        return { ...promo, valid: false, error: "No active source enrollment found for selected source session." };
       }
+
+      const target = getTargetForPromotion({ promo, sourceEnrollment });
+      if (target.createEnrollment && (!target.classId || !target.sectionId)) {
+        return { ...promo, valid: false, name: sourceEnrollment.student.name, error: "Target class and section are required." };
+      }
+      if (target.classId && !classIds.has(target.classId)) {
+        return { ...promo, valid: false, name: sourceEnrollment.student.name, error: "Target class is invalid." };
+      }
+      if (target.sectionId && !sectionIds.has(target.sectionId)) {
+        return { ...promo, valid: false, name: sourceEnrollment.student.name, error: "Target section is invalid." };
+      }
+      if (alreadyInTarget.has(promo.studentId)) {
+        return { ...promo, valid: false, name: sourceEnrollment.student.name, error: `Student already has enrollment in ${toYear.name}.` };
+      }
+      if (promo.status === "CONDITIONAL" && !promo.remarks) {
+        return { ...promo, valid: false, name: sourceEnrollment.student.name, error: "Conditional promotion requires remarks." };
+      }
+
+      return {
+        ...promo,
+        valid: true,
+        name: sourceEnrollment.student.name,
+        admissionNo: sourceEnrollment.student.admissionNo,
+        fromClassName: sourceEnrollment.class?.className || null,
+        fromSectionName: sourceEnrollment.section?.name || null,
+        target,
+      };
     });
 
-    if (existingPromotions.length > 0) {
-      const alreadyPromoted = existingPromotions.map((p) => p.studentId);
+    const invalidRows = rows.filter((row) => !row.valid);
+    if (preview) {
       return NextResponse.json({
-        error: `${existingPromotions.length} student(s) have already been promoted to ${toYear.name}`,
-        alreadyPromotedIds: alreadyPromoted
+        preview: true,
+        total: rows.length,
+        valid: rows.length - invalidRows.length,
+        invalid: invalidRows.length,
+        rows,
+      });
+    }
+
+    if (invalidRows.length) {
+      return NextResponse.json({
+        error: "Some promotions failed validation",
+        details: invalidRows.map((row) => ({ studentId: row.studentId, name: row.name, error: row.error })),
       }, { status: 400 });
     }
 
-    // Validate target classes and sections exist (filter out null for Class 12 graduation)
-    const targetClassIds = [...new Set(promotions.map((p) => p.toClassId).filter(Boolean))];
-    const targetSectionIds = [...new Set(promotions.map((p) => p.toSectionId).filter(Boolean))];
+    const result = await prisma.$transaction(async (tx) => {
+      const promotionBatch = await tx.promotionBatch.create({
+        data: {
+          schoolId,
+          fromAcademicYearId: fromYearId,
+          toAcademicYearId: toYearId,
+          promotedBy,
+          promotionType: options.promotionType || "REGULAR",
+          options,
+          totalStudents: rows.length,
+          status: "RUNNING",
+        },
+      });
 
-    const [validClasses, validSections] = await Promise.all([
-    targetClassIds.length > 0 ? prisma.class.findMany({ where: { id: { in: targetClassIds }, schoolId } }) : [],
-    targetSectionIds.length > 0 ? prisma.section.findMany({ where: { id: { in: targetSectionIds }, schoolId } }) : []]
-    );
-
-    if (validClasses.length !== targetClassIds.length) {
-      return NextResponse.json({ error: "One or more target classes are invalid" }, { status: 400 });
-    }
-    if (validSections.length !== targetSectionIds.length) {
-      return NextResponse.json({ error: "One or more target sections are invalid" }, { status: 400 });
-    }
-
-    // ========== EXECUTE PROMOTION ==========
-    const batchId = crypto.randomUUID(); // Group this batch of promotions
-
-    const results = await prisma.$transaction(async (tx) => {
       const updates = [];
-      const errors = [];
+      const now = new Date();
 
-      for (const promo of promotions) {
-        const { studentId, toClassId, toSectionId, status, remarks } = promo;
+      for (const row of rows) {
+        const sourceEnrollment = sourceByStudent.get(row.studentId);
+        const target = row.target;
+        let newEnrollment = null;
 
-        if (!toSectionId) {
-          errors.push({ studentId, error: "Target section is required" });
-          continue;
-        }
-
-        const currentStudent = await tx.student.findUnique({
-          where: { userId: studentId },
-          select: {
-            classId: true,
-            sectionId: true,
-            academicYearId: true,
-            name: true
-          }
+        await tx.studentSession.update({
+          where: { id: sourceEnrollment.id },
+          data: {
+            status: target.sourceSessionStatus,
+            enrollmentStatus: target.enrollmentStatus,
+            leftAt: now,
+            remarks: row.remarks || sourceEnrollment.remarks,
+          },
         });
 
-        if (!currentStudent) {
-          errors.push({ studentId, error: "Student not found" });
-          continue;
+        if (target.createEnrollment) {
+          newEnrollment = await tx.studentSession.create({
+            data: {
+              studentId: row.studentId,
+              academicYearId: toYearId,
+              classId: target.classId,
+              sectionId: target.sectionId,
+              rollNumber: options.generateRollNumbers ? null : sourceEnrollment.rollNumber,
+              status: "ACTIVE",
+              enrollmentStatus: "ENROLLED",
+              promotedFromEnrollmentId: sourceEnrollment.id,
+              promotionBatchId: promotionBatch.id,
+              promotionType: target.promotionType,
+              remarks: row.remarks,
+            },
+          });
+
+          if (toYear.isActive) {
+            await tx.student.update({
+              where: { userId: row.studentId },
+              data: {
+                currentSessionId: newEnrollment.id,
+                academicYearId: toYearId,
+                classId: target.classId,
+                sectionId: target.sectionId,
+                lifecycleStatus: "ACTIVE",
+                isAlumni: false,
+              },
+            });
+          }
+        } else {
+          await tx.student.update({
+            where: { userId: row.studentId },
+            data: {
+              lifecycleStatus: "ALUMNI",
+              isAlumni: true,
+              alumniConvertedAt: now,
+              DateOfLeaving: now,
+              currentSessionId: null,
+            },
+          });
+
+          await tx.alumni.upsert({
+            where: { originalStudentId: row.studentId },
+            update: {
+              lastClassId: sourceEnrollment.classId,
+              lastSectionId: sourceEnrollment.sectionId,
+              lastAcademicYear: fromYearId,
+              graduationYear: now.getFullYear(),
+              leavingDate: now,
+              leavingReason: "GRADUATED",
+            },
+            create: {
+              schoolId,
+              originalStudentId: row.studentId,
+              admissionNo: sourceEnrollment.student.admissionNo || "",
+              name: sourceEnrollment.student.name,
+              email: sourceEnrollment.student.email || "",
+              contactNumber: sourceEnrollment.student.contactNumber || "",
+              lastClassId: sourceEnrollment.classId,
+              lastSectionId: sourceEnrollment.sectionId,
+              lastAcademicYear: fromYearId,
+              graduationYear: now.getFullYear(),
+              leavingDate: now,
+              leavingReason: "GRADUATED",
+            },
+          });
         }
 
-        // Create Promotion History
         await tx.promotionHistory.create({
           data: {
-            studentId,
-            fromClassId: currentStudent.classId,
-            toClassId: toClassId,
-            fromSectionId: currentStudent.sectionId,
-            toSectionId: toSectionId,
-            fromYearId: fromYearId, // Use the passed fromYearId instead of potentially null academicYearId
-            toYearId: toYearId,
-            status,
-            remarks: remarks || null,
+            studentId: row.studentId,
+            fromClassId: sourceEnrollment.classId,
+            toClassId: target.classId,
+            fromSectionId: sourceEnrollment.sectionId,
+            toSectionId: target.sectionId,
+            fromYearId,
+            toYearId,
+            status: row.status,
+            remarks: row.remarks,
             promotedBy,
-            batchId
-          }
+            batchId: promotionBatch.id,
+            promotionBatchId: promotionBatch.id,
+          },
         });
 
-        // Handle different statuses
-        let updateData = {};
-
-        // Get source and target class details
-        const sourceClass = await tx.class.findUnique({ where: { id: currentStudent.classId } });
-        const targetClass = validClasses.find((c) => c.id === toClassId);
-
-        // Check if source is Class 12 (graduation case)
-        const isClass12 = sourceClass?.className === "12" || sourceClass?.className === "XII";
-        const targetClassName = targetClass?.className || "";
-        const isTargetClass13 = targetClassName === "13" || targetClassName === "XIII" || parseInt(targetClassName) > 12;
-
-        // Block promotion from Class 12 to Class 13+
-        if (isClass12 && status === "PROMOTED" && isTargetClass13) {
-          errors.push({
-            studentId,
-            name: currentStudent.name,
-            error: "Class 12 students cannot be promoted to Class 13. Use 'Graduate' instead."
-          });
-          continue;
-        }
-
-        // Handle GRADUATE status (Class 12 → Alumni)
-        if (status === "GRADUATE") {
-          // Create Alumni record
-          await tx.alumni.create({
-            data: {
-              schoolId,
-              originalStudentId: studentId,
-              admissionNo: currentStudent.admissionNo || "",
-              name: currentStudent.name,
-              email: currentStudent.email || "",
-              contactNumber: currentStudent.contactNumber || "",
-              lastClassId: currentStudent.classId,
-              lastSectionId: currentStudent.sectionId,
-              lastAcademicYear: fromYearId,
-              graduationYear: new Date().getFullYear(),
-              leavingDate: new Date(),
-              leavingReason: "GRADUATED"
-            }
-          });
-
-          // Mark student as alumni
-          updateData = {
-            academicYearId: toYearId,
-            isAlumni: true,
-            alumniConvertedAt: new Date(),
-            DateOfLeaving: new Date()
-          };
-        } else if (status === "PROMOTED" || status === "CONDITIONAL") {
-          // Normal promotion - move to new class/section/year
-          updateData = {
-            academicYearId: toYearId,
-            classId: toClassId,
-            sectionId: toSectionId
-          };
-        } else if (status === "DETAINED") {
-          // Keep same class but update year (they repeat the class)
-          updateData = {
-            academicYearId: toYearId
-            // classId and sectionId stay the same
-          };
-        }
-
-        // Update Student
-        const updatedStudent = await tx.student.update({
-          where: { userId: studentId },
-          data: updateData
-        });
-
-        // ── StudentSession lifecycle ──
-        // 1) Deactivate all ACTIVE sessions
-        await tx.studentSession.updateMany({
-          where: { studentId, status: 'ACTIVE' },
+        await tx.studentLifecycleAuditLog.create({
           data: {
-            status: status === 'GRADUATE' ? 'ALUMNI' : 'PROMOTED',
-            leftAt: new Date()
-          }
-        });
-
-        // 2) Create new StudentSession for target year (skip for graduates)
-        if (status !== 'GRADUATE') {
-          const newSession = await tx.studentSession.create({
-            data: {
-              studentId,
+            schoolId,
+            studentId: row.studentId,
+            enrollmentId: newEnrollment?.id || sourceEnrollment.id,
+            academicYearId: toYearId,
+            promotionBatchId: promotionBatch.id,
+            actorId: promotedBy,
+            action: `STUDENT_${row.status}`,
+            entityType: "StudentSession",
+            entityId: newEnrollment?.id || sourceEnrollment.id,
+            oldValue: {
+              enrollmentId: sourceEnrollment.id,
+              academicYearId: fromYearId,
+              classId: sourceEnrollment.classId,
+              sectionId: sourceEnrollment.sectionId,
+            },
+            newValue: {
+              enrollmentId: newEnrollment?.id || null,
               academicYearId: toYearId,
-              classId: status === 'DETAINED' ? currentStudent.classId : toClassId,
-              sectionId: status === 'DETAINED' ? currentStudent.sectionId ?? toSectionId : toSectionId,
-              rollNumber: null,
-              status: 'ACTIVE'
-            }
-          });
-
-          // 3) Update pointer
-          await tx.student.update({
-            where: { userId: studentId },
-            data: { currentSessionId: newSession.id }
-          });
-        } else {
-          // Graduate: clear pointer
-          await tx.student.update({
-            where: { userId: studentId },
-            data: { currentSessionId: null }
-          });
-        }
-
-        updates.push({
-          studentId,
-          name: currentStudent.name,
-          status,
-          isGraduated: isGraduation && status === "PROMOTED"
+              classId: target.classId,
+              sectionId: target.sectionId,
+              status: row.status,
+            },
+          },
         });
+
+        updates.push({ studentId: row.studentId, name: row.name, status: row.status, enrollmentId: newEnrollment?.id || null });
       }
 
-      if (errors.length > 0 && updates.length === 0) {
-        throw new Error(JSON.stringify({ errors }));
-      }
+      const summary = {
+        promoted: updates.filter((item) => item.status === "PROMOTED").length,
+        conditional: updates.filter((item) => item.status === "CONDITIONAL").length,
+        detained: updates.filter((item) => item.status === "DETAINED").length,
+        graduated: updates.filter((item) => item.status === "GRADUATE").length,
+      };
 
-      return { updates, errors };
-    });
+      await tx.promotionBatch.update({
+        where: { id: promotionBatch.id },
+        data: {
+          status: "COMPLETED",
+          promotedCount: updates.length,
+          skippedCount: 0,
+          failedCount: 0,
+          options: { ...options, summary },
+        },
+      });
 
-    // Summary
-    const summary = {
-      total: promotions.length,
-      promoted: results.updates.filter((u) => u.status === "PROMOTED").length,
-      detained: results.updates.filter((u) => u.status === "DETAINED").length,
-      conditional: results.updates.filter((u) => u.status === "CONDITIONAL").length,
-      graduated: results.updates.filter((u) => u.isGraduated).length,
-      errors: results.errors.length
-    };
+      return { promotionBatch, updates, summary };
+    }, { timeout: 60000, maxWait: 20000 });
 
     return NextResponse.json({
       message: "Promotions processed successfully",
-      count: results.updates.length,
-      summary,
-      batchId,
-      errors: results.errors.length > 0 ? results.errors : undefined
+      count: result.updates.length,
+      summary: {
+        total: promotions.length,
+        ...result.summary,
+        errors: 0,
+      },
+      batchId: result.promotionBatch.id,
     });
-
   } catch (error) {
     console.error("Error executing promotions:", error);
-
-    // Try to parse structured error
-    try {
-      const parsed = JSON.parse(error.message);
-      if (parsed.errors) {
-        return NextResponse.json({
-          error: "Some promotions failed",
-          details: parsed.errors
-        }, { status: 400 });
-      }
-    } catch {}
-
-    return NextResponse.json({
-      error: error.message || "Internal Server Error"
-    }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 });

@@ -48,6 +48,19 @@ export const GET = withSchoolAccess(async function GET(req) {
           user: { select: { profilePicture: true } },
           class: { select: { className: true } },
           section: { select: { name: true } },
+          sessions: {
+            where: {
+              academicYearId,
+              status: 'ACTIVE',
+              enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+            },
+            select: {
+              rollNumber: true,
+              class: { select: { className: true } },
+              section: { select: { name: true } },
+            },
+            take: 1,
+          },
           school: {
             select: {
               id: true, // Required for payment
@@ -98,6 +111,22 @@ export const GET = withSchoolAccess(async function GET(req) {
       if (!student) {
         return null;
       }
+      const activeEnrollment = student.sessions?.[0] || null;
+      if (!activeEnrollment) {
+        return {
+          student: {
+            userId: student.userId,
+            name: student.name,
+            admissionNo: student.admissionNo,
+            rollNumber: student.rollNumber,
+            profilePicture: student.user?.profilePicture,
+          },
+          school: student.school,
+          fee: null,
+          blocked: true,
+          message: 'This student is not enrolled in the selected academic session.'
+        };
+      }
 
       // Fetch fee settings for this school (including discount settings)
       const feeSettings = await prisma.feeSettings.findUnique({
@@ -145,12 +174,12 @@ export const GET = withSchoolAccess(async function GET(req) {
             userId: student.userId,
             name: student.name,
             admissionNo: student.admissionNo,
-            rollNumber: student.rollNumber,
+            rollNumber: activeEnrollment.rollNumber || student.rollNumber,
             profilePicture: student.user?.profilePicture,
             fatherName: student.FatherName,
             motherName: student.MotherName,
-            class: student.class?.className,
-            section: student.section?.name
+            class: activeEnrollment.class?.className || student.class?.className,
+            section: activeEnrollment.section?.name || student.section?.name
           },
           school: student.school,
           fee: null,
@@ -312,12 +341,12 @@ export const GET = withSchoolAccess(async function GET(req) {
           userId: student.userId,
           name: student.name,
           admissionNo: student.admissionNo,
-          rollNumber: student.rollNumber,
+          rollNumber: activeEnrollment.rollNumber || student.rollNumber,
           profilePicture: student.user?.profilePicture,
           fatherName: student.FatherName,
           motherName: student.MotherName,
-          class: student.class?.className,
-          section: student.section?.name
+          class: activeEnrollment.class?.className || student.class?.className,
+          section: activeEnrollment.section?.name || student.section?.name
         },
         school: student.school,
         fee: {

@@ -24,7 +24,8 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
       include: {
         user: {
           select: { name: true, email: true, profilePicture: true }
-        }
+        },
+        importBatch: true,
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -41,6 +42,10 @@ export const GET = withSchoolAccess(async function GET(req, { params }) {
       fileUrl: item.errors?.fileUrl || null,
       importedWithWarnings: item.errors?.importedWithWarnings || 0,
       missingJoiningDate: item.errors?.missingJoiningDate || 0,
+      unresolvedEnrollmentCount: item.importBatch?.unresolvedEnrollmentCount || item.errors?.unresolvedEnrollmentCount || 0,
+      rollbackStatus: item.importBatch?.rollbackStatus || null,
+      importBatchId: item.importBatch?.id || null,
+      importedSession: item.importBatch?.academicYearId || null,
     }));
 
     return NextResponse.json({

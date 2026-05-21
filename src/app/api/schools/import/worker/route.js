@@ -11,6 +11,7 @@ import { getAccountCredentialsEmailTemplate } from '@/lib/email';
 import { sendResendEmail } from '@/lib/resend';
 import { mapImportRow } from '@/lib/import-column-mapping';
 import { readImportWorksheetRows } from '@/lib/import-workbook';
+import { createUnresolvedEnrollmentIssuesForBatch } from '@/lib/enrollment/session-enrollment';
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -102,11 +103,38 @@ async function updateHistory(job) {
         errorReportUrl: job.errorReportUrl || null,
         importedWithWarnings: job.importedWithWarnings || 0,
         missingJoiningDate: job.missingJoiningDate || 0,
+        unresolvedEnrollmentCount: job.unresolvedEnrollmentCount || 0,
         failedRows: job.failedRows.slice(0, 200),
         credentials: job.credentials || [],
         etaSeconds: toEtaSeconds(job.processedRows, job.totalRows, job.startedAt)
       }
     }
+  });
+}
+
+async function updateImportBatch(job, patch = {}) {
+  if (!job.importBatchId) return null;
+
+  return prisma.importBatch.update({
+    where: { id: job.importBatchId },
+    data: {
+      status: job.status === 'completed' ? 'COMPLETED' :
+        job.status === 'failed' ? 'FAILED' :
+        job.status === 'cancelled' ? 'CANCELLED' :
+        job.status === 'running' ? 'RUNNING' : 'QUEUED',
+      successfulRows: job.success || 0,
+      failedRows: job.failed || 0,
+      warningCount: job.importedWithWarnings || 0,
+      missingJoiningDateCount: job.missingJoiningDate || 0,
+      metadata: {
+        jobId: job.id,
+        fileUrl: job.fileUrl,
+        errorReportUrl: job.errorReportUrl || null,
+        accountsCreated: job.accountsCreated || 0,
+        accountsFailed: job.accountsFailed || 0,
+      },
+      ...patch,
+    },
   });
 }
 
@@ -218,6 +246,8 @@ async function handleWorker(req) {
             academicYearId: job.academicYearId || null,
             classMappings: job.classMappings || {},
             sectionMappings: job.sectionMappings || {},
+            importBatchId: job.importBatchId || null,
+            rowNumber,
           });
           success += 1;
           if (result?.warnings?.length) importedWithWarnings += 1;
@@ -341,10 +371,22 @@ async function handleWorker(req) {
         console.error('[IMPORT COMPLETION EMAIL ERROR]', emailError);
       }
     }
+
+    if (job.importBatchId && job.moduleKey === 'students') {
+      const resolution = await createUnresolvedEnrollmentIssuesForBatch({
+        schoolId: job.schoolId,
+        importBatchId: job.importBatchId,
+        importedAcademicYearId: job.academicYearId,
+      });
+      updatedJob.unresolvedEnrollmentCount = resolution.created || 0;
+    }
   }
 
   await updateBulkJob(job.id, updatedJob);
   await updateHistory(updatedJob);
+  await updateImportBatch(updatedJob, {
+    unresolvedEnrollmentCount: updatedJob.unresolvedEnrollmentCount || 0,
+  });
 
   // Only re-enqueue if timed out with remaining chunks
   if (!allChunksDone && timedOut) {

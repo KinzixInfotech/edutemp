@@ -44,6 +44,7 @@ import {
     schoolDirectoryQueryKeys,
     snapshotQueries,
 } from '@/lib/school-directory-query';
+import UnresolvedEnrollmentBanner from '@/components/UnresolvedEnrollmentBanner';
 
 export default function StudentListPage() {
     const router = useRouter();
@@ -392,6 +393,8 @@ export default function StudentListPage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            <UnresolvedEnrollmentBanner />
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

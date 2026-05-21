@@ -4,6 +4,7 @@ import { withSchoolAccess } from "@/lib/api-auth"; // app/api/schools/transport/
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
+import { assertOperationalStudentsForYear, resolveActiveAcademicYear } from '@/lib/enrollment/session-enrollment';
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -55,6 +56,29 @@ export const PUT = withSchoolAccess(async function PUT(req, props) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
+    let activeYear = null;
+    if (status === 'APPROVED') {
+      activeYear = await resolveActiveAcademicYear(existingRequest.schoolId);
+      if (!activeYear) {
+        return NextResponse.json({ error: 'No active academic year found for transport request approval.' }, { status: 400 });
+      }
+      try {
+        await assertOperationalStudentsForYear({
+          schoolId: existingRequest.schoolId,
+          academicYearId: activeYear.id,
+          studentIds: [existingRequest.studentId],
+          moduleName: 'approving transport request',
+          requireJoiningDate: Boolean(transportFeeId),
+        });
+      } catch (error) {
+        return NextResponse.json({
+          error: error.message,
+          code: error.code || 'OPERATIONAL_ENROLLMENT_REQUIRED',
+          blockedStudentIds: error.blockedStudentIds || [],
+        }, { status: 400 });
+      }
+    }
+
     const request = await prisma.$transaction(async (tx) => {
       // Update request
       const updated = await tx.busRequest.update({
@@ -99,7 +123,8 @@ export const PUT = withSchoolAccess(async function PUT(req, props) {
               data: {
                 studentId: existingRequest.studentId,
                 routeId: finalRouteId,
-                schoolId: existingRequest.schoolId
+                schoolId: existingRequest.schoolId,
+                academicYearId: activeYear?.id || undefined,
               }
             });
           }
@@ -126,8 +151,6 @@ export const PUT = withSchoolAccess(async function PUT(req, props) {
                   data: {
                     studentId: existingRequest.studentId,
                     transportFeeId: transportFeeId,
-                    schoolId: existingRequest.schoolId,
-                    amount: transportFee.amount,
                     startDate: new Date(),
                     isActive: true
                   }

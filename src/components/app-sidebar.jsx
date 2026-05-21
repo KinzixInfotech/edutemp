@@ -334,7 +334,17 @@ export const SidebarData = [
         title: "Administration",
         items: [
             { label: "Classes & Sections", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
-            { label: "Manage Students", url: "/dashboard/schools/manage-student", icon: Baby, roles: ["ADMIN"] },
+            {
+                label: "Student Lifecycle",
+                icon: Baby,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Current Session Students", url: "/dashboard/schools/manage-student", roles: ["ADMIN"] },
+                    { label: "Global Student Registry", url: "/dashboard/schools/students/registry", roles: ["ADMIN"] },
+                    { label: "Enrollment Resolution", url: "/dashboard/schools/students/enrollment-resolution", roles: ["ADMIN"] },
+                    { label: "Promote Students", url: "/dashboard/schools/academic/promotion", roles: ["ADMIN"] },
+                ],
+            },
             { label: "Manage Parents", url: "/dashboard/schools/manage-parent", icon: User, roles: ["ADMIN"] },
             { label: "Academic Years", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
         ]

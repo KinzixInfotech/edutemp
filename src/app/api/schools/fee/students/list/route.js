@@ -25,24 +25,27 @@ export const GET = withSchoolAccess(async function GET(req) {
       academicYearId = activeYear.id;
     }
 
-    // Build filter — always scoped to academic year
-    const filters = {
-      schoolId,
-      academicYearId
+    const enrollmentFilters = {
+      academicYearId,
+      status: 'ACTIVE',
+      enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+      student: {
+        schoolId,
+        lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+        user: { deletedAt: null },
+      },
     };
 
-    if (classId) filters.classId = parseInt(classId, 10);
+    if (classId) enrollmentFilters.classId = parseInt(classId, 10);
 
-    // Fetch all students with their related info and fee data
-    const students = await prisma.student.findMany({
-      where: filters,
+    const enrollments = await prisma.studentSession.findMany({
+      where: enrollmentFilters,
       select: {
-        userId: true,
-        admissionNo: true,
+        id: true,
+        studentId: true,
         rollNumber: true,
-        name: true,
         classId: true,
-        academicYearId: true,
+        sectionId: true,
         class: {
           select: {
             id: true,
@@ -55,21 +58,31 @@ export const GET = withSchoolAccess(async function GET(req) {
             name: true
           }
         },
-        // Include fee data — FILTERED by academic year
-        studentFees: {
-          where: { academicYearId },
+        student: {
           select: {
-            id: true,
-            finalAmount: true,
-            paidAmount: true,
-            balanceAmount: true,
-            status: true
-          },
-          take: 1,
-          orderBy: {
-            assignedDate: 'desc'
+            userId: true,
+            admissionNo: true,
+            rollNumber: true,
+            name: true,
+            admissionDate: true,
+            missingJoiningDate: true,
+            profileStatus: true,
+            studentFees: {
+              where: { academicYearId },
+              select: {
+                id: true,
+                finalAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                status: true
+              },
+              take: 1,
+              orderBy: {
+                assignedDate: 'desc'
+              }
+            }
           }
-        }
+        },
       },
       orderBy: [
       { class: { className: 'asc' } },
@@ -78,10 +91,16 @@ export const GET = withSchoolAccess(async function GET(req) {
 
     });
 
-    // Transform the data to include fee as a single object
-    const transformedStudents = students.map((student) => ({
-      ...student,
-      fee: student.studentFees?.[0] || null,
+    const transformedStudents = enrollments.map((enrollment) => ({
+      ...enrollment.student,
+      enrollmentId: enrollment.id,
+      rollNumber: enrollment.rollNumber || enrollment.student.rollNumber,
+      classId: enrollment.classId,
+      sectionId: enrollment.sectionId,
+      academicYearId,
+      class: enrollment.class,
+      section: enrollment.section,
+      fee: enrollment.student.studentFees?.[0] || null,
       studentFees: undefined
     }));
 

@@ -60,17 +60,25 @@ export const POST = withSchoolAccess(async function POST(req, props) {
     }
 
     // 2. Fetch all students eligible for this exam
-    const students = await prisma.student.findMany({
+    const enrollments = await prisma.studentSession.findMany({
       where: {
-        schoolId,
-        classId: { in: exam.classes.map((c) => c.id) }
+        academicYearId: exam.academicYearId,
+        classId: { in: exam.classes.map((c) => c.id) },
+        status: 'ACTIVE',
+        enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+        student: {
+          schoolId,
+          lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+        },
       },
+      include: { student: true },
       orderBy: [
       { classId: 'asc' },
       { sectionId: 'asc' },
       { rollNumber: 'asc' }]
 
     });
+    const students = enrollments.map((enrollment) => enrollment.student);
 
     if (students.length === 0) {
       return NextResponse.json({ error: 'No students found for this exam' }, { status: 400 });

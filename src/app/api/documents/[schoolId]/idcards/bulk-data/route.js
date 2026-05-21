@@ -8,19 +8,30 @@ export const POST = withSchoolAccess(async function POST(request, props) {
     const { schoolId } = params;
     const body = await request.json();
     const { classId, sectionId, studentIds } = body;
+    const activeYear = await prisma.academicYear.findFirst({
+      where: { schoolId, isActive: true },
+      select: { id: true }
+    });
+    if (!activeYear) {
+      return NextResponse.json({ error: 'No active academic year found' }, { status: 400 });
+    }
 
     let whereClause = {
-      schoolId,
-      isActive: true
+      academicYearId: activeYear.id,
+      status: 'ACTIVE',
+      enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+      student: {
+        schoolId,
+        lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+      }
     };
 
     if (studentIds && studentIds.length > 0) {
-      whereClause.userId = { in: studentIds };
+      whereClause.studentId = { in: studentIds };
     } else {
       // If classId is provided, filter by class profile
       if (classId) {
-        whereClause.classId = parseInt(classId); // Check if classId in Student model is Int or String relation? Its usually relational.
-        // Actually Student model relates to Class via classId (Int).
+        whereClause.classId = parseInt(classId);
       }
       if (sectionId && sectionId !== 'ALL') {
         whereClause.sectionId = parseInt(sectionId);
@@ -29,30 +40,34 @@ export const POST = withSchoolAccess(async function POST(request, props) {
 
     // We need to fetch Students ensuring we get class/section details
     // Note: The Student model is linked to User.
-    const students = await prisma.student.findMany({
+    const enrollments = await prisma.studentSession.findMany({
       where: whereClause,
       include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-            profilePicture: true
-          }
-        },
         class: {
           select: { className: true }
         },
         section: {
           select: { name: true }
         },
-        parent: {
-          select: {
-            fatherName: true,
-            motherName: true,
-            fatherMobile: true,
-            address: true
+        student: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                profilePicture: true
+              }
+            },
+            parent: {
+              select: {
+                fatherName: true,
+                motherName: true,
+                fatherMobile: true,
+                address: true
+              }
+            }
           }
-        }
+        },
       },
       orderBy: {
         rollNumber: 'asc'
@@ -60,13 +75,15 @@ export const POST = withSchoolAccess(async function POST(request, props) {
     });
 
     // Format for frontend
-    const formattedStudents = students.map((s) => ({
+    const formattedStudents = enrollments.map((enrollment) => {
+      const s = enrollment.student;
+      return ({
       id: s.userId,
       name: s.user.name,
-      rollNumber: s.rollNumber,
+      rollNumber: enrollment.rollNumber || s.rollNumber,
       admissionNo: s.admissionNo,
-      className: s.class?.className,
-      section: s.section?.name,
+      className: enrollment.class?.className,
+      section: enrollment.section?.name,
       photo: s.user.profilePicture,
       dob: s.dateOfBirth,
       fatherName: s.parent?.fatherName,
@@ -74,7 +91,8 @@ export const POST = withSchoolAccess(async function POST(request, props) {
       address: s.parent?.address,
       emergencyContact: s.parent?.fatherMobile,
       bloodGroup: s.bloodGroup
-    }));
+    });
+    });
 
     return NextResponse.json({
       count: formattedStudents.length,

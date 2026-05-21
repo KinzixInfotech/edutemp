@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle, AlertCircle, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 export default function PromotionPage() {
@@ -36,6 +36,7 @@ export default function PromotionPage() {
     // Filter & Search State
     const [searchQuery, setSearchQuery] = useState("");
     const [filterSection, setFilterSection] = useState("all");
+    const [showHistory, setShowHistory] = useState(false);
 
     // Helper to display class names as Roman numerals
     const displayClassName = (name) => {
@@ -83,6 +84,20 @@ export default function PromotionPage() {
             return res.json();
         },
         enabled: !!schoolId
+    });
+
+    const { data: promotionHistory = {}, isLoading: historyLoading } = useQuery({
+        queryKey: ["promotionHistory", schoolId, fromYearId, toYearId],
+        queryFn: async () => {
+            const params = new URLSearchParams({ limit: "10" });
+            if (fromYearId) params.set("fromYearId", fromYearId);
+            if (toYearId) params.set("toYearId", toYearId);
+            const res = await fetch(`/api/schools/${schoolId}/academic/promotion/history?${params}`);
+            if (!res.ok) throw new Error("Failed to fetch promotion history");
+            return res.json();
+        },
+        enabled: !!schoolId && showHistory,
+        staleTime: 30 * 1000,
     });
 
     // Fetch Candidates
@@ -262,11 +277,65 @@ export default function PromotionPage() {
                     <p className="text-muted-foreground">Promote students to the next academic session</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setShowHistory((value) => !value)}>
+                        <History className="mr-2 h-4 w-4" />
+                        History
+                    </Button>
                     <Badge variant={step >= 1 ? "default" : "outline"}>1. Select Source</Badge>
                     <ArrowRight className="w-4 h-4 text-muted-foreground" />
                     <Badge variant={step >= 2 ? "default" : "outline"}>2. Review & Execute</Badge>
                 </div>
             </div>
+
+            {showHistory && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Promotion History</CardTitle>
+                        <CardDescription>Recent promotion batches with source and destination sessions.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {historyLoading ? (
+                            <div className="py-8 text-center text-sm text-muted-foreground">
+                                <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                                Loading promotion history...
+                            </div>
+                        ) : (promotionHistory.batches || []).length === 0 ? (
+                            <div className="py-8 text-center text-sm text-muted-foreground">No promotion history found.</div>
+                        ) : (
+                            <div className="space-y-3">
+                                {(promotionHistory.batches || []).map((batch) => (
+                                    <div key={batch.id} className="rounded-lg border p-4">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <div className="font-medium">
+                                                    {batch.fromYear?.name || "Source"} → {batch.toYear?.name || "Target"}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    By {batch.promoter?.name || batch.promoter?.email || "Unknown"} · {new Date(batch.createdAt).toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Badge variant="outline">{batch.status}</Badge>
+                                                <Badge>{batch.promotedCount || batch._count?.histories || 0} students</Badge>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                                            {(batch.histories || []).slice(0, 4).map((item) => (
+                                                <div key={item.id} className="rounded-md bg-muted/50 p-2">
+                                                    <span className="font-medium">{item.student?.name || "Student"}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {" "}· {item.fromClass?.className || "-"} / {item.fromSection?.name || "-"} → {item.toClass?.className || "-"} / {item.toSection?.name || "-"}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {step === 1 && (
                 <Card>
@@ -584,14 +653,14 @@ export default function PromotionPage() {
                         <div className="flex items-center justify-between pt-4 border-t">
                             <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
                             <div className="flex items-center gap-3">
-                                {candidates.filter(c => c.selected && !c.toSectionId && c.status !== "DETAINED").length > 0 && !toSectionId && (
+                                {candidates.filter(c => c.selected && !c.toSectionId && c.status !== "DETAINED" && c.status !== "GRADUATE").length > 0 && !toSectionId && (
                                     <span className="text-sm text-amber-600 dark:text-amber-400">
-                                        ⚠️ {candidates.filter(c => c.selected && !c.toSectionId && c.status !== "DETAINED").length} students need sections
+                                        ⚠️ {candidates.filter(c => c.selected && !c.toSectionId && c.status !== "DETAINED" && c.status !== "GRADUATE").length} students need sections
                                     </span>
                                 )}
                                 <Button
                                     onClick={handleExecutePromotion}
-                                    disabled={!toClassId || !toYearId || promoteMutation.isPending}
+                                    disabled={(!isSourceClass12 && !toClassId) || !toYearId || promoteMutation.isPending}
                                     className="bg-green-600 hover:bg-green-700"
                                 >
                                     {promoteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

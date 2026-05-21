@@ -96,23 +96,27 @@ model School {
   publicProfile           SchoolPublicProfile? // School Explorer public profile
 
   // Payroll Management
-  payrollConfig    PayrollConfig?
-  salaryStructures SalaryStructure[]
-  payrollPeriods   PayrollPeriod[]
-  leaveBuckets     LeaveBucket[]
-  payrollAuditLogs PayrollAuditLog[]
-  librarians       Librarian[]
-  accountants      Accountant[]
-  directors        Director[]
-  principals       Principal[]
-  settings         SchoolSettings?
-  transportStaffs  TransportStaff[]
-  transportFees    TransportFee[]
-  busRequests      BusRequest[]
-  routeAssignments RouteAssignment[]
-  importHistory    ImportHistory[]
-  smsWallet        SmsWallet?
-  feeSettings      FeeSettings?
+  payrollConfig              PayrollConfig?
+  salaryStructures           SalaryStructure[]
+  payrollPeriods             PayrollPeriod[]
+  leaveBuckets               LeaveBucket[]
+  payrollAuditLogs           PayrollAuditLog[]
+  librarians                 Librarian[]
+  accountants                Accountant[]
+  directors                  Director[]
+  principals                 Principal[]
+  settings                   SchoolSettings?
+  transportStaffs            TransportStaff[]
+  transportFees              TransportFee[]
+  busRequests                BusRequest[]
+  routeAssignments           RouteAssignment[]
+  importHistory              ImportHistory[]
+  importBatches              ImportBatch[]
+  enrollmentResolutionIssues EnrollmentResolutionIssue[]
+  studentLifecycleAuditLogs  StudentLifecycleAuditLog[]
+  promotionBatches           PromotionBatch[]
+  smsWallet                  SmsWallet?
+  feeSettings                FeeSettings?
 
   // Atlas Integration Fields
   atlas_classFrom      String?
@@ -301,11 +305,223 @@ model ImportHistory {
   accountsCreated Int      @default(0)
   accountsFailed  Int      @default(0)
 
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [importedBy], references: [id], onDelete: Cascade)
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [importedBy], references: [id], onDelete: Cascade)
+  importBatch ImportBatch?
 
   @@index([schoolId])
   @@index([createdAt])
+}
+
+enum ImportBatchStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  ROLLBACK_PENDING
+  ROLLED_BACK
+  PARTIAL_ROLLBACK
+  ROLLBACK_BLOCKED
+}
+
+enum ImportBatchItemStatus {
+  CREATED
+  UPDATED
+  SKIPPED
+  WARNING
+  FAILED
+  ROLLED_BACK
+  ROLLBACK_BLOCKED
+}
+
+enum EnrollmentResolutionStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  IGNORED
+  DISMISSED
+}
+
+enum StudentLifecycleStatus {
+  ACTIVE
+  ALUMNI
+  TC
+  LEFT
+  DROPPED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  PROMOTED
+  COMPLETED
+  WITHDRAWN
+  TC_ISSUED
+  LEFT
+  DROPPED
+  PENDING_VERIFICATION
+  IGNORED
+}
+
+model ImportBatch {
+  id                        String             @id @default(uuid()) @db.Uuid
+  schoolId                  String             @db.Uuid
+  importHistoryId           String?            @unique
+  academicYearId            String?            @db.Uuid
+  module                    String
+  importType                String             @default("BULK_IMPORT")
+  fileName                  String
+  sheetName                 String?
+  status                    ImportBatchStatus  @default(QUEUED)
+  totalRows                 Int                @default(0)
+  successfulRows            Int                @default(0)
+  failedRows                Int                @default(0)
+  warningCount              Int                @default(0)
+  missingJoiningDateCount   Int                @default(0)
+  unresolvedEnrollmentCount Int                @default(0)
+  rollbackStatus            ImportBatchStatus?
+  rollbackReport            Json?
+  rolledBackAt              DateTime?
+  rolledBackBy              String?            @db.Uuid
+  createdBy                 String             @db.Uuid
+  metadata                  Json?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  school           School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear?               @relation(fields: [academicYearId], references: [id])
+  history          ImportHistory?              @relation(fields: [importHistoryId], references: [id])
+  creator          User                        @relation("ImportBatchCreatedBy", fields: [createdBy], references: [id])
+  items            ImportBatchItem[]
+  students         Student[]                   @relation("StudentImportBatch")
+  enrollments      StudentSession[]            @relation("EnrollmentImportBatch")
+  studentFees      StudentFee[]                @relation("StudentFeeImportBatch")
+  feeLedgers       StudentFeeLedger[]          @relation("StudentFeeLedgerImportBatch")
+  routeAssignments StudentRouteAssignment[]    @relation("RouteAssignmentImportBatch")
+  stopAssignments  StudentStopAssignment[]     @relation("StopAssignmentImportBatch")
+  transportFees    StudentTransportFee[]       @relation("TransportFeeImportBatch")
+  promotionHistory PromotionHistory[]          @relation("PromotionHistoryImportBatch")
+  resolutionIssues EnrollmentResolutionIssue[]
+  auditLogs        StudentLifecycleAuditLog[]
+
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, status])
+  @@index([createdAt])
+}
+
+model ImportBatchItem {
+  id         String                @id @default(uuid()) @db.Uuid
+  batchId    String                @db.Uuid
+  rowNumber  Int?
+  module     String
+  targetType String?
+  targetId   String?
+  action     String?
+  status     ImportBatchItemStatus @default(CREATED)
+  sourceData Json?
+  warnings   Json?
+  errors     Json?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([targetType, targetId])
+  @@index([status])
+}
+
+model EnrollmentResolutionIssue {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  schoolId             String                     @db.Uuid
+  studentId            String                     @db.Uuid
+  importBatchId        String?                    @db.Uuid
+  lastEnrollmentId     String?                    @db.Uuid
+  activeAcademicYearId String                     @db.Uuid
+  issueType            String
+  category             String
+  suggestedAction      String
+  confidence           Int                        @default(0)
+  status               EnrollmentResolutionStatus @default(OPEN)
+  resolutionAction     String?
+  resolvedAt           DateTime?
+  resolvedBy           String?                    @db.Uuid
+  ignoredUntil         DateTime?
+  metadata             Json?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  school             School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student            Student         @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  importBatch        ImportBatch?    @relation(fields: [importBatchId], references: [id])
+  lastEnrollment     StudentSession? @relation("EnrollmentResolutionLastEnrollment", fields: [lastEnrollmentId], references: [id])
+  activeAcademicYear AcademicYear    @relation(fields: [activeAcademicYearId], references: [id])
+  resolver           User?           @relation("EnrollmentIssueResolvedBy", fields: [resolvedBy], references: [id])
+
+  @@unique([studentId, activeAcademicYearId, issueType])
+  @@index([schoolId, activeAcademicYearId, status])
+  @@index([importBatchId])
+  @@index([category])
+}
+
+model PromotionBatch {
+  id                 String   @id @default(uuid()) @db.Uuid
+  schoolId           String   @db.Uuid
+  fromAcademicYearId String   @db.Uuid
+  toAcademicYearId   String   @db.Uuid
+  promotedBy         String   @db.Uuid
+  promotionType      String   @default("REGULAR")
+  options            Json?
+  totalStudents      Int      @default(0)
+  promotedCount      Int      @default(0)
+  skippedCount       Int      @default(0)
+  failedCount        Int      @default(0)
+  status             String   @default("COMPLETED")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  school    School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  fromYear  AcademicYear               @relation("PromotionBatchFromYear", fields: [fromAcademicYearId], references: [id])
+  toYear    AcademicYear               @relation("PromotionBatchToYear", fields: [toAcademicYearId], references: [id])
+  promoter  User                       @relation("PromotionBatchPromoter", fields: [promotedBy], references: [id])
+  histories PromotionHistory[]
+  auditLogs StudentLifecycleAuditLog[]
+
+  @@index([schoolId, fromAcademicYearId, toAcademicYearId])
+  @@index([createdAt])
+}
+
+model StudentLifecycleAuditLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  schoolId         String   @db.Uuid
+  studentId        String?  @db.Uuid
+  enrollmentId     String?  @db.Uuid
+  academicYearId   String?  @db.Uuid
+  importBatchId    String?  @db.Uuid
+  promotionBatchId String?  @db.Uuid
+  actorId          String?  @db.Uuid
+  action           String
+  entityType       String
+  entityId         String?
+  oldValue         Json?
+  newValue         Json?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student        Student?        @relation(fields: [studentId], references: [userId])
+  enrollment     StudentSession? @relation(fields: [enrollmentId], references: [id])
+  academicYear   AcademicYear?   @relation(fields: [academicYearId], references: [id])
+  importBatch    ImportBatch?    @relation(fields: [importBatchId], references: [id])
+  promotionBatch PromotionBatch? @relation(fields: [promotionBatchId], references: [id])
+  actor          User?           @relation("StudentLifecycleAuditActor", fields: [actorId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@index([studentId])
+  @@index([enrollmentId])
+  @@index([importBatchId])
+  @@index([promotionBatchId])
 }
 
 model ContactSubmission {
@@ -1234,14 +1450,17 @@ model StudentRouteAssignment {
   routeId        String        @db.Uuid
   schoolId       String        @db.Uuid
   academicYearId String?       @db.Uuid
+  importBatchId  String?       @db.Uuid
   assignedAt     DateTime      @default(now())
   student        Student       @relation(fields: [studentId], references: [userId])
   route          Route         @relation(fields: [routeId], references: [id])
   academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
+  importBatch    ImportBatch?  @relation("RouteAssignmentImportBatch", fields: [importBatchId], references: [id])
 
   @@index([studentId])
   @@index([routeId])
   @@index([academicYearId])
+  @@index([importBatchId])
 }
 
 model VehicleLocation {
@@ -1414,23 +1633,26 @@ model BusStop {
 
 // Student assigned to specific stop
 model StudentStopAssignment {
-  id         String   @id @default(uuid()) @db.Uuid
-  studentId  String   @db.Uuid
-  stopId     String   @db.Uuid
-  routeId    String   @db.Uuid
-  pickupStop Boolean  @default(true)
-  dropStop   Boolean  @default(true)
-  isActive   Boolean  @default(true)
-  assignedAt DateTime @default(now())
+  id            String   @id @default(uuid()) @db.Uuid
+  studentId     String   @db.Uuid
+  stopId        String   @db.Uuid
+  routeId       String   @db.Uuid
+  importBatchId String?  @db.Uuid
+  pickupStop    Boolean  @default(true)
+  dropStop      Boolean  @default(true)
+  isActive      Boolean  @default(true)
+  assignedAt    DateTime @default(now())
 
-  student Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
-  stop    BusStop @relation(fields: [stopId], references: [id], onDelete: Cascade)
-  route   Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  student     Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  stop        BusStop      @relation(fields: [stopId], references: [id], onDelete: Cascade)
+  route       Route        @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  importBatch ImportBatch? @relation("StopAssignmentImportBatch", fields: [importBatchId], references: [id])
 
   @@unique([studentId, routeId])
   @@index([studentId])
   @@index([stopId])
   @@index([routeId])
+  @@index([importBatchId])
   @@index([isActive])
 }
 
@@ -1524,6 +1746,7 @@ model StudentTransportFee {
   id             String    @id @default(uuid()) @db.Uuid
   studentId      String    @db.Uuid
   transportFeeId String    @db.Uuid
+  importBatchId  String?   @db.Uuid
   startDate      DateTime
   endDate        DateTime?
   isActive       Boolean   @default(true)
@@ -1531,11 +1754,13 @@ model StudentTransportFee {
 
   student      Student               @relation(fields: [studentId], references: [userId], onDelete: Cascade)
   transportFee TransportFee          @relation(fields: [transportFeeId], references: [id], onDelete: Cascade)
+  importBatch  ImportBatch?          @relation("TransportFeeImportBatch", fields: [importBatchId], references: [id])
   payments     TransportFeePayment[]
 
   @@unique([studentId, transportFeeId])
   @@index([studentId])
   @@index([transportFeeId])
+  @@index([importBatchId])
   @@index([isActive])
 }
 
@@ -1952,9 +2177,13 @@ model User {
   securityEvents SecurityEvent[]
 
   // Payroll Management
-  payrollProfile  EmployeePayrollProfile?
-  transportStaff  TransportStaff?
-  importHistories ImportHistory[]
+  payrollProfile            EmployeePayrollProfile?
+  transportStaff            TransportStaff?
+  importHistories           ImportHistory[]
+  importBatchesCreated      ImportBatch[]               @relation("ImportBatchCreatedBy")
+  enrollmentIssuesResolved  EnrollmentResolutionIssue[] @relation("EnrollmentIssueResolvedBy")
+  studentLifecycleAuditLogs StudentLifecycleAuditLog[]  @relation("StudentLifecycleAuditActor")
+  promotionBatchesCreated   PromotionBatch[]            @relation("PromotionBatchPromoter")
 
   // AI System
   aiUsageLogs AiUsageLog[]
@@ -2156,8 +2385,11 @@ model Student {
   currentSessionId String? @unique @db.Uuid
 
   // Alumni Tracking
-  isAlumni          Boolean   @default(false)
+  isAlumni          Boolean                @default(false)
   alumniConvertedAt DateTime?
+  lifecycleStatus   StudentLifecycleStatus @default(ACTIVE)
+  importBatchId     String?                @db.Uuid
+  createdAt         DateTime               @default(now())
 
   ExamIssue              ExamIssue[]
   examResults            ExamResult[]
@@ -2167,6 +2399,7 @@ model Student {
   AcademicYear           AcademicYear?            @relation(fields: [academicYearId], references: [id])
   class                  Class?                   @relation(fields: [classId], references: [id])
   school                 School                   @relation(fields: [schoolId], references: [id])
+  importBatch            ImportBatch?             @relation("StudentImportBatch", fields: [importBatchId], references: [id])
   section                Section?                 @relation(fields: [sectionId], references: [id])
   user                   User                     @relation(fields: [userId], references: [id])
   StudentFeeStructure    StudentFeeStructure[]
@@ -2200,14 +2433,19 @@ model Student {
   studentWallet    StudentWallet?
 
   // StudentSession (per-year enrollment)
-  sessions       StudentSession[]
-  currentSession StudentSession?  @relation("CurrentSession", fields: [currentSessionId], references: [id])
+  sessions                   StudentSession[]
+  currentSession             StudentSession?             @relation("CurrentSession", fields: [currentSessionId], references: [id])
+  enrollmentResolutionIssues EnrollmentResolutionIssue[]
+  lifecycleAuditLogs         StudentLifecycleAuditLog[]
 
   @@index([classId])
   @@index([sectionId])
   @@index([parentId])
   @@index([currentSessionId])
+  @@index([importBatchId])
+  @@index([schoolId, lifecycleStatus])
   @@index([schoolId, missingJoiningDate])
+  @@index([schoolId, createdAt])
 }
 
 model FeeAssignmentHistory {
@@ -2250,30 +2488,45 @@ enum StudentReligion {
 // ============================================
 
 model StudentSession {
-  id             String        @id @default(uuid()) @db.Uuid
-  studentId      String        @db.Uuid
-  academicYearId String        @db.Uuid
-  classId        Int
-  sectionId      Int
-  rollNumber     String?
-  status         SessionStatus @default(ACTIVE)
+  id                       String           @id @default(uuid()) @db.Uuid
+  studentId                String           @db.Uuid
+  academicYearId           String           @db.Uuid
+  classId                  Int
+  sectionId                Int
+  rollNumber               String?
+  status                   SessionStatus    @default(ACTIVE)
+  enrollmentStatus         EnrollmentStatus @default(ENROLLED)
+  importBatchId            String?          @db.Uuid
+  promotedFromEnrollmentId String?          @db.Uuid
+  promotionBatchId         String?          @db.Uuid
+  promotionType            String?
+  remarks                  String?
 
   joinedAt DateTime  @default(now())
   leftAt   DateTime?
 
-  student      Student      @relation(fields: [studentId], references: [userId])
-  currentFor   Student?     @relation("CurrentSession")
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-  class        Class        @relation(fields: [classId], references: [id])
-  section      Section      @relation(fields: [sectionId], references: [id])
+  student                 Student                     @relation(fields: [studentId], references: [userId])
+  currentFor              Student?                    @relation("CurrentSession")
+  academicYear            AcademicYear                @relation(fields: [academicYearId], references: [id])
+  class                   Class                       @relation(fields: [classId], references: [id])
+  section                 Section                     @relation(fields: [sectionId], references: [id])
+  importBatch             ImportBatch?                @relation("EnrollmentImportBatch", fields: [importBatchId], references: [id])
+  promotedFromEnrollment  StudentSession?             @relation("EnrollmentPromotionLineage", fields: [promotedFromEnrollmentId], references: [id])
+  promotedEnrollments     StudentSession[]            @relation("EnrollmentPromotionLineage")
+  lastForResolutionIssues EnrollmentResolutionIssue[] @relation("EnrollmentResolutionLastEnrollment")
+  lifecycleAuditLogs      StudentLifecycleAuditLog[]
 
   @@unique([studentId, academicYearId])
   @@index([studentId, academicYearId])
   @@index([studentId, status])
+  @@index([studentId, enrollmentStatus])
   @@index([academicYearId])
   @@index([classId])
   @@index([sectionId])
   @@index([status])
+  @@index([enrollmentStatus])
+  @@index([importBatchId])
+  @@index([promotedFromEnrollmentId])
 }
 
 enum SessionStatus {
@@ -3031,6 +3284,8 @@ model AcademicYear {
   timetableTemplates     TimetableTemplate[]
   promotionHistoriesFrom PromotionHistory[]      @relation("PromotionFromYear")
   promotionHistoriesTo   PromotionHistory[]      @relation("PromotionToYear")
+  promotionBatchesFrom   PromotionBatch[]        @relation("PromotionBatchFromYear")
+  promotionBatchesTo     PromotionBatch[]        @relation("PromotionBatchToYear")
   transportFees          TransportFee[]
   competencyAssessments  CompetencyAssessment[]
   studentActivityRecords StudentActivityRecord[]
@@ -3052,7 +3307,10 @@ model AcademicYear {
   feeLedgerEntries StudentFeeLedger[]
 
   // StudentSession enrollments
-  studentSessions StudentSession[]
+  studentSessions                  StudentSession[]
+  importBatches                    ImportBatch[]
+  activeEnrollmentResolutionIssues EnrollmentResolutionIssue[]
+  studentLifecycleAuditLogs        StudentLifecycleAuditLog[]
 
   // Attendance binding
   attendance     Attendance[]
@@ -4614,6 +4872,7 @@ model StudentFee {
   schoolId             String  @db.Uuid
   academicYearId       String  @db.Uuid
   globalFeeStructureId String? @db.Uuid // Null for custom fees
+  importBatchId        String? @db.Uuid
 
   // Amounts
   originalAmount Float // Before any discounts
@@ -4635,6 +4894,7 @@ model StudentFee {
   school             School              @relation(fields: [schoolId], references: [id])
   academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
   globalFeeStructure GlobalFeeStructure? @relation(fields: [globalFeeStructureId], references: [id])
+  importBatch        ImportBatch?        @relation("StudentFeeImportBatch", fields: [importBatchId], references: [id])
 
   particulars  StudentFeeParticular[]
   installments StudentFeeInstallment[]
@@ -4646,6 +4906,7 @@ model StudentFee {
   @@index([schoolId, academicYearId, balanceAmount]) // Composite for outstanding fees queries
   @@index([status])
   @@index([studentId])
+  @@index([importBatchId])
 }
 
 // Individual Fee Components for Each Student
@@ -5206,12 +5467,13 @@ model StudentService {
 }
 
 model StudentFeeLedger {
-  id             String @id @default(uuid()) @db.Uuid
-  studentId      String @db.Uuid
-  schoolId       String @db.Uuid
-  academicYearId String @db.Uuid
-  feeSessionId   String @db.Uuid
-  feeComponentId String @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  studentId      String  @db.Uuid
+  schoolId       String  @db.Uuid
+  academicYearId String  @db.Uuid
+  feeSessionId   String  @db.Uuid
+  feeComponentId String  @db.Uuid
+  importBatchId  String? @db.Uuid
 
   month          DateTime
   monthLabel     String
@@ -5238,6 +5500,7 @@ model StudentFeeLedger {
   academicYear AcademicYear        @relation(fields: [academicYearId], references: [id])
   feeSession   FeeSession          @relation(fields: [feeSessionId], references: [id])
   feeComponent FeeComponent        @relation(fields: [feeComponentId], references: [id])
+  importBatch  ImportBatch?        @relation("StudentFeeLedgerImportBatch", fields: [importBatchId], references: [id])
   allocations  PaymentAllocation[]
   auditLogs    LedgerAuditLog[]
 
@@ -5250,6 +5513,7 @@ model StudentFeeLedger {
   @@index([status])
   @@index([feeSessionId])
   @@index([feeComponentId])
+  @@index([importBatchId])
 }
 
 model LateFeeRule {
@@ -5497,9 +5761,11 @@ model PromotionHistory {
   status  String // PROMOTED, DETAINED, CONDITIONAL
   remarks String?
 
-  promotedAt DateTime @default(now())
-  promotedBy String   @db.Uuid // User ID of Admin
-  batchId    String?  @db.Uuid // Group promotions done together
+  promotedAt       DateTime @default(now())
+  promotedBy       String   @db.Uuid // User ID of Admin
+  batchId          String?  @db.Uuid // Group promotions done together
+  promotionBatchId String?  @db.Uuid
+  importBatchId    String?  @db.Uuid
 
   // Rollback tracking
   isRolledBack   Boolean   @default(false)
@@ -5507,20 +5773,24 @@ model PromotionHistory {
   rolledBackBy   String?   @db.Uuid
   rollbackReason String?
 
-  student     Student      @relation(fields: [studentId], references: [userId])
-  fromClass   Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id])
-  toClass     Class        @relation("PromotionToClass", fields: [toClassId], references: [id])
-  fromSection Section?     @relation("PromotionFromSection", fields: [fromSectionId], references: [id])
-  toSection   Section?     @relation("PromotionToSection", fields: [toSectionId], references: [id])
-  fromYear    AcademicYear @relation("PromotionFromYear", fields: [fromYearId], references: [id])
-  toYear      AcademicYear @relation("PromotionToYear", fields: [toYearId], references: [id])
-  promoter    User         @relation(fields: [promotedBy], references: [id])
+  student        Student         @relation(fields: [studentId], references: [userId])
+  fromClass      Class           @relation("PromotionFromClass", fields: [fromClassId], references: [id])
+  toClass        Class           @relation("PromotionToClass", fields: [toClassId], references: [id])
+  fromSection    Section?        @relation("PromotionFromSection", fields: [fromSectionId], references: [id])
+  toSection      Section?        @relation("PromotionToSection", fields: [toSectionId], references: [id])
+  fromYear       AcademicYear    @relation("PromotionFromYear", fields: [fromYearId], references: [id])
+  toYear         AcademicYear    @relation("PromotionToYear", fields: [toYearId], references: [id])
+  promoter       User            @relation(fields: [promotedBy], references: [id])
+  promotionBatch PromotionBatch? @relation(fields: [promotionBatchId], references: [id])
+  importBatch    ImportBatch?    @relation("PromotionHistoryImportBatch", fields: [importBatchId], references: [id])
 
   @@index([studentId])
   @@index([fromClassId])
   @@index([toClassId])
   @@index([fromYearId])
   @@index([batchId])
+  @@index([promotionBatchId])
+  @@index([importBatchId])
 }
 
 // ============================================

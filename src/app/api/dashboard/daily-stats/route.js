@@ -78,10 +78,15 @@ export const GET = withSchoolAccess(async function GET(req) {
         }
       }),
 
-      // Total students in school (filtered by academic year)
-      prisma.student.count({
-        where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) }
-      }),
+      // Total operational students in the selected/current session
+      academicYearId ? prisma.studentSession.count({
+        where: {
+          academicYearId,
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+          student: { schoolId, lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] } }
+        }
+      }) : prisma.student.count({ where: { schoolId, lifecycleStatus: 'ACTIVE' } }),
 
       // Total teaching staff in school
       prisma.user.count({
@@ -146,6 +151,15 @@ export const GET = withSchoolAccess(async function GET(req) {
         where: {
           schoolId,
           academicYearId,
+          student: {
+            sessions: {
+              some: {
+                academicYearId,
+                status: 'ACTIVE',
+                enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] }
+              }
+            }
+          },
           balanceAmount: { gt: 0 }
         },
         _sum: { balanceAmount: true }
@@ -156,6 +170,15 @@ export const GET = withSchoolAccess(async function GET(req) {
         where: {
           schoolId,
           academicYearId,
+          student: {
+            sessions: {
+              some: {
+                academicYearId,
+                status: 'ACTIVE',
+                enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] }
+              }
+            }
+          },
           balanceAmount: { gt: 0 }
         }
       }) : 0]

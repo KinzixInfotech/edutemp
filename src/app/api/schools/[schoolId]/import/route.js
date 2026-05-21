@@ -18,6 +18,7 @@ import {
 } from '@/lib/import-column-mapping';
 import { readImportWorksheetRows } from '@/lib/import-workbook';
 import { resolveStudentImportRow } from '@/lib/student-import-normalization';
+import { createUnresolvedEnrollmentIssuesForBatch } from '@/lib/enrollment/session-enrollment';
 
 // Supabase Admin client for creating auth users
 const supabaseAdmin = createClient(
@@ -234,6 +235,24 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
     // Track created users for email sending
     const createdUsers = [];
+    const importedBy = formData.get('userId');
+    const importAcademicYearId = String(formData.get('academicYearId') || '').trim() || null;
+    let importBatch = null;
+    if (importedBy) {
+      importBatch = await prisma.importBatch.create({
+        data: {
+          schoolId,
+          academicYearId: importAcademicYearId || null,
+          module: moduleKey,
+          importType: 'DIRECT_IMPORT',
+          fileName: file.name,
+          status: 'RUNNING',
+          totalRows: data.length,
+          createdBy: importedBy,
+          metadata: { legacyDirectEndpoint: true },
+        },
+      });
+    }
     const schoolInfo = await prisma.school.findUnique({
       where: { id: schoolId },
       select: { name: true }
@@ -245,9 +264,11 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
 
       try {
         const importResult = await processRow(moduleKey, row, schoolId, FIELD_MAPPINGS[moduleKey] || {}, {
-          academicYearId: String(formData.get('academicYearId') || '').trim() || null,
+          academicYearId: importAcademicYearId,
           classMappings,
           sectionMappings,
+          importBatchId: importBatch?.id || null,
+          rowNumber,
         });
         results.success++;
         if (importResult?.warnings?.length) results.importedWithWarnings++;
@@ -296,10 +317,9 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     }
 
     // Save import history (get userId from formData)
-    const importedBy = formData.get('userId');
     if (importedBy) {
       try {
-        await prisma.importHistory.create({
+        const history = await prisma.importHistory.create({
           data: {
             schoolId,
             module: moduleKey,
@@ -313,6 +333,29 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
             errors: results.errors.length > 0 ? results.errors : null
           }
         });
+        let unresolvedEnrollmentCount = 0;
+        if (importBatch && moduleKey === 'students') {
+          const resolution = await createUnresolvedEnrollmentIssuesForBatch({
+            schoolId,
+            importBatchId: importBatch.id,
+            importedAcademicYearId: importAcademicYearId,
+          });
+          unresolvedEnrollmentCount = resolution.created || 0;
+        }
+        if (importBatch) {
+          await prisma.importBatch.update({
+            where: { id: importBatch.id },
+            data: {
+              importHistoryId: history.id,
+              status: results.failed > 0 ? 'COMPLETED' : 'COMPLETED',
+              successfulRows: results.success,
+              failedRows: results.failed,
+              warningCount: results.importedWithWarnings,
+              missingJoiningDateCount: results.missingJoiningDate,
+              unresolvedEnrollmentCount,
+            },
+          });
+        }
       } catch (historyError) {
         console.error('[IMPORT HISTORY ERROR]', historyError);
         // Continue even if history fails
@@ -541,11 +584,13 @@ async function importStudent(data, schoolId, options = {}) {
   // Generate UUID for user
   const userId = require('crypto').randomUUID();
 
-  // Get active academic year for session binding
-  const activeYear = await prisma.academicYear.findFirst({
+  // Resolve target academic year for session binding. Historical imports must not
+  // make the student operational in the current session.
+  const targetYear = await prisma.academicYear.findFirst({
     where: options.academicYearId ? { id: options.academicYearId, schoolId } : { schoolId, isActive: true },
-    select: { id: true }
+    select: { id: true, isActive: true, name: true }
   });
+  const bindAsCurrentSession = Boolean(targetYear?.isActive);
 
   // Create DB records FIRST using transaction
   const result = await prisma.$transaction(async (tx) => {
@@ -570,8 +615,8 @@ async function importStudent(data, schoolId, options = {}) {
         name: normalizedData.name,
         email: externalEmail || authEmail,
         admissionNo: studentId,
-        classId: existingClass?.id || null,
-        sectionId: section?.id || null,
+        classId: bindAsCurrentSession ? existingClass?.id || null : null,
+        sectionId: bindAsCurrentSession ? section?.id || null : null,
         schoolId,
         gender: normalizedData.gender || 'Other',
         religion: normalizeStudentReligion(normalizedData.religion) || null,
@@ -591,25 +636,56 @@ async function importStudent(data, schoolId, options = {}) {
         admissionDate: normalizedData.admissionDate || null,
         missingJoiningDate: Boolean(normalizedData.missingJoiningDate),
         profileStatus: normalizedData.profileStatus || (normalizedData.admissionDate ? 'ACTIVE' : 'MISSING_JOIN_DATE'),
-        ...(activeYear && { academicYearId: activeYear.id })
+        lifecycleStatus: 'ACTIVE',
+        importBatchId: options.importBatchId || null,
+        ...(bindAsCurrentSession && targetYear && { academicYearId: targetYear.id })
       }
     });
 
-    // Create StudentSession + set currentSessionId
-    if (activeYear?.id && existingClass?.id && section?.id) {
+    // Create session enrollment for the selected import year. Only active-year
+    // imports update Student.currentSessionId and legacy cache fields.
+    if (targetYear?.id && existingClass?.id && section?.id) {
       const session = await tx.studentSession.create({
         data: {
           studentId: user.id,
-          academicYearId: activeYear.id,
+          academicYearId: targetYear.id,
           classId: existingClass.id,
           sectionId: section.id,
           rollNumber: normalizedData.rollNumber || '',
-          status: 'ACTIVE'
+          status: 'ACTIVE',
+          enrollmentStatus: 'ENROLLED',
+          importBatchId: options.importBatchId || null,
+          remarks: options.importBatchId ? 'Created by bulk import' : null,
         }
       });
-      await tx.student.update({
-        where: { userId: user.id },
-        data: { currentSessionId: session.id }
+      if (bindAsCurrentSession) {
+        await tx.student.update({
+          where: { userId: user.id },
+          data: {
+            currentSessionId: session.id,
+            academicYearId: targetYear.id,
+            classId: existingClass.id,
+            sectionId: section.id,
+          }
+        });
+      }
+    }
+
+    if (options.importBatchId) {
+      await tx.importBatchItem.create({
+        data: {
+          batchId: options.importBatchId,
+          module: 'students',
+          rowNumber: options.rowNumber || null,
+          targetType: 'Student',
+          targetId: user.id,
+          action: 'CREATE_STUDENT_WITH_ENROLLMENT',
+          status: normalizedData.missingJoiningDate ? 'WARNING' : 'CREATED',
+          sourceData: data,
+          warnings: normalizedData.missingJoiningDate
+            ? ['Missing joining/admission date. Fee assignment is blocked until assigned.']
+            : undefined,
+        }
       });
     }
 

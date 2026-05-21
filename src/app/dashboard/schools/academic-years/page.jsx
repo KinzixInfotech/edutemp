@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar } from "lucide-react"
+import UnresolvedEnrollmentBanner from "@/components/UnresolvedEnrollmentBanner"
 
 export default function AcademicYearsPage() {
     const [years, setYears] = useState([])
@@ -307,6 +308,7 @@ export default function AcademicYearsPage() {
 
     return (
         <div className="p-6 space-y-6">
+            <UnresolvedEnrollmentBanner />
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Academic Years</h1>

@@ -418,6 +418,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
     }
 
     let history;
+    let importBatch;
 
     try {
       history = await prisma.importHistory.create({
@@ -441,13 +442,34 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
           }
         }
       });
+      importBatch = await prisma.importBatch.create({
+        data: {
+          schoolId,
+          importHistoryId: history.id,
+          academicYearId,
+          module: moduleKey,
+          importType: 'BULK_IMPORT',
+          fileName: file.name,
+          sheetName,
+          status: 'QUEUED',
+          totalRows,
+          createdBy: importedBy,
+          metadata: {
+            jobId,
+            fileUrl,
+            chunkSize: CHUNK_SIZE,
+            totalChunks: chunks.length,
+            selectedAcademicYear: academicYear?.name || null,
+          },
+        },
+      });
     } catch (error) {
       return NextResponse.json(
         {
           success: false,
-          step: 'prisma.importHistory.create',
+          step: 'IMPORT_HISTORY_OR_BATCH_CREATE',
           error:
-            error.message || 'Failed to create import history'
+            error.message || 'Failed to create import history or batch'
         },
         { status: 500 }
       );
@@ -469,6 +491,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
         academicYearId,
         academicYearName: academicYear?.name || null,
         historyId: history.id,
+        importBatchId: importBatch?.id || null,
         status: 'queued',
         chunkSize: CHUNK_SIZE,
         totalRows,
@@ -516,6 +539,7 @@ export const POST = withSchoolAccess(async function POST(req, { params }) {
       success: true,
       jobId,
       historyId: history.id,
+      importBatchId: importBatch?.id || null,
       status: 'queued',
       totalRows,
       totalChunks: chunks.length,

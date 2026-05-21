@@ -63,7 +63,7 @@ export const GET = withSchoolAccess(async function GET(req) {
       // Get exam details
       const exam = await prisma.exam.findUnique({
         where: { id: examId },
-        select: { id: true, title: true, status: true }
+        select: { id: true, title: true, status: true, academicYearId: true }
       });
 
       // Get exam subject for max marks
@@ -83,17 +83,35 @@ export const GET = withSchoolAccess(async function GET(req) {
         select: { id: true, className: true }
       });
 
-      // Get students in this class
-      const students = await prisma.student.findMany({
-        where: { classId: parseInt(classId), schoolId: session.schoolId },
+      // Get students actively enrolled in this exam session/class
+      const enrollments = await prisma.studentSession.findMany({
+        where: {
+          academicYearId: exam.academicYearId,
+          classId: parseInt(classId),
+          status: 'ACTIVE',
+          enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+          student: {
+            schoolId: session.schoolId,
+            lifecycleStatus: { notIn: ['ALUMNI', 'TC', 'LEFT', 'DROPPED', 'ARCHIVED'] },
+          },
+        },
         select: {
-          userId: true,
-          name: true,
           rollNumber: true,
-          admissionNo: true
+          student: {
+            select: {
+              userId: true,
+              name: true,
+              rollNumber: true,
+              admissionNo: true
+            }
+          }
         },
         orderBy: { rollNumber: 'asc' }
       });
+      const students = enrollments.map((enrollment) => ({
+        ...enrollment.student,
+        rollNumber: enrollment.rollNumber || enrollment.student.rollNumber
+      }));
 
       // Get existing marks
       const marks = await prisma.examResult.findMany({
@@ -185,6 +203,25 @@ export const POST = withSchoolAccess(async function POST(req) {
 
     if (submission?.status === 'LOCKED' || submission?.status === 'PUBLISHED') {
       return NextResponse.json({ error: 'Marks are locked. Contact admin to unlock.' }, { status: 403 });
+    }
+
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      select: { academicYearId: true },
+    });
+    const uniqueStudentIds = Array.from(new Set(marks.map((mark) => mark.studentId).filter(Boolean)));
+    const enrollmentCount = await prisma.studentSession.count({
+      where: {
+        academicYearId: exam?.academicYearId,
+        classId: parseInt(classId),
+        status: 'ACTIVE',
+        enrollmentStatus: { in: ['ENROLLED', 'PENDING_VERIFICATION'] },
+        studentId: { in: uniqueStudentIds },
+        student: { schoolId: session.schoolId },
+      },
+    });
+    if (!exam || enrollmentCount !== uniqueStudentIds.length) {
+      return NextResponse.json({ error: 'Marks can only be saved for active students enrolled in this exam session.' }, { status: 400 });
     }
 
     // Save marks using transaction

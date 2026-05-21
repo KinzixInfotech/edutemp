@@ -44,6 +44,18 @@ import {
     AlertDescription,
     AlertTitle,
 } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Table,
     TableBody,
@@ -54,6 +66,7 @@ import {
 } from "@/components/ui/table";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 import { supabase } from "@/lib/supabase";
+import UnresolvedEnrollmentBanner from "@/components/UnresolvedEnrollmentBanner";
 
 const MODULE_ICONS = {
     students: GraduationCap,
@@ -119,6 +132,13 @@ export default function ImportDataPage() {
     const [activeImportJobId, setActiveImportJobId] = useState(null);
     const [activeExportJobId, setActiveExportJobId] = useState(null);
     const autoExportedJobRef = useRef(null);
+    const [selectedBatchDetails, setSelectedBatchDetails] = useState(null);
+    const [batchDetailsLoading, setBatchDetailsLoading] = useState(false);
+
+    // Rollback state
+    const [rollbackItem, setRollbackItem] = useState(null);
+    const [deleteAuthAccounts, setDeleteAuthAccounts] = useState(false);
+    const [deleteAssociatedParents, setDeleteAssociatedParents] = useState(false);
 
     // Export credentials state (auto-export after import)
     const [exportCredentials, setExportCredentials] = useState(true);
@@ -366,6 +386,68 @@ export default function ImportDataPage() {
         } catch (error) {
             console.error('Failed to export failed rows:', error);
             toast.error('Failed to export failed rows file');
+        }
+    }
+
+    async function handleRollbackImport(item) {
+        if (!item.importBatchId) {
+            toast.error("This import does not have rollback tracking.");
+            return;
+        }
+
+        setRollbackItem(item);
+        setDeleteAuthAccounts(false);
+        setDeleteAssociatedParents(false);
+    }
+
+    async function confirmRollbackImport() {
+        if (!rollbackItem) return;
+        const item = rollbackItem;
+        setRollbackItem(null);
+
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/import/batches/${item.importBatchId}/rollback`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    actorId: fullUser?.id,
+                    deleteAuthAccounts,
+                    deleteAssociatedParents,
+                    deleteImportedOnlyStudents: true
+                })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                toast.error(data.conflicts?.[0]?.message || data.error || "Rollback blocked");
+                return;
+            }
+
+            toast.success("Import batch rolled back");
+            queryClient.invalidateQueries({ queryKey: ['importHistory', schoolId] });
+            queryClient.invalidateQueries({ queryKey: ['importJobs', schoolId] });
+        } catch (error) {
+            console.error('Rollback error:', error);
+            toast.error(error.message || 'Rollback failed');
+        }
+    }
+
+    async function handleViewImport(item) {
+        if (!item.importBatchId) {
+            toast.error("This import does not have batch details.");
+            return;
+        }
+
+        setBatchDetailsLoading(true);
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/import/batches/${item.importBatchId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to load import batch");
+            setSelectedBatchDetails(data.batch || data);
+        } catch (error) {
+            toast.error(error.message || "Failed to load import batch");
+        } finally {
+            setBatchDetailsLoading(false);
         }
     }
 
@@ -688,34 +770,25 @@ export default function ImportDataPage() {
                         Import and export data using Excel files
                     </p>
                 </div>
-                {/* Tab Switcher */}
-                <div className="flex gap-2 bg-muted p-1 rounded-lg">
-                    <Button
-                        variant={activeTab === "import" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setActiveTab("import")}
-                    >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import
-                    </Button>
-                    <Button
-                        variant={activeTab === "export" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setActiveTab("export")}
-                    >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                    </Button>
-                    <Button
-                        variant={activeTab === "history" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setActiveTab("history")}
-                    >
-                        <Clock className="h-4 w-4 mr-2" />
-                        History
-                    </Button>
-                </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="flex flex-wrap h-auto">
+                        <TabsTrigger value="import">
+                            <Upload className="h-4 w-4 mr-2" />
+                            Import
+                        </TabsTrigger>
+                        <TabsTrigger value="export">
+                            <Download className="h-4 w-4 mr-2" />
+                            Export
+                        </TabsTrigger>
+                        <TabsTrigger value="history">
+                            <Clock className="h-4 w-4 mr-2" />
+                            History
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </div>
+
+            <UnresolvedEnrollmentBanner />
 
             {activeTab === "import" && visibleImportJobs.length > 0 && (
                 <Card>
@@ -776,6 +849,11 @@ export default function ImportDataPage() {
                                                 disabled={abortImportJobMutation.isPending}
                                             >
                                                 Abort
+                                            </Button>
+                                        )}
+                                        {job.importBatchId && job.rollbackStatus !== "ROLLED_BACK" && (
+                                            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleRollbackImport(job)}>
+                                                Rollback Batch
                                             </Button>
                                         )}
                                     </div>
@@ -1036,6 +1114,16 @@ export default function ImportDataPage() {
                                             </TableCell>
                                             <TableCell className="text-sm max-w-[200px] truncate">
                                                 {item.fileName}
+                                                {item.unresolvedEnrollmentCount > 0 && (
+                                                    <div className="text-xs text-amber-600">
+                                                        {item.unresolvedEnrollmentCount} unresolved enrollment(s)
+                                                    </div>
+                                                )}
+                                                {item.rollbackStatus && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Rollback: {item.rollbackStatus}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/50">
@@ -1063,6 +1151,11 @@ export default function ImportDataPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-2">
+                                                    {item.importBatchId && (
+                                                        <Button variant="outline" size="sm" onClick={() => handleViewImport(item)}>
+                                                            View Import
+                                                        </Button>
+                                                    )}
                                                     {item.credentials?.length > 0 && (
                                                         <Button variant="outline" size="sm" onClick={() => handleExportCredentials(item.credentials, item.module)}>
                                                             Added Students
@@ -1078,6 +1171,11 @@ export default function ImportDataPage() {
                                                             Error CSV
                                                         </Button>
                                                     )}
+                                                    {item.importBatchId && item.rollbackStatus !== "ROLLED_BACK" && (
+                                                        <Button variant="outline" size="sm" onClick={() => handleRollbackImport(item)}>
+                                                            Rollback Batch
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -1088,6 +1186,61 @@ export default function ImportDataPage() {
                             <div className="text-center py-12 text-muted-foreground">
                                 <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No import history yet</p>
+                            </div>
+                        )}
+                        {(batchDetailsLoading || selectedBatchDetails) && (
+                            <div className="mt-6 rounded-lg border p-4 space-y-4">
+                                {batchDetailsLoading ? (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Loading import details...
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <h3 className="font-semibold">{selectedBatchDetails.fileName}</h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {selectedBatchDetails.module} · {selectedBatchDetails.academicYear?.name || 'No session'} · by {selectedBatchDetails.creator?.name || selectedBatchDetails.creator?.email || 'System'}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Badge variant="outline">{selectedBatchDetails.status}</Badge>
+                                                {selectedBatchDetails.rollbackStatus && <Badge variant="outline">Rollback: {selectedBatchDetails.rollbackStatus}</Badge>}
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 md:grid-cols-5">
+                                            <div className="rounded-md bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Rows</div><div className="font-semibold">{selectedBatchDetails.totalRows || 0}</div></div>
+                                            <div className="rounded-md bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Success</div><div className="font-semibold">{selectedBatchDetails.successfulRows || 0}</div></div>
+                                            <div className="rounded-md bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Failed</div><div className="font-semibold">{selectedBatchDetails.failedRows || 0}</div></div>
+                                            <div className="rounded-md bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Warnings</div><div className="font-semibold">{selectedBatchDetails.warningCount || 0}</div></div>
+                                            <div className="rounded-md bg-muted/50 p-3"><div className="text-xs text-muted-foreground">Unresolved</div><div className="font-semibold">{selectedBatchDetails.unresolvedEnrollmentCount || 0}</div></div>
+                                        </div>
+                                        {selectedBatchDetails.rollbackReport?.conflicts?.length > 0 && (
+                                            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                                <div className="font-medium mb-2">Rollback conflicts</div>
+                                                <ul className="space-y-1">
+                                                    {selectedBatchDetails.rollbackReport.conflicts.map((conflict, index) => (
+                                                        <li key={`${conflict.type}-${index}`}>{conflict.message || conflict.type}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {selectedBatchDetails.resolutionIssues?.length > 0 && (
+                                            <div className="space-y-2">
+                                                <div className="text-sm font-medium">Enrollment resolution issues</div>
+                                                <div className="grid gap-2 md:grid-cols-2">
+                                                    {selectedBatchDetails.resolutionIssues.slice(0, 6).map((issue) => (
+                                                        <div key={issue.id} className="rounded-md bg-amber-50 border border-amber-200 p-2 text-sm">
+                                                            <div className="font-medium">{issue.student?.name || issue.studentId}</div>
+                                                            <div className="text-xs text-amber-800">{issue.category} · {issue.suggestedAction} · {issue.confidence}%</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         )}
                     </CardContent>

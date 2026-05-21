@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { remember, generateKey, invalidateStudentDirectoryCaches } from "@/lib/cache";
 import { getVisibleContactEmail } from "@/lib/auth-identifiers";
+import { listCurrentSessionStudents } from "@/lib/enrollment/session-enrollment";
 
 export const GET = withSchoolAccess(async function GET(req, props) {
   const params = await props.params;
@@ -93,6 +94,27 @@ export const GET = withSchoolAccess(async function GET(req, props) {
     const result = await remember(
       cacheKey,
       async () => {
+        if (academicYearId) {
+          const sessionResult = await listCurrentSessionStudents({
+            schoolId,
+            academicYearId,
+            classId: parsedClassId,
+            sectionId: parsedSectionId,
+            search,
+            sortBy,
+            page: pageNum,
+            limit: limitNum,
+          });
+
+          return {
+            ...sessionResult,
+            students: sessionResult.students.map((student) => ({
+              ...student,
+              email: getVisibleContactEmail(student.email, student.user?.email),
+            })),
+          };
+        }
+
         const skip = (pageNum - 1) * limitNum;
 
         const missingJoiningDateFilter = {
